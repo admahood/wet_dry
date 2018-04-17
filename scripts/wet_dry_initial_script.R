@@ -35,28 +35,33 @@
 #
 # visualization idea: animation illustrating the difference
 
-#### libraries ####
-library(raster) # for crs, also loads the sp package which contains spTransform
-library(rgdal) # for readOGR
-library(rgeos) # for gIntersection
+# setup ------------------------------------------------------------------------
+libs <- c("sf", "tidyverse", "raster", "rgdal", "rgeos")
+lapply(libs, library, character.only = TRUE, verbose = FALSE)
 
 
-#### import data ####
-plot_data = readOGR(dsn = "data/BLM_AIM", layer = "BLM_AIM_20161025") #BLM plots
-ecoregions = readOGR(dsn = "data/ecoregions", layer = "NA_CEC_Eco_Level3") #ecoregions
-scenes = readOGR(dsn = "data/WRS2_paths/wrs2_asc_desc", layer = "wrs2_asc_desc") #landsat scenes
-
-#### tweak data ####
-great_basin = subset(ecoregions, NA_L3NAME %in% c("Northern Basin and Range", "Central Basin and Range", "Snake River Plain"))
-great_basin = spTransform(great_basin, crs(plot_data)) # matching projections
-great_basin = rgeos::gUnaryUnion(great_basin) # dissolve into one polygon
-gb_plots = raster::intersect(plot_data,great_basin) # clipping to great basin
-gb_plots = gb_plots[!is.na(gb_plots@data$DateVisite),] # removing rows where the plot was not read
-gb_plots$year = substr(as.character(gb_plots@data$DateVisite),1,4) # making a year field
+# import data ------------------------------------------------------------------
+system("aws s3 sync s3://earthlab-amahood/data/BLM_AIM data/BLM_AIM")
+system("aws s3 sync s3://earthlab-amahood/data/ecoregions data/ecoregions")
+system("aws s3 sync s3://earthlab-amahood/data/WRS2_paths/wrs2_asc_desc data/WRS2_paths/wrs2_asc_desc")
 
 
+plot_data = st_read("data/BLM_AIM/BLM_AIM_20161025.shp") #BLM plots
+ecoregions = st_read("data/ecoregions/NA_CEC_Eco_Level3.shp") #ecoregions
+scenes = st_read("data/WRS2_paths/wrs2_asc_desc/wrs2_asc_desc.shp") #landsat scenes
 
-#### functions ####
+# tweak data -------------------------------------------------------------------
+great_basin = subset(ecoregions, NA_L3NAME %in% c("Northern Basin and Range", 
+                                                  "Central Basin and Range", 
+                                                  "Snake River Plain"))
+great_basin = st_transform(great_basin, st_crs(plot_data)) # matching projections
+great_basin = st_union(great_basin) # dissolve into one polygon
+gb_plots = st_intersection(plot_data,great_basin) # clipping to great basin
+gb_plots = gb_plots[!is.na(gb_plots$DateVisite),] # removing rows where the plot was not read
+gb_plots$year = substr(as.character(gb_plots$DateVisite),1,4) # making a year field
+
+
+# functions --------------------------------------------------------------------
 
 brightness7 <- function(df) {
   x = (df$sr_band1 *0.3561) +
@@ -89,16 +94,14 @@ wetness7 <- function(df){
 }
 
 
-
-
-#### get scenes ####
-scenes = spTransform(scenes,crs(plot_data)) # matching projections
+# get scenes -------------------------------------------------------------------
+scenes = st_transform(scenes,st_crs(plot_data)) # matching projections
 scenes = scenes[scenes$ROW<100,] # getting rid of path/rows we don't want 
-gb_plots = raster::intersect(gb_plots,scenes[,9:10]) # grabbing only the row and path
+gb_plots = st_intersection(gb_plots,scenes[,9:10]) # grabbing only the row and path
 gb_plots$path_row = as.character(paste0("0",gb_plots$PATH,"0",gb_plots$ROW)) 
 # creating a handy dandy field that outputs the exact string that is in the filename
 
-#### extract landsat data to plots ####
+# extract landsat data to plots ------------------------------------------------
 
 landsat_path = "/Volumes/seagate_external/internship_project/atmos_corrected_landsat/landsat_" 
 dir.create("data/scrap", showWarnings = FALSE)
@@ -133,7 +136,7 @@ for(i in 1:length(years)){
       untar(tar_files[1], exdir = exdir)
       #listing only the tif files we've extracted (there's a bunch of metadata etc too, which you should familiarize yourself with)
       tif_files = Sys.glob(paste0(exdir,"*.tif"))
-    
+      
       for(k in 1:length(tif_files)){
         # now we loop through each tif file and extract the values
         band = raster::raster(tif_files[k]) # this just loads the raster
@@ -169,8 +172,8 @@ df$SR = df$sr_band4/df$sr_band3
 
 
 
-  
-  
+
+
 write.csv(df, file = "data/plots_with_landsat.csv")
 
 
