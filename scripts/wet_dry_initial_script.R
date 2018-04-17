@@ -101,7 +101,11 @@ gb_plots = st_intersection(gb_plots,scenes[,9:10]) # grabbing only the row and p
 gb_plots$path_row = as.character(paste0("0",gb_plots$PATH,"0",gb_plots$ROW)) 
 # creating a handy dandy field that outputs the exact string that is in the filename
 
-# extract landsat data to plots ------------------------------------------------
+# extract landsat data to plots ---------------ADAM STOPPED HERE
+
+# Dylan - you need to upload the stuff from that landsat path to the s3 bucket. do it into 
+# something like earthlab/amahood/landsat7, so we keep them separate from the landsat 5 stuff that
+# andrea downloaded
 
 landsat_path = "/Volumes/seagate_external/internship_project/atmos_corrected_landsat/landsat_" 
 dir.create("data/scrap", showWarnings = FALSE)
