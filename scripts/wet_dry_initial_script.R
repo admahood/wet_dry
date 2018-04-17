@@ -118,7 +118,9 @@ path_row_combos = unique(gb_plots@data$path_row) # this gives us the unique path
 #path_row_combos = path_row_combos[c(1,6)] # for testing
 
 # matching the landsat projection (it's usually easier to reproject vectors instead of rasters)
-gb_plots = spTransform(gb_plots, '+proj=utm +zone=11 +datum=WGS84 +units=m +no_defs +ellps=WGS84 +towgs84=0,0,0 ')
+
+# this might have to be modified to fit the st_tranform syntax
+gb_plots = st_transform(gb_plots, '+proj=utm +zone=11 +datum=WGS84 +units=m +no_defs +ellps=WGS84 +towgs84=0,0,0 ')
 
 gbplots_list = list()
 counter = 1
@@ -152,6 +154,8 @@ for(i in 1:length(years)){
       #column names at
       #if we don't do this, each landsat file will spit out unique column names, making putting the data
       #back together a big pain
+      
+      # this should be redone with dplyr::rename possibly... for some reason sf doesn't like the colnames thing
       colnames(gbplots_subset@data) = c(names(gbplots_subset[1:55]), 
                                         substr(names(gbplots_subset[56:69]), 42,1000))
       #adding the data to a list - converting back to a shapefile will be easy later, 
