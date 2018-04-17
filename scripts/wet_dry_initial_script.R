@@ -35,16 +35,24 @@
 #
 # visualization idea: animation illustrating the difference
 
+# BEFORE DOING ANYTHING, CLICK THE R PROJECT FILE TO OPEN THE PROJECT
+# BEFORE DOING ANYTHING, CLICK THE R PROJECT FILE TO OPEN THE PROJECT
+# BEFORE DOING ANYTHING, CLICK THE R PROJECT FILE TO OPEN THE PROJECT
+# BEFORE DOING ANYTHING, CLICK THE R PROJECT FILE TO OPEN THE PROJECT
+
 # setup ------------------------------------------------------------------------
 libs <- c("sf", "tidyverse", "raster", "rgdal", "rgeos")
 lapply(libs, library, character.only = TRUE, verbose = FALSE)
 
 
 # import data ------------------------------------------------------------------
-system("aws s3 sync s3://earthlab-amahood/data/BLM_AIM data/BLM_AIM")
-system("aws s3 sync s3://earthlab-amahood/data/ecoregions data/ecoregions")
-system("aws s3 sync s3://earthlab-amahood/data/WRS2_paths/wrs2_asc_desc data/WRS2_paths/wrs2_asc_desc")
+# syntax for s3 is: aws s3 sync <s3 bucket location> <local location>
 
+system("aws s3 sync s3://earthlab-amahood/data/BLM_AIM /home/rstudio/wet_dry/data/BLM_AIM")
+system("aws s3 sync s3://earthlab-amahood/data/ecoregions /home/rstudio/wet_dry/data/ecoregions")
+system("aws s3 sync s3://earthlab-amahood/data/WRS2_paths/wrs2_asc_desc /home/rstudio/wet_dry/data/WRS2_paths/wrs2_asc_desc")
+
+# if these st_reads don't work, you probably didn't open the project yet
 
 plot_data = st_read("data/BLM_AIM/BLM_AIM_20161025.shp") #BLM plots
 ecoregions = st_read("data/ecoregions/NA_CEC_Eco_Level3.shp") #ecoregions
