@@ -70,6 +70,7 @@ gb_plots$year = substr(as.character(gb_plots$DateVisite),1,4) # making a year fi
 
 
 # functions --------------------------------------------------------------------
+# make new functions for landsat 5
 
 brightness7 <- function(df) {
   x = (df$sr_band1 *0.3561) +
@@ -109,30 +110,27 @@ gb_plots = st_intersection(gb_plots,scenes[,9:10]) # grabbing only the row and p
 gb_plots$path_row = as.character(paste0("0",gb_plots$PATH,"0",gb_plots$ROW)) 
 # creating a handy dandy field that outputs the exact string that is in the filename
 
-# extract landsat data to plots ---------------ADAM STOPPED HERE
+# extract landsat data to plots ------------------------------------------------
 
-# Dylan - you need to upload the stuff from that landsat path to the s3 bucket. do it into 
-# something like earthlab/amahood/landsat7, so we keep them separate from the landsat 5 stuff that
-# andrea downloaded
-
-landsat_path = "/Volumes/seagate_external/internship_project/atmos_corrected_landsat/landsat_" 
+landsat_s3 <- "s3://earthlab-amahood/data/landsat7"
+landsat_local <- "/home/rstudio/wet_dry/data/landsat7" 
 dir.create("data/scrap", showWarnings = FALSE)
 exdir = "data/scrap/"
 
 years = unique(gb_plots$year) # getting the years plots were monitored - 2011-2015
-path_row_combos = unique(gb_plots@data$path_row) # this gives us the unique path row combinations
-
-# years = 2012 # for testing. comment these out when running on all the data
-#path_row_combos = path_row_combos[c(1,6)] # for testing
-
-# matching the landsat projection (it's usually easier to reproject vectors instead of rasters)
+path_row_combos = unique(gb_plots$path_row) # this gives us the unique path row combinations
 
 # this might have to be modified to fit the st_tranform syntax
-gb_plots = st_transform(gb_plots, '+proj=utm +zone=11 +datum=WGS84 +units=m +no_defs +ellps=WGS84 +towgs84=0,0,0 ')
+gb_plots = st_transform(gb_plots, crs='+proj=utm +zone=11 +datum=WGS84 +units=m +no_defs +ellps=WGS84 +towgs84=0,0,0 ')
 
 gbplots_list = list()
 counter = 1
 for(i in 1:length(years)){
+  
+  system(paste0("aws s3 sync ",
+               landsat_s3, "/landsat_",years[i], " ",
+               landsat_local, "/", years[i]))
+  
   for(j in 1:length(path_row_combos)){
     
     # subsetting the plots for the year and row/column combination
@@ -141,9 +139,10 @@ for(i in 1:length(years)){
                               & gb_plots$year == years[i],]
     print(paste(round(counter/125*100), "%")) #progress indicator
     
-    if(length(gbplots_subset) > 0) {
+    if(nrow(gbplots_subset) > 0) {
       # listing all the files with the right year and path/row combo
-      tar_files = Sys.glob(paste0(landsat_path, years[i], "/","LE07", 
+      
+      tar_files = Sys.glob(paste0(landsat_local,"/", years[i], "/","LE07", 
                                   path_row_combos[j],
                                   "*.tar.gz")) 
       print("untarring")
@@ -155,9 +154,9 @@ for(i in 1:length(years)){
         # now we loop through each tif file and extract the values
         band = raster::raster(tif_files[k]) # this just loads the raster
         gbplots_subset = raster::extract(band, gbplots_subset, sp=TRUE) # and here we extract
-        print(c(years[i],path_row_combos[j],tif_files[k]))
       }
       file.remove(Sys.glob(paste0(exdir,"*"))) # now we delete the tifs
+      print("extracted")
       #rename the columns - this required just manually going through and figuring out where to clip the 
       #column names at
       #if we don't do this, each landsat file will spit out unique column names, making putting the data
@@ -168,12 +167,15 @@ for(i in 1:length(years)){
                                         substr(names(gbplots_subset[56:69]), 42,1000))
       #adding the data to a list - converting back to a shapefile will be easy later, 
       #since they have lat and long as data frame columns
-      gbplots_list[[counter]] = gbplots_subset@data
+      gbplots_list[[counter]] = gbplots_subset
     }
     else {print("nopoints")}
     counter = counter + 1 
   }
+  system(paste0("rm -r ",landsat_local, "/", years[i] ))
 }
+
+### Adam stopped here - need to get the rest of the landsat7 files -------------
 
 gbplots_list[[1]] = gbplots_list[[1]][,c(1:69)]
 
