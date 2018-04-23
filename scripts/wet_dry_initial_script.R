@@ -44,79 +44,7 @@
 libs <- c("sf", "tidyverse", "raster", "rgdal", "rgeos")
 lapply(libs, library, character.only = TRUE, verbose = FALSE)
 
-
-# functions --------------------------------------------------------------------
-# make new functions for landsat 5
-
-brightness7 <- function(df) {
-  x = (df$sr_band1 *0.3561) +
-    (df$sr_band2 * 0.3972) + 
-    (df$sr_band3 * 0.3904) +
-    (df$sr_band4 * 0.6966) +
-    (df$sr_band5 * 0.2286) +
-    (df$sr_band7 * 0.1596)
-  return(x)
-}
-
-greenness7 <- function(df){
-  x = (df$sr_band1 *-0.3344) +
-    (df$sr_band2 * -0.3544) + 
-    (df$sr_band3 * -0.4556) +
-    (df$sr_band4 * 0.6966) +
-    (df$sr_band5 * -0.0242) +
-    (df$sr_band7 * -0.2630)
-  return(x)
-}
-
-wetness7 <- function(band1,band2,band3,band4,band5,band7){
-  x = (df$sr_band1 * 0.2626) +
-    (df$sr_band2 * 0.2141) + 
-    (df$sr_band3 * 0.0926) +
-    (df$sr_band4 * 0.0656) +
-    (df$sr_band5 * -0.7629) +
-    (df$sr_band7 * -0.5388)
-  return(x)
-}
-
-bright7 <- function(band1,band2,band3,band4,band5,band7) {
-  x <- (band1 *0.3561) +
-    (band2 * 0.3972) + 
-    (band3 * 0.3904) +
-    (band4 * 0.6966) +
-    (band5 * 0.2286) +
-    (band7 * 0.1596)
-  return(x)
-}
-
-green7 <- function(band1,band2,band3,band4,band5,band7){
-  x <- (band1 *-0.3344) +
-    (band2 * -0.3544) + 
-    (band3 * -0.4556) +
-    (band4 * 0.6966) +
-    (band5 * -0.0242) +
-    (band7 * -0.2630)
-  return(x)
-}
-
-wet7 <- function(band1,band2,band3,band4,band5,band7){
-  x <- (band1 * 0.2626) +
-    (band2 * 0.2141) + 
-    (band3 * 0.0926) +
-    (band4 * 0.0656) +
-    (band5 * -0.7629) +
-    (band7 * -0.5388)
-  return(x)
-}
-
-get_ndvi <- function(band3, band4){
-  return((band4 - band3)/ (band4 + band3))}
-get_evi <- function(band1,band3,band4){
-  return(2.5 * ((band4 - band3)/(band4 + (6 * band3) - (7.5 * band1) + 1)))
-}
-get_savi <- function(band3, band4){
-  return(((band4 - band3) / (band4 + band3 + 0.5)) * 1.5)}
-get_sr <- function(band3,band4){return(band4/band3)}
-
+source("/home/rstudio/wet_dry/scripts/functions.R")
 
 # import data ------------------------------------------------------------------
 # syntax for s3 is: aws s3 sync <s3 bucket location> <local location>
@@ -163,8 +91,8 @@ path_row_combos <- unique(gb_plots$path_row) # this gives us the unique path row
 gb_plots <- st_transform(gb_plots, crs='+proj=utm +zone=11 +datum=WGS84 +units=m +no_defs +ellps=WGS84 +towgs84=0,0,0 ')
 
 gbplots_list <- list()
-counter <- 1
-for(i in 1:length(years)){
+counter <- 1 # can't parallelize with this counter system
+for(i in 1:length(years)){ 
   
   system(paste0("aws s3 sync ",
                 landsat_s3, "/landsat_",years[i], " ",
@@ -242,7 +170,7 @@ system(paste("aws s3 sync",
               dem_s3,
               dem_local))
 
-demfile <- "/Users/TheEagle/fire_proj/wet_dry/data/SRTM_dem/gb_dem_2"
+demfile <- "/home/rstudio/wet_dry/data/SRTM_dem/gb_dem.tif"
 dempath <- "/Volumes/seagate_external/internship_project/SRTM_DEM_raster/dem/"
 
 demlist=list.files(dem_local, pattern="tif$", full.names=TRUE)
@@ -259,26 +187,16 @@ gb_srtm_dem <- do.call(raster::merge, raster_list, filename = demfile)
 
 #### terrain raster ####
 
-sloperaster <- terrain(gb_srtm_dem, 
-                       opt = 'slope', 
-                       unit = 'degrees', 
-                       neighbors = 8, 
-                       filename = paste0(terrain_path,'slope'), format = 'GTiff')
+ter_rst <- terrain(gb_srtm_dem,
+                   opt = c('slope', 'aspect', 'TPI', 'TRI', 'roughness','flowdir'),
+                   unit = 'degrees',
+                   neighbors = 8, 
+                   format = 'GTiff')
 
-aspectraster <- terrain(gb_srtm_dem, opt = 'aspect', unit ='degrees', 
-                        neighbors = 8, 
-                        filename = paste0(terrain_path,'aspect'), format = 'GTiff')
+for(i in 1:length(ter_rst)){
+  writeRaster()
+}
 
-TPIraster <-  terrain(gb_srtm_dem, opt = 'TPI', 
-                      filename = paste0(terrain_path,'TDI'), format = 'GTiff')
-
-TRIraster <- terrain(gb_srtm_dem, opt = 'TRI', 
-                     filename = paste0(terrain_path,'TRI'), format = 'GTiff')
-
-roughnessraster <- terrain(gb_srtm_dem, opt = 'roughness', 
-                           filename = paste0(terrain_path,'roughness'), format = 'GTiff')
-
-rm(sloperaster, aspectraster, TPIraster, TRIraster, roughnessraster)
 
 
 ####successful terrain merge####
