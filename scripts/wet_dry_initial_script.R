@@ -45,30 +45,6 @@ libs <- c("sf", "tidyverse", "raster", "rgdal", "rgeos")
 lapply(libs, library, character.only = TRUE, verbose = FALSE)
 
 
-# import data ------------------------------------------------------------------
-# syntax for s3 is: aws s3 sync <s3 bucket location> <local location>
-
-system("aws s3 sync s3://earthlab-amahood/data/BLM_AIM /home/rstudio/wet_dry/data/BLM_AIM")
-system("aws s3 sync s3://earthlab-amahood/data/ecoregions /home/rstudio/wet_dry/data/ecoregions")
-system("aws s3 sync s3://earthlab-amahood/data/WRS2_paths/wrs2_asc_desc /home/rstudio/wet_dry/data/WRS2_paths/wrs2_asc_desc")
-
-# if these st_reads don't work, you probably didn't open the project yet
-
-plot_data = st_read("data/BLM_AIM/BLM_AIM_20161025.shp") #BLM plots
-ecoregions = st_read("data/ecoregions/NA_CEC_Eco_Level3.shp") #ecoregions
-scenes = st_read("data/WRS2_paths/wrs2_asc_desc/wrs2_asc_desc.shp") #landsat scenes
-
-# tweak data -------------------------------------------------------------------
-great_basin = subset(ecoregions, NA_L3NAME %in% c("Northern Basin and Range", 
-                                                  "Central Basin and Range", 
-                                                  "Snake River Plain"))
-great_basin = st_transform(great_basin, st_crs(plot_data)) # matching projections
-great_basin = st_union(great_basin) # dissolve into one polygon
-gb_plots = st_intersection(plot_data,great_basin) # clipping to great basin
-gb_plots = gb_plots[!is.na(gb_plots$DateVisite),] # removing rows where the plot was not read
-gb_plots$year = substr(as.character(gb_plots$DateVisite),1,4) # making a year field
-
-
 # functions --------------------------------------------------------------------
 # make new functions for landsat 5
 
@@ -92,7 +68,7 @@ greenness7 <- function(df){
   return(x)
 }
 
-wetness7 <- function(df){
+wetness7 <- function(band1,band2,band3,band4,band5,band7){
   x = (df$sr_band1 * 0.2626) +
     (df$sr_band2 * 0.2141) + 
     (df$sr_band3 * 0.0926) +
@@ -102,12 +78,75 @@ wetness7 <- function(df){
   return(x)
 }
 
+bright7 <- function(band1,band2,band3,band4,band5,band7) {
+  x <- (band1 *0.3561) +
+    (band2 * 0.3972) + 
+    (band3 * 0.3904) +
+    (band4 * 0.6966) +
+    (band5 * 0.2286) +
+    (band7 * 0.1596)
+  return(x)
+}
+
+green7 <- function(band1,band2,band3,band4,band5,band7){
+  x <- (band1 *-0.3344) +
+    (band2 * -0.3544) + 
+    (band3 * -0.4556) +
+    (band4 * 0.6966) +
+    (band5 * -0.0242) +
+    (band7 * -0.2630)
+  return(x)
+}
+
+wet7 <- function(band1,band2,band3,band4,band5,band7){
+  x <- (band1 * 0.2626) +
+    (band2 * 0.2141) + 
+    (band3 * 0.0926) +
+    (band4 * 0.0656) +
+    (band5 * -0.7629) +
+    (band7 * -0.5388)
+  return(x)
+}
+
+get_ndvi <- function(band3, band4){
+  return((band4 - band3)/ (band4 + band3))}
+get_evi <- function(band1,band3,band4){
+  return(2.5 * ((band4 - band3)/(band4 + (6 * band3) - (7.5 * band1) + 1)))
+}
+get_savi <- function(band3, band4){
+  return(((band4 - band3) / (band4 + band3 + 0.5)) * 1.5)}
+get_sr <- function(band3,band4){return(band4/band3)}
+
+
+# import data ------------------------------------------------------------------
+# syntax for s3 is: aws s3 sync <s3 bucket location> <local location>
+
+system("aws s3 sync s3://earthlab-amahood/data/BLM_AIM /home/rstudio/wet_dry/data/BLM_AIM")
+system("aws s3 sync s3://earthlab-amahood/data/ecoregions /home/rstudio/wet_dry/data/ecoregions")
+system("aws s3 sync s3://earthlab-amahood/data/WRS2_paths/wrs2_asc_desc /home/rstudio/wet_dry/data/WRS2_paths/wrs2_asc_desc")
+
+# if these st_reads don't work, you probably didn't open the project yet
+
+plot_data <- st_read("data/BLM_AIM/BLM_AIM_20161025.shp") #BLM plots
+ecoregions <- st_read("data/ecoregions/NA_CEC_Eco_Level3.shp") #ecoregions
+scenes <- st_read("data/WRS2_paths/wrs2_asc_desc/wrs2_asc_desc.shp") #landsat scenes
+
+# tweak data -------------------------------------------------------------------
+great_basin <- subset(ecoregions, NA_L3NAME %in% c("Northern Basin and Range", 
+                                                   "Central Basin and Range", 
+                                                   "Snake River Plain"))
+great_basin <- st_transform(great_basin, st_crs(plot_data)) # matching projections
+great_basin <- st_union(great_basin) # dissolve into one polygon
+gb_plots <- st_intersection(plot_data,great_basin) # clipping to great basin
+gb_plots <- gb_plots[!is.na(gb_plots$DateVisite),] # removing rows where the plot was not read
+gb_plots$year <- substr(as.character(gb_plots$DateVisite),1,4) # making a year field
+
 
 # get scenes -------------------------------------------------------------------
-scenes = st_transform(scenes,st_crs(plot_data)) # matching projections
-scenes = scenes[scenes$ROW<100,] # getting rid of path/rows we don't want 
-gb_plots = st_intersection(gb_plots,scenes[,9:10]) # grabbing only the row and path
-gb_plots$path_row = as.character(paste0("0",gb_plots$PATH,"0",gb_plots$ROW)) 
+scenes <- st_transform(scenes,st_crs(plot_data)) # matching projections
+scenes <- scenes[scenes$ROW<100,] # getting rid of path/rows we don't want 
+gb_plots <- st_intersection(gb_plots,scenes[,9:10]) # grabbing only the row and path
+gb_plots$path_row <- as.character(paste0("0",gb_plots$PATH,"0",gb_plots$ROW)) 
 # creating a handy dandy field that outputs the exact string that is in the filename
 
 # extract landsat data to plots ------------------------------------------------
@@ -115,45 +154,45 @@ gb_plots$path_row = as.character(paste0("0",gb_plots$PATH,"0",gb_plots$ROW))
 landsat_s3 <- "s3://earthlab-amahood/data/landsat7"
 landsat_local <- "/home/rstudio/wet_dry/data/landsat7" 
 dir.create("data/scrap", showWarnings = FALSE)
-exdir = "data/scrap/"
+exdir <- "data/scrap/"
 
-years = unique(gb_plots$year) # getting the years plots were monitored - 2011-2015
-path_row_combos = unique(gb_plots$path_row) # this gives us the unique path row combinations
+years <- unique(gb_plots$year) # getting the years plots were monitored - 2011-2015
+path_row_combos <- unique(gb_plots$path_row) # this gives us the unique path row combinations
 
 # this might have to be modified to fit the st_tranform syntax
-gb_plots = st_transform(gb_plots, crs='+proj=utm +zone=11 +datum=WGS84 +units=m +no_defs +ellps=WGS84 +towgs84=0,0,0 ')
+gb_plots <- st_transform(gb_plots, crs='+proj=utm +zone=11 +datum=WGS84 +units=m +no_defs +ellps=WGS84 +towgs84=0,0,0 ')
 
-gbplots_list = list()
-counter = 1
+gbplots_list <- list()
+counter <- 1
 for(i in 1:length(years)){
   
   system(paste0("aws s3 sync ",
-               landsat_s3, "/landsat_",years[i], " ",
-               landsat_local, "/", years[i]))
+                landsat_s3, "/landsat_",years[i], " ",
+                landsat_local, "/", years[i]))
   
   for(j in 1:length(path_row_combos)){
     
     # subsetting the plots for the year and row/column combination
     print("subsetting")
-    gbplots_subset = gb_plots[gb_plots$path_row == path_row_combos[j]
-                              & gb_plots$year == years[i],]
+    gbplots_subset <- gb_plots[gb_plots$path_row == path_row_combos[j]
+                               & gb_plots$year == years[i],]
     print(paste(round(counter/125*100), "%")) #progress indicator
     
     if(nrow(gbplots_subset) > 0) {
       # listing all the files with the right year and path/row combo
       
-      tar_files = Sys.glob(paste0(landsat_local,"/", years[i], "/","LE07", 
-                                  path_row_combos[j],
-                                  "*.tar.gz")) 
+      tar_files <- Sys.glob(paste0(landsat_local,"/", years[i], "/","LE07", 
+                                   path_row_combos[j],
+                                   "*.tar.gz")) 
       print("untarring")
       untar(tar_files[1], exdir = exdir)
       #listing only the tif files we've extracted (there's a bunch of metadata etc too, which you should familiarize yourself with)
-      tif_files = Sys.glob(paste0(exdir,"*.tif"))
+      tif_files <- Sys.glob(paste0(exdir,"*.tif"))
       
       for(k in 1:length(tif_files)){
         # now we loop through each tif file and extract the values
-        band = raster::raster(tif_files[k]) # this just loads the raster
-        gbplots_subset = raster::extract(band, gbplots_subset, sp=TRUE) # and here we extract
+        band <- raster::raster(tif_files[k]) # this just loads the raster
+        gbplots_subset <- raster::extract(band, gbplots_subset, sp=TRUE) # and here we extract
       }
       file.remove(Sys.glob(paste0(exdir,"*"))) # now we delete the tifs
       print("extracted")
@@ -163,44 +202,50 @@ for(i in 1:length(years)){
       #back together a big pain
       
       # this should be redone with dplyr::rename possibly... for some reason sf doesn't like the colnames thing
-      colnames(gbplots_subset@data) = c(names(gbplots_subset[1:55]), 
-                                        substr(names(gbplots_subset[56:69]), 42,1000))
+      colnames(gbplots_subset@data) <- c(names(gbplots_subset[1:55]), 
+                                         substr(names(gbplots_subset[56:69]), 42,1000))
       #adding the data to a list - converting back to a shapefile will be easy later, 
       #since they have lat and long as data frame columns
-      gbplots_list[[counter]] = gbplots_subset
+      gbplots_list[[counter]] <- gbplots_subset
     }
     else {print("nopoints")}
-    counter = counter + 1 
+    counter <- counter + 1 
   }
-  system(paste0("rm -r ",landsat_local, "/", years[i] ))
+  system(paste0("rm -r ",landsat_local, "/", years[i] )) #deleting the unneeded landsat files
 }
 
 ### Adam stopped here - need to get the rest of the landsat7 files -------------
 
 gbplots_list[[1]] = gbplots_list[[1]][,c(1:69)]
 
+for(i in 1:length(gbplots_list)){
+  st_as_sf(gbplots_list[[i]])
+}
+
 df = do.call("rbind", gbplots_list) # this takes the list of stuff and makes it into a data frame
 df <- df[df$pixel_qa == 66, ] #select plots without clouds
 
 #### Create vegetation indices ####
-df$NDVI <- (df$sr_band4 - df$sr_band3)/ (df$sr_band4 + df$sr_band3)
-df$EVI <- 2.5 * ((df$sr_band4 - df$sr_band3)/(df$sr_band4 + (6 * df$sr_band3) - (7.5 * df$sr_band1) + 1))
-df$SAVI <- ((df$sr_band4 - df$sr_band3) / (df$sr_band4 + df$sr_band3 + 0.5)) * 1.5
-df$SR = df$sr_band4/df$sr_band3
-
-
-
-
+df$NDVI <- get_ndvi(df$sr_band3,df$sr_band4)
+df$EVI <- get_evi(df$sr_band1, df$sr_band3, df$sr_band4)
+df$SAVI <- get_savi(df$sr_band3,df$sr_band4)
+df$SR = get_sr(df$sr_band3,df$sr_band4)
 
 write.csv(df, file = "data/plots_with_landsat.csv")
 
 
-#### Slope aspect elevation -  d####
-terrain_path <- '/Users/TheEagle/fire_proj/wet_dry/data/SRTM_dem/'
+#### Slope aspect elevation ----------------------------------------------
+dem_s3 <- 's3://earthlab-amahood/data/SRTM_dem'
+dem_local <- '/home/rstudio/wet_dry/data/dem'
+
+system(paste("aws s3 sync",
+              dem_s3,
+              dem_local))
+
 demfile <- "/Users/TheEagle/fire_proj/wet_dry/data/SRTM_dem/gb_dem_2"
 dempath <- "/Volumes/seagate_external/internship_project/SRTM_DEM_raster/dem/"
 
-demlist=list.files(dempath, pattern="tif$", full.names=TRUE)
+demlist=list.files(dem_local, pattern="tif$", full.names=TRUE)
 
 for(i in demlist) { assign(unlist(strsplit(i, "[.]"))[1], raster(i)) } 
 
