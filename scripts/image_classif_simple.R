@@ -1,5 +1,7 @@
 ####load packages and create raster stack from tifs in local directory####
 library(raster)
+library(rasterVis)
+library(lattice)
 library(caTools)
 library(randomForest)
 library(ROCR)
@@ -115,5 +117,16 @@ e <- extent(437000, 487000, 4620000, 4670000)
 
 brick_ss <- crop(brick_2011, e)
 landsat_rgb_ss <- plotRGB(brick_ss, r = 3, g = 2, b = 1, axes = TRUE, stretch = 'lin', main = 'Landsat 2001 true color subset')
-writeRaster(brick_ss, )
+#save subset to file 
+writeRaster(brick_ss, filename = "/Users/TheEagle/fire_proj/wet_dry/data/subset_2001", format = "GTiff")
+#create classified raster using predict function
 pr <- predict(brick_ss, forest_simple, type = 'class', progress = 'text')
+writeRaster(pr, filename = "/Users/TheEagle/Desktop/classified_test", format = "GTiff")
+# plot classified image 
+pr <- ratify(pr)
+rat <- levels(pr)[[1]]
+rat$legend <- c("cheatgrass", "sagebrush")
+levels(pr) <- rat
+levelplot(pr, maxpixels = 1e6, col.regions = c("darkgreen","lightgreen"), 
+          scales = list(draw = FALSE), 
+          main = "simple random forest classification")
