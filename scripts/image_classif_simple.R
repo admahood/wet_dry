@@ -23,8 +23,8 @@ library(aws.s3)
 system("aws s3 sync s3://earthlab-amahood/data/landsat_simpleclassification/stacks home/rstudio/wet_dry/data")
 
 #tif paths
-tif_path_2001 <- "~/wet_dry/home/rstudio/wet_dry/data/2001_stack.tif"
-tif_path_2002 <- "~/wet_dry/home/rstudio/wet_dry/data/2002_stack.tif"
+tif_path_2001 <- "~/home/rstudio/wet_dry/data/2001_stack.tif"
+tif_path_2002 <- "~/home/rstudio/wet_dry/data/2002_stack.tif"
 
 
 #rlist2001 <- list.files(tif_path_2001, pattern="tif$", full.names=TRUE)
@@ -47,7 +47,7 @@ names(brick_2002) <- c("sr_band1", "sr_band2", "sr_band3", "sr_band4", "sr_band5
 
 ####Load and Prep plot Data with extracted pixel values####
 system("aws s3 sync s3://earthlab-amahood/data/csv home/wet_dry/data")
-gb_data <- read.csv("~/wet_dry/home/wet_dry/data/plots_with_landsat.csv")
+gb_data <- read.csv("~/home/wet_dry/data/plots_with_landsat.csv")
 
 
 
@@ -145,9 +145,13 @@ legend("topleft", rownames(ms), cex = .8, col = mycolor, lty = 1, lwd = 3, bty =
 pr01 <- predict(brick_2001, forest_simple, type = 'class', progress = 'text')
 pr02 <- predict(brick_2002, forest_simple, type = 'class', progress = 'text')
 
-writeRaster(pr01, filename = "~/wet_dry/data/classified_images/2001_simple", format = "GTiff")
-writeRaster(pr02, filename = "~/wet_dry/data/classified_images/2002_simple", format = "GTiff")
-# plot classified image 
+#write raster files of classified images
+
+#writeRaster(pr01, filename = "~/home/wet_dry/data/2001_simple", format = "GTiff")
+#writeRaster(pr02, filename = "~/home/wet_dry/data/2002_simple", format = "GTiff")
+
+####plot classified image#### 
+
 pr01 <- ratify(pr01)
 pr02 <- ratify(pr02)
 
@@ -162,7 +166,9 @@ levels(pr02) <- rat02
 
 levelplot(pr01, maxpixels = 1e6, col.regions = c("darkgreen","lightgreen"), 
           scales = list(draw = FALSE), 
-          main = "simple random forest classification")
+          main = "simple random forest classification '01")
 levelplot(pr02, maxpixels = 1e6, col.regions = c("darkgreen","lightgreen"), 
           scales = list(draw = FALSE), 
-          main = "simple random forest classification")
+          main = "simple random forest classification '02")
+#upload classified images to s3 bucket
+#system("aws s3 sync ~/home/wet_dry/data/classified_images s3://earthlab-amahood/data/landsat_simpleclassification/classified_images")
