@@ -176,31 +176,29 @@ system(paste("aws s3 sync",
               dem_s3,
               dem_local))
 
-demfile <- "/home/rstudio/wet_dry/data/SRTM_dem/gb_dem.tif"
-dempath <- "/Volumes/seagate_external/internship_project/SRTM_DEM_raster/dem/"
-
 demlist=list.files(dem_local, pattern="tif$", full.names=TRUE)
 
-for(i in demlist) { assign(unlist(strsplit(i, "[.]"))[1], raster(i)) } 
+# for(i in demlist) { assign(unlist(strsplit(i, "[.]"))[1], raster(i)) } 
 
 raster_list <- list()
 for(i in 1:length(demlist)){
   raster_list[[i]] <- raster(demlist[i])
 }
 
-gb_srtm_dem <- do.call(raster::merge, raster_list, filename = demfile)
-
+gb_srtm_dem <- do.call(raster::merge, raster_list)
+writeRaster(gb_srtm_dem, "data/gb_dem.tif")
+system("aws s3 cp data/gb_dem.tif s3://earthlab-amahood/data/SRTM_dem/gb_dem.tif")
 
 #### terrain raster ####
-
+opts <- c('slope', 'aspect', 'TPI', 'TRI', 'roughness','flowdir')
 ter_rst <- terrain(gb_srtm_dem,
-                   opt = c('slope', 'aspect', 'TPI', 'TRI', 'roughness','flowdir'),
+                   opt = opts,
                    unit = 'degrees',
                    neighbors = 8, 
                    format = 'GTiff')
 
 for(i in 1:length(ter_rst)){
-  writeRaster()
+  writeRaster(ter_rst[[i]], filename = paste0(opts[i],".tif"))
 }
 
 
