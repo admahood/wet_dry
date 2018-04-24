@@ -144,13 +144,18 @@ for(i in 1:length(years)){
 
 ### Adam stopped here - need to get the rest of the landsat7 files -------------
 
-gbplots_list[[1]] = gbplots_list[[1]][,c(1:69)]
+# gbplots_list[[1]] = gbplots_list[[1]][,c(1:69)]
 
+otherlist <- list()
+counter <- 1
 for(i in 1:length(gbplots_list)){
-  st_as_sf(gbplots_list[[i]])
+  if(length(gbplots_list[[i]]) > 0){
+  otherlist[[counter]] <-gbplots_list[[i]]@data
+  counter <- counter +1
+  }
 }
 
-df = do.call("rbind", gbplots_list) # this takes the list of stuff and makes it into a data frame
+df <- bind_rows(otherlist)
 df <- df[df$pixel_qa == 66, ] #select plots without clouds
 
 #### Create vegetation indices ####
@@ -160,6 +165,7 @@ df$SAVI <- get_savi(df$sr_band3,df$sr_band4)
 df$SR = get_sr(df$sr_band3,df$sr_band4)
 
 write.csv(df, file = "data/plots_with_landsat.csv")
+system("aws s3 cp data/plots_with_landsat.csv s3://earthlab-amahood/data/plots_with_landsat.csv")
 
 
 #### Slope aspect elevation ----------------------------------------------
