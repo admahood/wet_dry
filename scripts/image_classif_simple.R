@@ -1,5 +1,12 @@
 ####load packages and create raster stack from tifs in local directory####
+install.packages("randomForest")
+install.packages( "party")
+install.packages("ROCR")
+install.packages("picante")
+install.packages("caTools")
+install.packages("vegan")
 library(raster)
+library(vegan)
 library(rasterVis)
 library(lattice)
 library(caTools)
@@ -10,25 +17,37 @@ library(picante)
 library(rpart)
 library(rpart.plot)
 library(tidyverse)
+library(aws.s3)
 
-tif_path <- "/Volumes/seagate_external/internship_project/scene_for_classification_test/2001/2001_tifs/"
+#pull scenes from s3
+system("aws s3 sync s3://earthlab-amahood/data/landsat_simpleclassification/stacks home/rstudio/wet_dry/data")
 
-rlist=list.files(tif_path, pattern="tif$", full.names=TRUE)
+#tif paths
+tif_path_2001 <- "~/wet_dry/home/rstudio/wet_dry/data/2001_stack.tif"
+tif_path_2002 <- "~/wet_dry/home/rstudio/wet_dry/data/2002_stack.tif"
 
 
-for(i in rlist) { assign(unlist(strsplit(i, "[.]"))[1], raster(i)) } 
+#rlist2001 <- list.files(tif_path_2001, pattern="tif$", full.names=TRUE)
+#rlist2002 <- list.files(tif_path_2002, pattern="tif$", full.names=TRUE)
 
-brick_2011 <- stack(rlist)
 
-####display landsat image in true/false color####
 
-landsat_rgb <- plotRGB(brick_2011, r = 3, g = 2, b = 1, axes = TRUE, stretch = 'lin', main = 'Landsat 2001 true color')
-landsat_fcc <- plotRGB(brick_2011, r = 4, g = 2, b = 1, axes = TRUE, stretch = 'lin', main = 'Landsat 2001 false color')
+brick_2001 <- stack(tif_path_2001)
+brick_2002 <- stack(tif_path_2002)
 
-names(brick_2011) <- c("sr_band1", "sr_band2", "sr_band3", "sr_band4", "sr_band5", "sr_band7")
+####display landsat images in true/false color####
+
+landsat_rgb01 <- plotRGB(brick_2001, r = 3, g = 2, b = 1, axes = TRUE, stretch = 'lin', main = 'Landsat 2001 true color')
+landsat_fcc01 <- plotRGB(brick_2001, r = 4, g = 2, b = 1, axes = TRUE, stretch = 'lin', main = 'Landsat 2001 false color')
+landsat_rgb02 <- plotRGB(brick_2002, r = 3, g = 2, b = 1, axes = TRUE, stretch = 'lin', main = 'Landsat 2002 true color')
+landsat_fcc02 <- plotRGB(brick_2002, r = 4, g = 2, b = 1, axes = TRUE, stretch = 'lin', main = 'Landsat 2002 false color')
+
+names(brick_2001) <- c("sr_band1", "sr_band2", "sr_band3", "sr_band4", "sr_band5", "sr_band7")
+names(brick_2002) <- c("sr_band1", "sr_band2", "sr_band3", "sr_band4", "sr_band5", "sr_band7")
 
 ####Load and Prep plot Data with extracted pixel values####
-gb_data <- read.csv("/Users/TheEagle/fire_proj/wet_dry/data/plots_with_landsat.csv")
+system("aws s3 sync s3://earthlab-amahood/data/csv home/wet_dry/data")
+gb_data <- read.csv("~/wet_dry/home/wet_dry/data/plots_with_landsat.csv")
 
 
 
@@ -111,22 +130,39 @@ legend("topleft", rownames(ms), cex = .8, col = mycolor, lty = 1, lwd = 3, bty =
 
 
 ####image classification####
-#create subset of original landsat image to test classification with 
-extent(brick_2011)
-e <- extent(437000, 487000, 4620000, 4670000)
 
-brick_ss <- crop(brick_2011, e)
-landsat_rgb_ss <- plotRGB(brick_ss, r = 3, g = 2, b = 1, axes = TRUE, stretch = 'lin', main = 'Landsat 2001 true color subset')
+# #create subset of original landsat image to test classification with 
+# extent(brick_2011)
+# e <- extent(437000, 487000, 4620000, 4670000)
+# 
+# brick_ss <- crop(brick_2011, e)
+# landsat_rgb_ss <- plotRGB(brick_ss, r = 3, g = 2, b = 1, axes = TRUE, stretch = 'lin', main = 'Landsat 2001 true color subset')
+
 #save subset to file 
-writeRaster(brick_ss, filename = "/Users/TheEagle/fire_proj/wet_dry/data/subset_2001", format = "GTiff")
+#writeRaster(brick_ss, filename = "/Users/TheEagle/fire_proj/wet_dry/data/subset_2001", format = "GTiff")
+
 #create classified raster using predict function
-pr <- predict(brick_ss, forest_simple, type = 'class', progress = 'text')
-writeRaster(pr, filename = "/Users/TheEagle/Desktop/classified_test", format = "GTiff")
+pr01 <- predict(brick_2001, forest_simple, type = 'class', progress = 'text')
+pr02 <- predict(brick_2002, forest_simple, type = 'class', progress = 'text')
+
+writeRaster(pr01, filename = "~/wet_dry/data/classified_images/2001_simple", format = "GTiff")
+writeRaster(pr02, filename = "~/wet_dry/data/classified_images/2002_simple", format = "GTiff")
 # plot classified image 
-pr <- ratify(pr)
-rat <- levels(pr)[[1]]
-rat$legend <- c("cheatgrass", "sagebrush")
-levels(pr) <- rat
-levelplot(pr, maxpixels = 1e6, col.regions = c("darkgreen","lightgreen"), 
+pr01 <- ratify(pr01)
+pr02 <- ratify(pr02)
+
+rat01 <- levels(pr01)[[1]]
+rat02 <- levels(pr02)[[1]]
+
+rat01$legend <- c("cheatgrass", "sagebrush")
+rat02$legend <- c("cheatgrass", "sagebrush")
+
+levels(pr01) <- rat01
+levels(pr02) <- rat02
+
+levelplot(pr01, maxpixels = 1e6, col.regions = c("darkgreen","lightgreen"), 
+          scales = list(draw = FALSE), 
+          main = "simple random forest classification")
+levelplot(pr02, maxpixels = 1e6, col.regions = c("darkgreen","lightgreen"), 
           scales = list(draw = FALSE), 
           main = "simple random forest classification")
