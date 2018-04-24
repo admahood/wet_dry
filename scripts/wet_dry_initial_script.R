@@ -44,79 +44,7 @@
 libs <- c("sf", "tidyverse", "raster", "rgdal", "rgeos")
 lapply(libs, library, character.only = TRUE, verbose = FALSE)
 
-
-# functions --------------------------------------------------------------------
-# make new functions for landsat 5
-
-brightness7 <- function(df) {
-  x = (df$sr_band1 *0.3561) +
-    (df$sr_band2 * 0.3972) + 
-    (df$sr_band3 * 0.3904) +
-    (df$sr_band4 * 0.6966) +
-    (df$sr_band5 * 0.2286) +
-    (df$sr_band7 * 0.1596)
-  return(x)
-}
-
-greenness7 <- function(df){
-  x = (df$sr_band1 *-0.3344) +
-    (df$sr_band2 * -0.3544) + 
-    (df$sr_band3 * -0.4556) +
-    (df$sr_band4 * 0.6966) +
-    (df$sr_band5 * -0.0242) +
-    (df$sr_band7 * -0.2630)
-  return(x)
-}
-
-wetness7 <- function(band1,band2,band3,band4,band5,band7){
-  x = (df$sr_band1 * 0.2626) +
-    (df$sr_band2 * 0.2141) + 
-    (df$sr_band3 * 0.0926) +
-    (df$sr_band4 * 0.0656) +
-    (df$sr_band5 * -0.7629) +
-    (df$sr_band7 * -0.5388)
-  return(x)
-}
-
-bright7 <- function(band1,band2,band3,band4,band5,band7) {
-  x <- (band1 *0.3561) +
-    (band2 * 0.3972) + 
-    (band3 * 0.3904) +
-    (band4 * 0.6966) +
-    (band5 * 0.2286) +
-    (band7 * 0.1596)
-  return(x)
-}
-
-green7 <- function(band1,band2,band3,band4,band5,band7){
-  x <- (band1 *-0.3344) +
-    (band2 * -0.3544) + 
-    (band3 * -0.4556) +
-    (band4 * 0.6966) +
-    (band5 * -0.0242) +
-    (band7 * -0.2630)
-  return(x)
-}
-
-wet7 <- function(band1,band2,band3,band4,band5,band7){
-  x <- (band1 * 0.2626) +
-    (band2 * 0.2141) + 
-    (band3 * 0.0926) +
-    (band4 * 0.0656) +
-    (band5 * -0.7629) +
-    (band7 * -0.5388)
-  return(x)
-}
-
-get_ndvi <- function(band3, band4){
-  return((band4 - band3)/ (band4 + band3))}
-get_evi <- function(band1,band3,band4){
-  return(2.5 * ((band4 - band3)/(band4 + (6 * band3) - (7.5 * band1) + 1)))
-}
-get_savi <- function(band3, band4){
-  return(((band4 - band3) / (band4 + band3 + 0.5)) * 1.5)}
-get_sr <- function(band3,band4){return(band4/band3)}
-
+source("/home/rstudio/wet_dry/scripts/functions.R")
 
 # import data ------------------------------------------------------------------
 # syntax for s3 is: aws s3 sync <s3 bucket location> <local location>
@@ -163,8 +91,8 @@ path_row_combos <- unique(gb_plots$path_row) # this gives us the unique path row
 gb_plots <- st_transform(gb_plots, crs='+proj=utm +zone=11 +datum=WGS84 +units=m +no_defs +ellps=WGS84 +towgs84=0,0,0 ')
 
 gbplots_list <- list()
-counter <- 1
-for(i in 1:length(years)){
+counter <- 1 # can't parallelize with this counter system
+for(i in 1:length(years)){ 
   
   system(paste0("aws s3 sync ",
                 landsat_s3, "/landsat_",years[i], " ",
@@ -216,13 +144,18 @@ for(i in 1:length(years)){
 
 ### Adam stopped here - need to get the rest of the landsat7 files -------------
 
-gbplots_list[[1]] = gbplots_list[[1]][,c(1:69)]
+# gbplots_list[[1]] = gbplots_list[[1]][,c(1:69)]
 
+otherlist <- list()
+counter <- 1
 for(i in 1:length(gbplots_list)){
-  st_as_sf(gbplots_list[[i]])
+  if(length(gbplots_list[[i]]) > 0){
+  otherlist[[counter]] <-gbplots_list[[i]]@data
+  counter <- counter +1
+  }
 }
 
-df = do.call("rbind", gbplots_list) # this takes the list of stuff and makes it into a data frame
+df <- bind_rows(otherlist)
 df <- df[df$pixel_qa == 66, ] #select plots without clouds
 
 #### Create vegetation indices ####
@@ -232,6 +165,7 @@ df$SAVI <- get_savi(df$sr_band3,df$sr_band4)
 df$SR = get_sr(df$sr_band3,df$sr_band4)
 
 write.csv(df, file = "data/plots_with_landsat.csv")
+system("aws s3 cp data/plots_with_landsat.csv s3://earthlab-amahood/data/plots_with_landsat.csv")
 
 
 #### Slope aspect elevation ----------------------------------------------
@@ -242,43 +176,31 @@ system(paste("aws s3 sync",
               dem_s3,
               dem_local))
 
-demfile <- "/Users/TheEagle/fire_proj/wet_dry/data/SRTM_dem/gb_dem_2"
-dempath <- "/Volumes/seagate_external/internship_project/SRTM_DEM_raster/dem/"
-
 demlist=list.files(dem_local, pattern="tif$", full.names=TRUE)
 
-for(i in demlist) { assign(unlist(strsplit(i, "[.]"))[1], raster(i)) } 
+# for(i in demlist) { assign(unlist(strsplit(i, "[.]"))[1], raster(i)) } 
 
 raster_list <- list()
 for(i in 1:length(demlist)){
   raster_list[[i]] <- raster(demlist[i])
 }
 
-gb_srtm_dem <- do.call(raster::merge, raster_list, filename = demfile)
-
+gb_srtm_dem <- do.call(raster::merge, raster_list)
+writeRaster(gb_srtm_dem, "data/gb_dem.tif")
+system("aws s3 cp data/gb_dem.tif s3://earthlab-amahood/data/SRTM_dem/gb_dem.tif")
 
 #### terrain raster ####
+opts <- c('slope', 'aspect', 'TPI', 'TRI', 'roughness','flowdir')
+ter_rst <- terrain(gb_srtm_dem,
+                   opt = opts,
+                   unit = 'degrees',
+                   neighbors = 8, 
+                   format = 'GTiff')
 
-sloperaster <- terrain(gb_srtm_dem, 
-                       opt = 'slope', 
-                       unit = 'degrees', 
-                       neighbors = 8, 
-                       filename = paste0(terrain_path,'slope'), format = 'GTiff')
+for(i in 1:length(ter_rst)){
+  writeRaster(ter_rst[[i]], filename = paste0(opts[i],".tif"))
+}
 
-aspectraster <- terrain(gb_srtm_dem, opt = 'aspect', unit ='degrees', 
-                        neighbors = 8, 
-                        filename = paste0(terrain_path,'aspect'), format = 'GTiff')
-
-TPIraster <-  terrain(gb_srtm_dem, opt = 'TPI', 
-                      filename = paste0(terrain_path,'TDI'), format = 'GTiff')
-
-TRIraster <- terrain(gb_srtm_dem, opt = 'TRI', 
-                     filename = paste0(terrain_path,'TRI'), format = 'GTiff')
-
-roughnessraster <- terrain(gb_srtm_dem, opt = 'roughness', 
-                           filename = paste0(terrain_path,'roughness'), format = 'GTiff')
-
-rm(sloperaster, aspectraster, TPIraster, TRIraster, roughnessraster)
 
 
 ####successful terrain merge####
