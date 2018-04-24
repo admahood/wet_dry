@@ -43,6 +43,8 @@
 # setup ------------------------------------------------------------------------
 libs <- c("sf", "tidyverse", "raster", "rgdal", "rgeos")
 lapply(libs, library, character.only = TRUE, verbose = FALSE)
+install.packages("aws.s3")
+library(aws.s3)
 
 source("/home/rstudio/wet_dry/scripts/functions.R")
 
@@ -88,10 +90,11 @@ years <- unique(gb_plots$year) # getting the years plots were monitored - 2011-2
 path_row_combos <- unique(gb_plots$path_row) # this gives us the unique path row combinations
 
 # this might have to be modified to fit the st_tranform syntax
-gb_plots <- st_transform(gb_plots, crs='+proj=utm +zone=11 +datum=WGS84 +units=m +no_defs +ellps=WGS84 +towgs84=0,0,0 ')
+gb_plots <- st_transform(gb_plots, crs=st_crs(plot_data))
 
 gbplots_list <- list()
 counter <- 1 # can't parallelize with this counter system
+kounter <- 1
 for(i in 1:length(years)){ 
   
   system(paste0("aws s3 sync ",
@@ -122,22 +125,31 @@ for(i in 1:length(years)){
         band <- raster::raster(tif_files[k]) # this just loads the raster
         gbplots_subset <- raster::extract(band, gbplots_subset, sp=TRUE) # and here we extract
       }
+      gbplots_subset <- st_transform(st_as_sf(gbplots_subset),crs = st_crs(plot_data))
       file.remove(Sys.glob(paste0(exdir,"*"))) # now we delete the tifs
       print("extracted")
-      #rename the columns - this required just manually going through and figuring out where to clip the 
-      #column names at
-      #if we don't do this, each landsat file will spit out unique column names, making putting the data
-      #back together a big pain
       
-      # this should be redone with dplyr::rename possibly... for some reason sf doesn't like the colnames thing
-      colnames(gbplots_subset@data) <- c(names(gbplots_subset[1:55]), 
-                                         substr(names(gbplots_subset[56:69]), 42,1000))
+      #renaming columns
+      oldnames <- names(gbplots_subset[56:69])[1:14]
+      newnames <- substr(names(gbplots_subset[56:69]), 42,1000)[1:14]
+      gbplots_subset <- rename_at(gbplots_subset, vars(oldnames),~ newnames)
+      
       #adding the data to a list - converting back to a shapefile will be easy later, 
       #since they have lat and long as data frame columns
-      gbplots_list[[counter]] <- gbplots_subset
-    }
-    else {print("nopoints")}
+      gbplots_list[[kounter]] <- gbplots_subset
+      
+      if(kounter == 1){
+        result <- gbplots_subset
+      }else{
+        result <- rbind(result, gbplots_subset)
+      }
+      
+      
+      kounter <- kounter + 1
+    }else {print("nopoints")}
     counter <- counter + 1 
+    
+    
   }
   system(paste0("rm -r ",landsat_local, "/", years[i] )) #deleting the unneeded landsat files
 }
@@ -146,17 +158,8 @@ for(i in 1:length(years)){
 
 # gbplots_list[[1]] = gbplots_list[[1]][,c(1:69)]
 
-otherlist <- list()
-counter <- 1
-for(i in 1:length(gbplots_list)){
-  if(length(gbplots_list[[i]]) > 0){
-  otherlist[[counter]] <-gbplots_list[[i]]@data
-  counter <- counter +1
-  }
-}
 
-df <- bind_rows(otherlist)
-df <- df[df$pixel_qa == 66, ] #select plots without clouds
+df <- result[result$pixel_qa == 66, ] #select plots without clouds
 
 #### Create vegetation indices ####
 df$NDVI <- get_ndvi(df$sr_band3,df$sr_band4)
@@ -164,8 +167,8 @@ df$EVI <- get_evi(df$sr_band1, df$sr_band3, df$sr_band4)
 df$SAVI <- get_savi(df$sr_band3,df$sr_band4)
 df$SR = get_sr(df$sr_band3,df$sr_band4)
 
-write.csv(df, file = "data/plots_with_landsat.csv")
-system("aws s3 cp data/plots_with_landsat.csv s3://earthlab-amahood/data/plots_with_landsat.csv")
+# write.csv(df, file = "data/plots_with_landsat.csv")
+# system("aws s3 cp data/plots_with_landsat.csv s3://earthlab-amahood/data/plots_with_landsat.csv")
 
 
 #### Slope aspect elevation ----------------------------------------------
@@ -175,20 +178,23 @@ dem_local <- '/home/rstudio/wet_dry/data/dem'
 system(paste("aws s3 sync",
               dem_s3,
               dem_local))
-
-demlist=list.files(dem_local, pattern="tif$", full.names=TRUE)
-
-# for(i in demlist) { assign(unlist(strsplit(i, "[.]"))[1], raster(i)) } 
-
-raster_list <- list()
-for(i in 1:length(demlist)){
-  raster_list[[i]] <- raster(demlist[i])
+if(!file.exists("data/dem/gb_dem.tif")){
+  
+  demlist=list.files(dem_local, pattern="tif$", full.names=TRUE)
+  
+  # for(i in demlist) { assign(unlist(strsplit(i, "[.]"))[1], raster(i)) } 
+  
+  raster_list <- list()
+  for(i in 1:length(demlist)){
+    raster_list[[i]] <- raster(demlist[i])
+  }
+  
+  gb_srtm_dem <- do.call(raster::merge, raster_list)
+  writeRaster(gb_srtm_dem, "data/gb_dem.tif")
+  system("aws s3 cp data/gb_dem.tif s3://earthlab-amahood/data/SRTM_dem/gb_dem.tif")
 }
 
-gb_srtm_dem <- do.call(raster::merge, raster_list)
-writeRaster(gb_srtm_dem, "data/gb_dem.tif")
-system("aws s3 cp data/gb_dem.tif s3://earthlab-amahood/data/SRTM_dem/gb_dem.tif")
-
+gb_srtm_dem <- raster("data/dem/gb_dem.tif")
 #### terrain raster ####
 opts <- c('slope', 'aspect', 'TPI', 'TRI', 'roughness','flowdir')
 ter_rst <- terrain(gb_srtm_dem,
@@ -198,24 +204,29 @@ ter_rst <- terrain(gb_srtm_dem,
                    format = 'GTiff')
 
 for(i in 1:length(ter_rst)){
-  writeRaster(ter_rst[[i]], filename = paste0(opts[i],".tif"))
+  filename = paste0("data/gb_",opts[i],".tif")
+  writeRaster(ter_rst[[i]], filename = filename)
+  system(paste0("aws s3 cp ",
+                filename,
+                dem_s3, "/",filename))
 }
 
 
 
 ####successful terrain merge####
-coords <- df[c("Longitude", "Latitude")]
-df_sp <- SpatialPointsDataFrame(coords, df, proj4string = CRS("+proj=longlat +datum=WGS84 +no_defs +ellps=WGS84 +towgs84=0,0,0"))
+# coords <- df[c("Longitude", "Latitude")]
+# df_sp <- SpatialPointsDataFrame(coords, df, proj4string = CRS("+proj=longlat +datum=WGS84 +no_defs +ellps=WGS84 +towgs84=0,0,0"))
 
-df_sp@data$elevation <- raster::extract(gb_srtm_dem, df_sp)
-df_sp@data$slope <- raster::extract(sloperaster, df_sp)
-df_sp@data$aspect <- raster::extract(aspectraster, df_sp)
-df_sp@data$TPI <- raster::extract(TPIraster, df_sp)
-df_sp@data$TRI <- raster::extract(TRIraster, df_sp)
-df_sp@data$roughness <- raster::extract(roughnessraster, df_sp)
+df$elevation <- raster::extract(gb_srtm_dem, df)
 
-df_sp@data$folded_aspect = abs(180 - abs(df_sp@data$aspect - 225))
-df <- df_sp@data
+df$slope <- raster::extract(terrain[1], df)
+df$aspect <- raster::extract(terrain[2], df)
+df$TPI <- raster::extract(terrain[3], df)
+df$TRI <- raster::extract(terrain[4], df)
+df$roughness <- raster::extract(terrain[5], df)
+df$flowdir <- raster::extract(terrain[6],df)
+
+df$folded_aspect = abs(180 - abs(df_sp@data$aspect - 225))
 
 #  
 # gridded ssurgo?
