@@ -43,8 +43,8 @@
 # setup ------------------------------------------------------------------------
 libs <- c("sf", "tidyverse", "raster", "rgdal", "rgeos")
 lapply(libs, library, character.only = TRUE, verbose = FALSE)
-install.packages("aws.s3")
-library(aws.s3)
+# install.packages("aws.s3")
+# library(aws.s3)
 
 source("/home/rstudio/wet_dry/scripts/functions.R")
 
@@ -154,24 +154,8 @@ for(i in 1:length(years)){
   system(paste0("rm -r ",landsat_local, "/", years[i] )) #deleting the unneeded landsat files
 }
 
-### Adam stopped here - need to get the rest of the landsat7 files -------------
 
-# gbplots_list[[1]] = gbplots_list[[1]][,c(1:69)]
-
-
-df <- result[result$pixel_qa == 66, ] #select plots without clouds
-
-#### Create vegetation indices ####
-df$NDVI <- get_ndvi(df$sr_band3,df$sr_band4)
-df$EVI <- get_evi(df$sr_band1, df$sr_band3, df$sr_band4)
-df$SAVI <- get_savi(df$sr_band3,df$sr_band4)
-df$SR = get_sr(df$sr_band3,df$sr_band4)
-
-# write.csv(df, file = "data/plots_with_landsat.csv")
-# system("aws s3 cp data/plots_with_landsat.csv s3://earthlab-amahood/data/plots_with_landsat.csv")
-
-
-#### Slope aspect elevation ----------------------------------------------
+#### merging elevation tifs ----------------------------------------------
 dem_s3 <- 's3://earthlab-amahood/data/SRTM_dem'
 dem_local <- '/home/rstudio/wet_dry/data/dem'
 
@@ -195,146 +179,54 @@ if(!file.exists("data/dem/gb_dem.tif")){
 }
 
 gb_srtm_dem <- raster("data/dem/gb_dem.tif")
-#### terrain raster ####
-opts <- c('slope', 'aspect', 'TPI', 'TRI', 'roughness','flowdir')
-ter_rst <- terrain(gb_srtm_dem,
-                   opt = opts,
-                   unit = 'degrees',
-                   neighbors = 8, 
-                   format = 'GTiff')
 
-for(i in 1:length(ter_rst)){
-  filename = paste0("data/gb_",opts[i],".tif")
-  writeRaster(ter_rst[[i]], filename = filename)
+# terrain raster --------------------------------------------------------------------------
+
+opts <- c('slope', 'aspect', 'TPI', 'TRI', 'roughness','flowdir')
+for(i in 1:length(opts)){
+  filename <- paste0("data/",opts[i],".tif")
+  if(!file.exists(filename)){
+  ter_rst <- terrain(gb_srtm_dem,
+                     opt = opts[i],
+                     unit = 'degrees',
+                     neighbors = 8, 
+                     format = 'GTiff',
+                     filename = filename)}
   system(paste0("aws s3 cp ",
                 filename,
-                dem_s3, "/",filename))
+                " s3://earthlab-amahood/",filename))
 }
 
+# keep only sunny days ----------------------------------------------------------------------
 
+df <- result[result$pixel_qa == 66, ] %>% #select plots without clouds
+  na.omit()
 
-####successful terrain merge####
-# coords <- df[c("Longitude", "Latitude")]
-# df_sp <- SpatialPointsDataFrame(coords, df, proj4string = CRS("+proj=longlat +datum=WGS84 +no_defs +ellps=WGS84 +towgs84=0,0,0"))
+# Create vegetation indices -------------------------------------------------------------------
+df$NDVI <- get_ndvi(df$sr_band3,df$sr_band4)
+df$EVI <- get_evi(df$sr_band1, df$sr_band3, df$sr_band4)
+df$SAVI <- get_savi(df$sr_band3,df$sr_band4)
+df$SR = get_sr(df$sr_band3,df$sr_band4)
+
+df$greenness <- green7(df$sr_band1,df$sr_band2,df$sr_band3,df$sr_band4,df$sr_band5,df$sr_band7)
+df$brightness <- bright7(df$sr_band1,df$sr_band2,df$sr_band3,df$sr_band4,df$sr_band5,df$sr_band7)
+df$wetness <- wet7(df$sr_band1,df$sr_band2,df$sr_band3,df$sr_band4,df$sr_band5,df$sr_band7)
+
+# extracting elevation and topography -----------------------------------------------
 
 df$elevation <- raster::extract(gb_srtm_dem, df)
 
-df$slope <- raster::extract(terrain[1], df)
-df$aspect <- raster::extract(terrain[2], df)
-df$TPI <- raster::extract(terrain[3], df)
-df$TRI <- raster::extract(terrain[4], df)
-df$roughness <- raster::extract(terrain[5], df)
-df$flowdir <- raster::extract(terrain[6],df)
+df$slope <- raster::extract(raster("data/slope.tif"), df)
+df$aspect <- raster::extract(raster("data/aspect.tif"), df)
+df$TPI <- raster::extract(raster("data/TPI.tif"), df)
+df$TRI <- raster::extract(raster("data/TRI.tif"), df)
+df$roughness <- raster::extract(raster("data/roughness.tif"), df)
+df$flowdir <- raster::extract(raster("data/flowdir.tif"),df)
 
-df$folded_aspect = abs(180 - abs(df_sp@data$aspect - 225))
-
-#  
-# gridded ssurgo?
-# homogeneos versus heterogeneous
-# add date visited, date of landsat
-# look into landsat 4/5
+df$folded_aspect = abs(180 - abs(df$aspect - 225))
 
 
-
-
-
-# this object is like a gigabyte, so make sure to delete it from memory so it's not 
-# saved as an R object in the .RData file (thus making our git pushes and pulls 
-# take forever)
-rm(x)
-
-# for(i in 1:length(years)){
-#   for(j in 1:length(path_row_combos)){
-#     
-#     
-#     # subsetting the plots for the year and row/column combination
-#     print("subsetting")
-#     gbplots_subset = gb_plots[gb_plots$path_row == path_row_combos[j]
-#                               & gb_plots$year == years[i],]
-#     print(paste(round(counter/125*100), "%")) #progress indicator
-#     print(c(length(gbplots_subset), years[i], path_row_combos[j]))
-#     counter = counter +1
-#   }}
-
-
-
-####tasselled cap####
-df$greenness <- greenness7(df)
-df$brightness <- brightness7(df)
-df$wetness <- wetness7(df)
-#### train landsat pixels as shrub vs grass ####
-
-# Dylan's progress starts here
-
-#libraries
-install.packages("randomForest"); install.packages("party"); 
-library(randomForest); 
-library(rpart); 
-library(rattle); 
-library(rpart.plot); 
-library(RColorBrewer); 
-library(caret); 
-library(rfUtilities)
-library(ROCR)
-
-
-#load and prep data
-gb_data <- read.csv("data/plots_with_landsat.csv")
-gb_data$InvTreeCov <- as.numeric(gb_data$InvTreeCov)
-
-
-
-## for splitting data into test and training sets, might not need this since random forests do the splitting and sampling within the function
-splitdf <- function(dataframe, seed=NULL) {
-  if (!is.null(seed)) set.seed(seed)
-  index <- 1:nrow(dataframe)
-  trainindex <- sample(index, trunc(length(index)/2))
-  trainset <- dataframe[trainindex, ]
-  testset <- dataframe[-trainindex, ]
-  list(trainset=trainset,testset=testset)
-}
-
-splits.gb_plots <- splitdf(gb_plots, seed = 1)
-
-trainset.gb_plots <- splits.gb_plots$trainset; testset.gb_plots <- splits.gb_plots$testset
-
-
-
-
-# end of Dylan's work
-
-library(picante)
-
-s = read.csv("data/plots_with_landsat.csv")
-t = s[rowSums(s[,c(32,39)]) > 0,]
-u = t[,c(32,39)]
-
-comm <- decostand(u, method = "total")
-comm.bc.dist <- vegdist(comm, method = "bray")
-comm.bc.clust <- hclust(comm.bc.dist, method = "average")
-plot(comm.bc.clust, ylab = "Bray-Curtis dissimilarity", labels = FALSE)
-t$cluster <- as.factor(cutree(comm.bc.clust, 2))
-
-
-
-library(randomForest)
-## Random Forests using Party
-library(party)
-library(caret)
-
-data = t
-
-controls = cforest_unbiased(ntree = 500)
-
-## Creating decision tree and forest models, replace "Class" with your dependent variable. You get a classification
-## tree if this variable is categorical or a regression tree if it is continuous. Both are fine, but classification
-## trees are prerhaps a little easier to interpret
-tree<-ctree(cluster ~ sr_band1 +sr_band2 +sr_band3 +sr_band4 +sr_band5 + sr_band7, data= data, controls = controls) ## Fitting the decsion tree model
-plot(tree) ## Plotting this model
-fit <- cforest(cluster ~ ., data=data, controls = controls) ## Fitting the RF model
-
-TreeStats<-caret:::cforestStats(tree) ## Extracting accuracy statistics for decision tree
-fitStats<-caret:::cforestStats(fit) ## Extracting accuracy statistics for forest model
-
-imp<-varimp(fit, conditional=T) ## Determining variable importance, as measured by mean decrease in accuracy of model with elimination of variable
+# writing the file and pushing to s3 -----------------------------------------------
+st_write(df, "data/plots_with_landsat.gpkg")
+system("aws s3 cp data/plots_with_landsat.csv s3://earthlab-amahood/data/plots_with_landsat.gpkg")
 
