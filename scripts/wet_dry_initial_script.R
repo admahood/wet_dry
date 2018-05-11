@@ -54,20 +54,38 @@ source("/home/rstudio/wet_dry/scripts/functions.R")
 system("aws s3 sync s3://earthlab-amahood/data/BLM_AIM /home/rstudio/wet_dry/data/BLM_AIM")
 system("aws s3 sync s3://earthlab-amahood/data/ecoregions /home/rstudio/wet_dry/data/ecoregions")
 system("aws s3 sync s3://earthlab-amahood/data/WRS2_paths/wrs2_asc_desc /home/rstudio/wet_dry/data/WRS2_paths/wrs2_asc_desc")
+system("aws s3 sync s3://earthlab-amahood/data/landfire_esp_rcl /home/rstudio/wet_dry/data/landfire_esp_rcl")
 
 # if these st_reads don't work, you probably didn't open the project yet
 
 plot_data <- st_read("data/BLM_AIM/BLM_AIM_20161025.shp") #BLM plots
 ecoregions <- st_read("data/ecoregions/NA_CEC_Eco_Level3.shp") #ecoregions
 scenes <- st_read("data/WRS2_paths/wrs2_asc_desc/wrs2_asc_desc.shp") #landsat scenes
+shrub_binary <- raster("data/landfire_esp_rcl/shrub_binary.tif") 
+binary_clip <- raster("data/landfire_esp_rcl/clipped_binary.tif") #clipped (in arcmap) shrub binary
 
 # tweak data -------------------------------------------------------------------
 great_basin <- subset(ecoregions, NA_L3NAME %in% c("Northern Basin and Range", 
                                                    "Central Basin and Range", 
                                                    "Snake River Plain"))
+
+
 great_basin <- st_transform(great_basin, st_crs(plot_data)) # matching projections
 great_basin <- st_union(great_basin) # dissolve into one polygon
-gb_plots <- st_intersection(plot_data,great_basin) # clipping to great basin
+#write gb ecoregion union to file and upload to s3
+#gb_filename <- "data/ecoregions/gb_union.shp"
+#st_write(great_basin, gb_filename)
+#system(paste0("aws s3 cp ", gb_filename, " s3://earthlab-amahood/", gb_filename))
+
+# Failed (for now) attempt at clipping shrub_binary to great basin extent#
+#great_basin_sp <- great_basin
+#great_basin_sp <- st_transform(great_basin_sp, crs = crs(shrub_binary, asText = TRUE))
+#great_basin_sp <- as(great_basin, Class = "Spatial")
+
+#shrub_binary <- raster::crop(shrub_binary, extent(great_basin_sp))
+#shrub_binary <- raster::mask(shrub_binary, great_basin_sp)
+
+gb_plots <- st_intersection(plot_data,great_basin)# clipping to great basin
 gb_plots <- gb_plots[!is.na(gb_plots$DateVisite),] # removing rows where the plot was not read
 gb_plots$year <- substr(as.character(gb_plots$DateVisite),1,4) # making a year field
 
