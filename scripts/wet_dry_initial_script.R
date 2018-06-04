@@ -54,7 +54,7 @@ source("/home/rstudio/wet_dry/scripts/functions.R")
 system("aws s3 sync s3://earthlab-amahood/data/BLM_AIM /home/rstudio/wet_dry/data/BLM_AIM")
 system("aws s3 sync s3://earthlab-amahood/data/ecoregions /home/rstudio/wet_dry/data/ecoregions")
 system("aws s3 sync s3://earthlab-amahood/data/WRS2_paths/wrs2_asc_desc /home/rstudio/wet_dry/data/WRS2_paths/wrs2_asc_desc")
-
+system("aws s3 sync s3://earthlab-amahood/data/landfire_esp_rcl /home/rstudio/wet_dry/data/landfire_esp_rcl")
 # if these st_reads don't work, you probably didn't open the project yet
 
 plot_data <- st_read("data/BLM_AIM/BLM_AIM_20161025.shp") #BLM plots
@@ -184,21 +184,27 @@ if(!file.exists("data/dem/gb_dem.tif")){
 gb_srtm_dem <- raster("data/dem/gb_dem.tif")
 
 # terrain raster --------------------------------------------------------------------------
+ter_s3 <- 's3://earthlab-amahood/data/terrain'
+ter_local <- '/home/rstudio/wet_dry/data/terrain'
 
+system(paste("aws s3 sync",
+             ter_s3,
+             ter_local))
 opts <- c('slope', 'aspect', 'TPI', 'TRI', 'roughness','flowdir')
 for(i in 1:length(opts)){
-  filename <- paste0("data/",opts[i],".tif")
+  filename <- paste0("data/terrain/",opts[i],".tif")
   if(!file.exists(filename)){
   ter_rst <- terrain(gb_srtm_dem,
                      opt = opts[i],
                      unit = 'degrees',
                      neighbors = 8, 
                      format = 'GTiff',
-                     filename = filename)}
+                     filename = filename)
   system(paste0("aws s3 cp ",
                 filename,
                 " s3://earthlab-amahood/",filename))
-}
+  }
+  }
 
 # keep only sunny days ----------------------------------------------------------------------
 
@@ -219,12 +225,12 @@ df$wetness <- wet7(df$sr_band1,df$sr_band2,df$sr_band3,df$sr_band4,df$sr_band5,d
 
 df$elevation <- raster::extract(gb_srtm_dem, df)
 
-df$slope <- raster::extract(raster("data/slope.tif"), df)
-df$aspect <- raster::extract(raster("data/aspect.tif"), df)
-df$TPI <- raster::extract(raster("data/TPI.tif"), df)
-df$TRI <- raster::extract(raster("data/TRI.tif"), df)
-df$roughness <- raster::extract(raster("data/roughness.tif"), df)
-df$flowdir <- raster::extract(raster("data/flowdir.tif"),df)
+df$slope <- raster::extract(raster("data/terrain/slope.tif"), df)
+df$aspect <- raster::extract(raster("data/terrain/aspect.tif"), df)
+df$TPI <- raster::extract(raster("data/terrain/TPI.tif"), df)
+df$TRI <- raster::extract(raster("data/terrain/TRI.tif"), df)
+df$roughness <- raster::extract(raster("data/terrain/roughness.tif"), df)
+df$flowdir <- raster::extract(raster("data/terrain/flowdir.tif"), df)
 
 df$folded_aspect = abs(180 - abs(df$aspect - 225))
 
@@ -233,7 +239,7 @@ df$folded_aspect = abs(180 - abs(df$aspect - 225))
 system("aws s3 sync s3://earthlab-amahood/data/landfire_esp_rcl /home/rstudio/wet_dry/data/landfire_esp_rcl")
 shrub_binary <- raster("data/landfire_esp_rcl/shrub_binary.tif") 
 
-df$esp_mask <- raster::extract(shrub_binary, df)
+df$esp_mask <- raster::extract(binary_clip, df)
 
 # writing the file and pushing to s3 -----------------------------------------------
 st_write(df, "data/plots_with_landsat.gpkg")
