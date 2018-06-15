@@ -159,42 +159,46 @@ for(i in 1:length(years)){
 
 
 #### merging elevation tifs ----------------------------------------------
-dem_s3 <- 's3://earthlab-amahood/data/SRTM_dem'
-dem_local <- '/home/rstudio/wet_dry/data/dem'
+# dem_s3 <- 's3://earthlab-amahood/data/SRTM_dem'
+# dem_local <- '/home/rstudio/wet_dry/data/dem'
+# 
+# system(paste("aws s3 sync",
+#               dem_s3,
+#               dem_local))
+# if(!file.exists("data/dem/gb_dem.tif")){
+#   
+#   demlist=list.files(dem_local, pattern="tif$", full.names=TRUE)
+#   
+#   # for(i in demlist) { assign(unlist(strsplit(i, "[.]"))[1], raster(i)) } 
+#   
+#   raster_list <- list()
+#   for(i in 1:length(demlist)){
+#     raster_list[[i]] <- raster(demlist[i])
+#   }
+#   
+#   gb_srtm_dem <- do.call(raster::merge, raster_list)
+#   writeRaster(gb_srtm_dem, "data/gb_dem.tif")
+#   system("aws s3 cp data/gb_dem.tif s3://earthlab-amahood/data/SRTM_dem/gb_dem.tif")
+# }
+# 
+# gb_srtm_dem <- raster("data/dem/gb_dem.tif")
 
-system(paste("aws s3 sync",
-              dem_s3,
-              dem_local))
-if(!file.exists("data/dem/gb_dem.tif")){
-  
-  demlist=list.files(dem_local, pattern="tif$", full.names=TRUE)
-  
-  # for(i in demlist) { assign(unlist(strsplit(i, "[.]"))[1], raster(i)) } 
-  
-  raster_list <- list()
-  for(i in 1:length(demlist)){
-    raster_list[[i]] <- raster(demlist[i])
-  }
-  
-  gb_srtm_dem <- do.call(raster::merge, raster_list)
-  writeRaster(gb_srtm_dem, "data/gb_dem.tif")
-  system("aws s3 cp data/gb_dem.tif s3://earthlab-amahood/data/SRTM_dem/gb_dem.tif")
-}
-
-gb_srtm_dem <- raster("data/dem/gb_dem.tif")
+####NEW LANDFIRE DEM HERE ----------------------------------------------------------
+system("aws s3 sync s3://earthlab-amahood/data/LF_DEM /home/rstudio/wet_dry/data/dem")
+gb_dem <- raster("data/dem/reproj_lf_dem_gb.tif")
 
 # terrain raster --------------------------------------------------------------------------
-ter_s3 <- 's3://earthlab-amahood/data/terrain'
-ter_local <- '/home/rstudio/wet_dry/data/terrain'
+ter_s3 <- 's3://earthlab-amahood/data/terrain_2'
+ter_local <- '/home/rstudio/wet_dry/data/terrain_2'
 
 system(paste("aws s3 sync",
              ter_s3,
              ter_local))
 opts <- c('slope', 'aspect', 'TPI', 'TRI', 'roughness','flowdir')
 for(i in 1:length(opts)){
-  filename <- paste0("data/terrain/",opts[i],".tif")
+  filename <- paste0("data/terrain_2/",opts[i],".tif")
   if(!file.exists(filename)){
-  ter_rst <- terrain(gb_srtm_dem,
+  ter_rst <- terrain(gb_dem,
                      opt = opts[i],
                      unit = 'degrees',
                      neighbors = 8, 
@@ -205,7 +209,19 @@ for(i in 1:length(opts)){
                 " s3://earthlab-amahood/",filename))
   }
   }
+#### create terrain raster stack ####
+slope_gb <- raster("data/terrain_2/slope.tif")
+aspect_gb <- raster("data/terrain_2/aspect.tif")
+TPI_gb <- raster("data/terrain_2/TPI.tif")
+TRI_gb <- raster("data/terrain_2/TRI.tif")
+roughness_gb <- raster("data/terrain_2/roughness.tif")
+flowdir_gb <- raster("data/terrain_2/flowdir.tif")
 
+terrain_gb <- stack(slope_gb, aspect_gb, TPI_gb, TRI_gb, roughness_gb, flowdir_gb, gb_dem)
+
+writeRaster(terrain_gb, "home/rstudio/wet_dry/data/terrain_2/terrain_gb.tif")
+
+system("aws s3 cp home/rstudio/wet_dry/data/terrain_2/terrain_gb.tif s3://earthlab-amahood/data/terrain_2/terrain_gb.tif)
 # keep only sunny days ----------------------------------------------------------------------
 
 df <- result[result$pixel_qa == 66, ] %>% #select plots without clouds
@@ -223,14 +239,14 @@ df$wetness <- wet7(df$sr_band1,df$sr_band2,df$sr_band3,df$sr_band4,df$sr_band5,d
 
 # extracting elevation and topography -----------------------------------------------
 
-df$elevation <- raster::extract(gb_srtm_dem, df)
+df$elevation <- raster::extract(terrain_gb[[7]], df)
 
-df$slope <- raster::extract(raster("data/terrain/slope.tif"), df)
-df$aspect <- raster::extract(raster("data/terrain/aspect.tif"), df)
-df$TPI <- raster::extract(raster("data/terrain/TPI.tif"), df)
-df$TRI <- raster::extract(raster("data/terrain/TRI.tif"), df)
-df$roughness <- raster::extract(raster("data/terrain/roughness.tif"), df)
-df$flowdir <- raster::extract(raster("data/terrain/flowdir.tif"), df)
+df$slope <- raster::extract(terrain_gb[[1]], df)
+df$aspect <- raster::extract(terrain_gb[[2]], df)
+df$TPI <- raster::extract(terrain_gb[[3]], df)
+df$TRI <- raster::extract(terrain_gb[[4]], df)
+df$roughness <- raster::extract(terrain_gb[[5]], df)
+df$flowdir <- raster::extract(terrain_gb[[6]], df)
 
 df$folded_aspect = abs(180 - abs(df$aspect - 225))
 
