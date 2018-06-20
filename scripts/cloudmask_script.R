@@ -51,12 +51,15 @@ plotRGB(s1_unmasked, 6, 5, 4, stretch = "hist")
 
 #issues with extent..... for some reason crop won't match the extents
 
-crop(s1, extent(s2))
-cover(s1, s2)
-
-resample(s2, s1)
-compareRaster(s1, s2)
+s1.2 <- resample(s1, s2, filename = "/home/rstudio/wet_dry/data/landsat_cloudmask_test/resamptest_1")
 
 
-extent(s1)
-extent(s2)
+
+
+#uploading results to s3
+writeRaster(s2, "/home/rstudio/wet_dry/data/landsat_cloudmask_test/scene2_allbands")
+writeRaster(s3, "/home/rstudio/wet_dry/data/landsat_cloudmask_test/scene3_allbands")
+writeRaster(s1, "/home/rstudio/wet_dry/data/landsat_cloudmask_test/scene1_allbands")
+file.rename("/home/rstudio/wet_dry/data/landsat_cloudmask_test/resamptest_1.grd", "/home/rstudio/wet_dry/data/landsat_cloudmask_test/stacks/resamptest_1.grd")
+
+system("aws s3 sync ~/wet_dry/data/landsat_cloudmask_test s3://earthlab-amahood/data/landsat_cloudmask_test")
