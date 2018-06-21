@@ -30,7 +30,7 @@ for(year in years){
       tar_path <- "/home/rstudio/wet_dry/data/ls5/"
       tar_list <- Sys.glob(paste0(tar_path, "LT05", path_row_combo,"*.gz"))
       
-      qas <- data.frame(filenames = NA, value = NA, goodpix = NA, i = NA)
+      qas <- data.frame(filenames = NA, value66 = NA, goodpix = NA, i = NA)
       for (i in 1:length(tar_list)) {
         exdir <- paste0("data/scrap/",i)
         dir.create(exdir)
