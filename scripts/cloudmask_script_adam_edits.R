@@ -75,9 +75,20 @@ for(year in years){
       print(compareRaster(masked[[1]], masked[[2]]))
       
       final <- cover(masked[[1]], masked[[2]])
-
+      names(final) <- c("band_1", "band_2", "band_3", "band_4", "band_5", "band_7")
+      filenamef <- paste("ls5", year, path_row_combo,".tif", sep = "_")
+      writeRaster(final, paste0("data/scrap/",filenamef))
+      system(paste0("aws s3 cp",
+                    " data/scrap/", filenamef, 
+                    " s3://earthlab-amahood/data/landsat_pixel_replaced/", filenamef))
       #brackets from beginning      
+    }else{write.csv(paste("already have", Sys.glob(paste0("data/ls5/*",path_row_combo,"*"))),
+                    paste0("data/scrap/we_need_more", filenamef, ".csv"))
+      system(paste0("aws s3 cp ", paste0("data/scrap/we_need_more", filenamef, ".csv"),
+                    " s3://earthlab-amahood/data/landsat_pixel_replaced/needmore/",
+                    paste0("we_need_more", filenamef, ".csv")))
     }
+    system("rm -r data/scrap/")
   }
   system("rm -r data/ls5/")
 }
