@@ -9,9 +9,14 @@ library(dplyr)
 # turn off factors
 options(stringsAsFactors = FALSE)
 
-#list tar filenames in landsat_cloudmask_test 
-# changed to Sys.glob so there weren't also directories in there
-# added in stuff to pick out path-row
+#create generic mask creation function for use in overlay (can be done with basic raster arithmetic but overlay is easier on memory)
+# functions should go in the beginning of the script( or in a separate functions file)
+maskcreate<- function(x, y){
+  x[y != 66] <- NA
+  return(x)
+}
+
+# big loop ---------------------------------------------------------------------
 
 years <- 1984:2011
 path_row_combo <- prcs$prc[1] # placeholder before loop
@@ -60,42 +65,26 @@ for(year in years){
       e <- extent(bands[[1]])
       f <- extent(bands[[2]])
       
-      x <- crop(masked[[2]], masked[[1]])
-      final <- crop(masked[[1]], x)
-      compareRaster(final, x)
+      e@xmin <- max(c(e@xmin, f@xmin))
+      e@xmax <- min(c(e@xmax, f@xmax))
+      e@ymin <- max(c(e@ymin, f@ymin))
+      e@ymax <- min(c(e@ymax, f@ymax))
       
+      masked <- lapply(masked, FUN = raster::crop, y = e)
       
+      print(compareRaster(masked[[1]], masked[[2]]))
+      
+      final <- cover(masked[[1]], masked[[2]])
+
       #brackets from beginning      
     }
   }
   system("rm -r data/ls5/")
 }
-#create generic mask creation function for use in overlay (can be done with basic raster arithmetic but overlay is easier on memory)
-# functions should go in the beginning of the script( or in a separate functions file)
-maskcreate<- function(x, y){
-  x[y != 66] <- NA
-  return(x)
-}
 
 
-
-#check to see if masked rasters have same extent
-
-compareRaster(june4_masked, july6_masked)
-
-#extents do not match exactly. resolve this with resample
-
-july6_masked <- resample(july6_masked, june4_masked)
-#july6_masked <- crop(july6_masked, june4_masked)
-
-
-#again, check to ensure resample matched the extents
-
-compareRaster(june4_masked, july6_masked)
-
-#replace masked values in one raster with values from another
 
 july6_replaced <- cover(july6_masked, june4_masked)
 
-plotRGB(july6_replaced, stretch = "lin")
-plot(july6_replaced)
+plotRGB(masked[[1]], stretch = "lin")
+plotRGB(final, stretch = "lin")
