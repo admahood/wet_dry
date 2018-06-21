@@ -33,94 +33,33 @@ for(year in years){}
     qas <- data.frame(filenames = NA, value = NA, goodpix = NA, i = NA)
     for (i in 1:length(tar_list)) {
       exdir <- paste0("data/scrap/",i)
-      #dir.create(exdir)
-      #untar(tar_list[i], exdir = exdir)
+      dir.create(exdir)
+      untar(tar_list[i], exdir = exdir)
       qas[i, 1] <- Sys.glob(paste0(exdir, "/*pixel_qa.tif"))
       x<-freq(raster(Sys.glob(paste0(exdir, "/*pixel_qa.tif")))) %>% as_tibble()
       qas[i, 2] <- x[1,1]
       qas[i, 3] <- x[1,2]
       qas[i, 4] <- i
     }
-    which_i <- dplyr::arrange(qas, desc(goodpix));qas
+    qas <- dplyr::arrange(qas, desc(goodpix))
+    ordered_i <- qas$i
     
-#list tif files for each scene
-tifs_1 <- list.files(exdir, "*.tif", full.names = T)
-
-#stack tif files for each scene
-s1<- stack(tifs_1)
-
-
-#create cloud mask for first scene 
-mask_1 <- raster(tifs_1[10])
-plot(mask_1)
-mask_1[mask_1 > 0] <- NA
-plot(mask_1)
-
-#apply mask
-s1 <- mask(s1, mask = mask_1)
-
-#plot masked and unmasked scene
-plotRGB(s1, 6, 5, 4, stretch = "hist")
-
-plotRGB(s1_unmasked, 6, 5, 4, stretch = "hist")
-
-#issues with extent....use resample instead of crop/extend to avoid memory allocation error
-
-s1.2 <- resample(s1, s2, filename = "/home/rstudio/wet_dry/data/landsat_cloudmask_test/resamptest_1")
-
-
-
-
-#uploading results to s3
-writeRaster(s2, "/home/rstudio/wet_dry/data/landsat_cloudmask_test/scene2_allbands")
-writeRaster(s3, "/home/rstudio/wet_dry/data/landsat_cloudmask_test/scene3_allbands")
-writeRaster(s1, "/home/rstudio/wet_dry/data/landsat_cloudmask_test/scene1_allbands")
-file.rename("/home/rstudio/wet_dry/data/landsat_cloudmask_test/resamptest_1.grd", "/home/rstudio/wet_dry/data/landsat_cloudmask_test/stacks/resamptest_1.grd")
-
-system("aws s3 sync ~/wet_dry/data/landsat_cloudmask_test s3://earthlab-amahood/data/landsat_cloudmask_test")
-
-
-
-####6/20 starts here####
-
-#download and load stacked scenes
-
-system("aws s3 sync s3://earthlab-amahood/data/landsat_cloudmask_test/stacks /home/rstudio/wet_dry/data/landsat_cloudmask_test/stacks")
-
-june4 <- brick("/home/rstudio/wet_dry/data/landsat_cloudmask_test/stacks/scene1_allbands.gri")
-june20 <- brick("/home/rstudio/wet_dry/data/landsat_cloudmask_test/stacks/scene2_allbands.gri")
-july6 <- brick("/home/rstudio/wet_dry/data/landsat_cloudmask_test/stacks/scene3_allbands.gri")
-
-
-#plot to visualize cloud cover
-plotRGB(june4, r = 6, g = 5, b = 4, stretch = "hist")
-
-plotRGB(june20, r = 6, g = 5, b = 4, stretch = "hist")
-
-plotRGB(july6, r = 6, g = 5, b = 4, stretch = "hist")
-
-
-#create pixel quality rasters for masking
-
-pqa_june4 <- june4[[1]]
-pqa_june20 <- june20[[1]]
-pqa_july6 <- july6[[1]]
-
-
-plot(pqa_june4)
-plot(pqa_june20)
-plot(pqa_july6)
-
-#drop unnecessary layers from stack to speed up processing a bit
-june4 <- dropLayer(june4, c(1, 2, 3, 10))
-june4 <- brick(june4)
-june20 <- dropLayer(june20, c(1, 2, 3, 10))
-june20 <- brick(june20)
-july6 <- dropLayer(july6, c(1, 2, 3, 10))
-july6 <- brick(july6)
-
+    tifs <- list()
+    for(i in 1:length(tar_list)){
+      tifs[[i]] <- Sys.glob(paste0("data/scrap/", i, "/*band*.tif"))
+    }
+    
+    bands <- list()
+    qa <- list()
+    masked <- list()
+    for(i in 1:length(tar_list)){
+      bands[[i]] <- stack(tifs[[ordered_i[i][1]]])
+      qa[[i]] <- raster(Sys.glob(paste0("data/scrap/",ordered_i[i][1],"/*pixel_qa.tif")))
+      masked[[i]] <- overlay(x <- bands[[i]], y = qa[[i]], fun = maskcreate) # this takes time
+    }
 #create generic mask creation function for use in overlay (can be done with basic raster arithmetic but overlay is easier on memory)
-ls5_maskcreate<- function(x, y){
+# functions should go in the beginning of the script( or in a separate functions file)
+maskcreate<- function(x, y){
   x[y != 66] <- NA
   return(x)
 }
@@ -140,7 +79,7 @@ compareRaster(june4_masked, july6_masked)
 #extents do not match exactly. resolve this with resample
 
 july6_masked <- resample(july6_masked, june4_masked)
-july6_masked <- crop(july6_masked, june4_masked)
+#july6_masked <- crop(july6_masked, june4_masked)
 
 
 #again, check to ensure resample matched the extents
