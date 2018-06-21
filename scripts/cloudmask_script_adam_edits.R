@@ -57,6 +57,9 @@ for(year in years){
         qa[[i]] <- raster(Sys.glob(paste0("data/scrap/",ordered_i[i][1],"/*pixel_qa.tif")))
         masked[[i]] <- overlay(x <- bands[[i]], y = qa[[i]], fun = maskcreate) # this takes time
       }
+      e <- extent(bands[[1]])
+      f <- extent(bands[[2]])
+      
       x <- crop(masked[[2]], masked[[1]])
       final <- crop(masked[[1]], x)
       compareRaster(final, x)
