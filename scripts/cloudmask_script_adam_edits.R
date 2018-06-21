@@ -5,20 +5,16 @@
 library(raster)
 library(rgdal)
 library(rgeos)
-
+library(dplyr)
 # turn off factors
 options(stringsAsFactors = FALSE)
-
-# import files -----------------------------------------------------------------
-system("aws s3 sync s3://earthlab-amahood/data/landsat_cloudmask_test /home/rstudio/wet_dry/data/landsat_cloudmask_test")
-
 
 #list tar filenames in landsat_cloudmask_test 
 # changed to Sys.glob so there weren't also directories in there
 # added in stuff to pick out path-row
 
 years <- 1984:2011
-path_row_combo <- path_row_combos[1] # placeholder before loop
+path_row_combo <- prcs$prc[1] # placeholder before loop
 year = years[1] # placeholder before loop
 dir.create("data/scrap")
 
