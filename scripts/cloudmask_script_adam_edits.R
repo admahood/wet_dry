@@ -1,42 +1,53 @@
 ####6/19 code starts here. basic mask creation and application to single scene accomplished 
 #as well as creation of stacks from each scene for figuring out how to replace masked values ####
 
-# import spatial packages
+# setup ------------------------------------------------------------------------
 library(raster)
 library(rgdal)
 library(rgeos)
+
 # turn off factors
 options(stringsAsFactors = FALSE)
 
+# import files -----------------------------------------------------------------
 system("aws s3 sync s3://earthlab-amahood/data/landsat_cloudmask_test /home/rstudio/wet_dry/data/landsat_cloudmask_test")
 
 
-#list tar filenames in landsat_cloudmask_test
-tar_list <- list.files("/home/rstudio/wet_dry/data/landsat_cloudmask_test", full.names = T)
+#list tar filenames in landsat_cloudmask_test 
+# changed to Sys.glob so there weren't also directories in there
+# added in stuff to pick out path-row
 
-#for loop for untarring and placing each scene's tif files into separate folder
-for (i in 1:length(tar_list)) {
-  dir.create(paste0("/home/rstudio/wet_dry/data/landsat_cloudmask_test", "/", "scene", i))
-  untar(tar_list[i], exdir = paste0("/home/rstudio/wet_dry/data/landsat_cloudmask_test", "/", "scene", i))
-}
+years <- 1984:2011
+path_row_combo <- path_row_combos[1] # placeholder before loop
+year = years[1] # placeholder before loop
+dir.create("data/scrap")
 
+for(year in years){}
+  system(paste0("aws s3 sync s3://earthlab-amahood/data/landsat/landsat_", year,
+                " data/ls5/"))
+
+  for(path_row_combo in path_row_combos){}
+    tar_path <- "/home/rstudio/wet_dry/data/ls5/"
+    tar_list <- Sys.glob(paste0(tar_path, "LT05", path_row_combo,"*.gz"))
+    
+    qas <- data.frame(filenames = NA, value = NA, goodpix = NA, i = NA)
+    for (i in 1:length(tar_list)) {
+      exdir <- paste0("data/scrap/",i)
+      #dir.create(exdir)
+      #untar(tar_list[i], exdir = exdir)
+      qas[i, 1] <- Sys.glob(paste0(exdir, "/*pixel_qa.tif"))
+      x<-freq(raster(Sys.glob(paste0(exdir, "/*pixel_qa.tif")))) %>% as_tibble()
+      qas[i, 2] <- x[1,1]
+      qas[i, 3] <- x[1,2]
+      qas[i, 4] <- i
+    }
+    which_i <- dplyr::arrange(qas, desc(goodpix));qas
+    
 #list tif files for each scene
-tifs_1 <- list.files("/home/rstudio/wet_dry/data/landsat_cloudmask_test/scene1", "*.tif", full.names = T)
-
-tifs_2 <-  list.files("/home/rstudio/wet_dry/data/landsat_cloudmask_test/scene2", "*.tif", full.names = T)
-
-tifs_3 <-  list.files("/home/rstudio/wet_dry/data/landsat_cloudmask_test/scene3", "*.tif", full.names = T)
+tifs_1 <- list.files(exdir, "*.tif", full.names = T)
 
 #stack tif files for each scene
-s1_unmasked <- stack(tifs_1)
-s1 <- stack(tifs_1)
-
-
-s2 <- stack(tifs_2)
-
-
-
-s3 <- stack(tifs_3)
+s1<- stack(tifs_1)
 
 
 #create cloud mask for first scene 
@@ -129,6 +140,8 @@ compareRaster(june4_masked, july6_masked)
 #extents do not match exactly. resolve this with resample
 
 july6_masked <- resample(july6_masked, june4_masked)
+july6_masked <- crop(july6_masked, june4_masked)
+
 
 #again, check to ensure resample matched the extents
 
