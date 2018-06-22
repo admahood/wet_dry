@@ -47,7 +47,6 @@ foreach(year = years) %dopar% {
   
   for(path_row_combo in prcs$prc){
     if(prcs[prcs$prc == path_row_combo,]$freq > 1){
-      t0 <- Sys.time()
       filenamef <- paste("ls5", year, path_row_combo,".tif", sep = "_")
       system(paste("echo", year, path_row_combo))
       
@@ -89,14 +88,13 @@ foreach(year = years) %dopar% {
           bands[[i]] <- stack(tifs[[ordered_i[i][1]]])
           qa[[i]] <- raster(Sys.glob(paste0("data/scrap/",year, "/", ordered_i[i][1],"/*pixel_qa.tif")))
           masked[[i]] <- overlay(x <- bands[[i]], y = qa[[i]], fun = maskcreate) # this takes time
-          rm(qa)
           e <- extent(bands[[i]])
           xmins[i] <- e@xmin
           xmaxs[i] <- e@xmax
           ymins[i] <- e@ymin
           ymaxs[i] <- e@ymax
         }
-        
+        rm(qa)
         e <- extent(bands[[1]])
         
         e@xmin <- max(xmins)
@@ -125,7 +123,7 @@ foreach(year = years) %dopar% {
                       " data/results/", filenamef, 
                       " s3://earthlab-amahood/data/landsat_pixel_replaced/", filenamef))
         gc()
-        print(Sys.time() - t0)
+        
       }else{system("echo skipping")}
     }else{system("echo not enough")}
   }
