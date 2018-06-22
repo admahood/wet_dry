@@ -6,6 +6,8 @@ library(raster)
 library(rgdal)
 library(rgeos)
 library(dplyr)
+library(foreach)
+library(doParallel)
 # turn off factors
 options(stringsAsFactors = FALSE)
 
@@ -22,6 +24,9 @@ years <- 1984:2011
 year = years[1] # placeholder before loop
 dir.create("data/results")
 dir.create("data/needs")
+
+corz <- detectCores()-1
+registerDoParallel(corz)
 
 foreach(year = years) %dopar% {
   system(paste0("aws s3 sync s3://earthlab-amahood/data/landsat/landsat_", year,
