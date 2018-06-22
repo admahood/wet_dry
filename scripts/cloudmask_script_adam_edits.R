@@ -11,33 +11,37 @@ library(rgeos)
 library(dplyr)
 library(foreach)
 library(doParallel)
-# turn off factors
-options(stringsAsFactors = FALSE)
 
-#create generic mask creation function for use in overlay (can be done with basic raster arithmetic but overlay is easier on memory)
+# create generic mask creation function for use in overlay (can be done with basic raster arithmetic but overlay is easier on memory)
 # functions should go in the beginning of the script( or in a separate functions file)
-maskcreate<- function(x, y){
+maskcreate <- function(x, y){
   x[y != 66] <- NA
   return(x)
 }
 
 # big loop ---------------------------------------------------------------------
 
-years <- 1984:2011
+years <- 1984:2011 # parallel iterator
 dir.create("data")
 dir.create("data/results")
 dir.create("data/needs")
 dir.create("data/scrap")
 
-corz <- length(years)
+# parallel prep
+corz <- length(years) # using only 28 cores out of 64 possible due to memory (RAM) needs
 registerDoParallel(corz)
 
-foreach(year = years) %dopar% {
+foreach(year = years) %dopar% { # note that foreach has a slightly different syntax
+  
   system(paste0("aws s3 sync s3://earthlab-amahood/data/landsat/landsat_", year,
                 " data/ls5/y",year))
+  
+  # creating a table of path row combinations and how many files of each we have
   prcs <- list.files(paste0("data/ls5/y",year,"/")) %>% substr(5,10) %>% table() %>% as.data.frame()
   colnames(prcs) <- c("prc", "freq")
   prcs$prc <- as.character(prcs$prc)
+  
+  # adding some extra info to write out so we can download more scenes
   prcs$year <- year
   prcs$file = NA
   for(i in 1:nrow(prcs)){
@@ -49,17 +53,33 @@ foreach(year = years) %dopar% {
                 " data/needs/needs_", year, ".csv",
                 " s3://earthlab-amahood/data/needs/needs_", year, ".csv"))
   
+  # using the prc column out of that data frame as our iterator
+  
   for(path_row_combo in prcs$prc){
+    
+    # this if statement ensures that we're only going through this whole thing
+    # for path/row combos where we have more than one scene
     if(prcs[prcs$prc == path_row_combo,]$freq > 1){
+      
+      # this is the result filename, to be used at the end. defnining it here
+      # so that we can avoid creating it a second time if it's already made
+      # i.e. that's the upcoming if statement
       filenamef <- paste("ls5", year, path_row_combo,".tif", sep = "_")
+      
+      # this is the way to have the script print something out from a parallel script
+      # the print() function doesn't work in parallel
       system(paste("echo", year, path_row_combo))
       
       if(!file.exists(file.path("data/results/", filenamef))){
+        
+        # the a directory where the compressed landsat files are coming from
         tar_path <- paste0("/home/rstudio/wet_dry/data/ls5/y",year,"/")
         tar_list <- Sys.glob(paste0(tar_path, "LT05", path_row_combo,"*.gz"))
         
         qas <- data.frame(filenames = NA, value66 = NA, goodpix = NA, i = NA)
         for (i in 1:length(tar_list)) {
+          
+          # deleting everything from previous loops
           exdir <- paste0("data/scrap/",year, "/",i)
           system(paste0("rm -r ", exdir))
           dir.create(exdir)
