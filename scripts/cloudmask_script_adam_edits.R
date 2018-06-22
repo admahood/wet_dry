@@ -21,11 +21,12 @@ maskcreate<- function(x, y){
 # big loop ---------------------------------------------------------------------
 
 years <- 1984:2011
+dir.create("data")
 dir.create("data/results")
 dir.create("data/needs")
 dir.create("data/scrap")
 
-corz <- 18
+corz <- length(years)
 registerDoParallel(corz)
 
 foreach(year = years) %dopar% {
