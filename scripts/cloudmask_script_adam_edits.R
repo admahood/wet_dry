@@ -31,9 +31,10 @@ for(year in years){
   colnames(prcs) <- c("prc", "freq")
   prcs$prc <- as.character(prcs$prc)
   
-  t0 <- Sys.time()
+  
   for(path_row_combo in prcs$prc){
     if(prcs[prcs$prc == path_row_combo,]$freq > 1){
+      t0 <- Sys.time()
       filenamef <- paste("ls5", year, path_row_combo,".tif", sep = "_")
       
       if(!file.exists(file.path("data/results/", filenamef))){
