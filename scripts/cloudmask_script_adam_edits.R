@@ -21,7 +21,6 @@ maskcreate<- function(x, y){
 # big loop ---------------------------------------------------------------------
 
 years <- 1984:2011
-year = years[1] # placeholder before loop
 dir.create("data/results")
 dir.create("data/needs")
 
@@ -41,6 +40,9 @@ foreach(year = years) %dopar% {
   }
   needs <- prcs[prcs$freq == 1,]
   write.csv(needs, paste0("data/needs/needs_",year,".csv"))
+  system(paste0("aws s3 cp",
+                " data/needs/needs_", year, ".csv",
+                " s3://earthlab-amahood/data/needs/needs_", year, ".csv"))
   
   for(path_row_combo in prcs$prc){
     dir.create("data/scrap")
