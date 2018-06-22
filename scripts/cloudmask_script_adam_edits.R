@@ -67,6 +67,7 @@ foreach(year = years) %dopar% {
           qas[i, 3] <- x[1,2]
           qas[i, 4] <- i
         }
+        rm(x)
         qas <- dplyr::arrange(qas, desc(goodpix))
         ordered_i <- qas$i
         
@@ -86,6 +87,7 @@ foreach(year = years) %dopar% {
           bands[[i]] <- stack(tifs[[ordered_i[i][1]]])
           qa[[i]] <- raster(Sys.glob(paste0("data/scrap/",year, "/", ordered_i[i][1],"/*pixel_qa.tif")))
           masked[[i]] <- overlay(x <- bands[[i]], y = qa[[i]], fun = maskcreate) # this takes time
+          rm(qa)
           e <- extent(bands[[i]])
           xmins[i] <- e@xmin
           xmaxs[i] <- e@xmax
@@ -100,6 +102,8 @@ foreach(year = years) %dopar% {
         e@ymin <- max(ymins)
         e@ymax <- min(ymaxs)
         
+        rm(bands)
+        
         masked <- lapply(masked, FUN = raster::crop, y = e) # applies crop to a list of rasters
         
         print(compareRaster(masked[[1]], masked[[2]]))
@@ -109,10 +113,12 @@ foreach(year = years) %dopar% {
         if(length(tar_list) == 3){
           final <- cover(final, masked[[3]])
         }else{print('yay')}
+        rm(masked)
         
         names(final) <- c("band_1", "band_2", "band_3", "band_4", "band_5", "band_7")
         
         writeRaster(final, paste0("data/results/",filenamef), overwrite = TRUE)
+        rm(final)
         system(paste0("aws s3 cp",
                       " data/results/", filenamef, 
                       " s3://earthlab-amahood/data/landsat_pixel_replaced/", filenamef))
