@@ -21,7 +21,6 @@ maskcreate<- function(x, y){
 years <- 1984:2011
 path_row_combo <- prcs$prc[1] # placeholder before loop
 year = years[1] # placeholder before loop
-dir.create("data/scrap")
 dir.create("data/results")
 
 for(year in years){
@@ -33,6 +32,7 @@ for(year in years){
   
   
   for(path_row_combo in prcs$prc){
+    dir.create("data/scrap")
     if(prcs[prcs$prc == path_row_combo,]$freq > 1){
       t0 <- Sys.time()
       filenamef <- paste("ls5", year, path_row_combo,".tif", sep = "_")
