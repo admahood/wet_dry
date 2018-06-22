@@ -25,7 +25,7 @@ dir.create("data/results")
 dir.create("data/needs")
 dir.create("data/scrap")
 
-corz <- detectCores()-1
+corz <- 18
 registerDoParallel(corz)
 
 foreach(year = years) %dopar% {
