@@ -57,31 +57,45 @@ for(year in years){
       bands <- list()
       qa <- list()
       masked <- list()
+      xmins <- c()
+      xmaxs <- c()
+      ymins <- c()
+      ymaxs <- c()
       for(i in 1:length(tar_list)){
         bands[[i]] <- stack(tifs[[ordered_i[i][1]]])
         qa[[i]] <- raster(Sys.glob(paste0("data/scrap/",ordered_i[i][1],"/*pixel_qa.tif")))
         masked[[i]] <- overlay(x <- bands[[i]], y = qa[[i]], fun = maskcreate) # this takes time
+        e <- extent(bands[[i]])
+        xmins[i] <- e@xmin
+        xmaxs[i] <- e@xmax
+        ymins[i] <- e@ymin
+        ymaxs[i] <- e@ymax
       }
+      
       e <- extent(bands[[1]])
-      f <- extent(bands[[2]])
       
-      e@xmin <- max(c(e@xmin, f@xmin))
-      e@xmax <- min(c(e@xmax, f@xmax))
-      e@ymin <- max(c(e@ymin, f@ymin))
-      e@ymax <- min(c(e@ymax, f@ymax))
+      e@xmin <- max(xmins)
+      e@xmax <- min(xmaxs)
+      e@ymin <- max(ymins)
+      e@ymax <- min(ymaxs)
       
-      masked <- lapply(masked, FUN = raster::crop, y = e)
+      masked <- lapply(masked, FUN = raster::crop, y = e) # applies crop to a list of rasters
       
       print(compareRaster(masked[[1]], masked[[2]]))
       
       final <- cover(masked[[1]], masked[[2]])
+      
+      if(length(tar_list) == 3){
+        final <- cover(final, masked[[3]])
+      }else{print('yay')}
+      
       names(final) <- c("band_1", "band_2", "band_3", "band_4", "band_5", "band_7")
       filenamef <- paste("ls5", year, path_row_combo,".tif", sep = "_")
       writeRaster(final, paste0("data/scrap/",filenamef))
       system(paste0("aws s3 cp",
                     " data/scrap/", filenamef, 
                     " s3://earthlab-amahood/data/landsat_pixel_replaced/", filenamef))
-      #brackets from beginning      
+      gc()
     }else{write.csv(paste("already have", Sys.glob(paste0("data/ls5/*",path_row_combo,"*"))),
                     paste0("data/scrap/we_need_more", filenamef, ".csv"))
       system(paste0("aws s3 cp ", paste0("data/scrap/we_need_more", filenamef, ".csv"),
