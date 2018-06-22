@@ -19,9 +19,9 @@ maskcreate<- function(x, y){
 # big loop ---------------------------------------------------------------------
 
 years <- 1984:2011
-path_row_combo <- prcs$prc[1] # placeholder before loop
 year = years[1] # placeholder before loop
 dir.create("data/results")
+dir.create("data/needs")
 
 for(year in years){
   system(paste0("aws s3 sync s3://earthlab-amahood/data/landsat/landsat_", year,
@@ -29,9 +29,15 @@ for(year in years){
   prcs <- list.files("data/ls5") %>% substr(5,10) %>% table() %>% as.data.frame()
   colnames(prcs) <- c("prc", "freq")
   prcs$prc <- as.character(prcs$prc)
+  prcs$year <- year
+  prcs$file = NA
+  for(i in 1:nrow(prcs)){
+    prcs[i, 4] <- Sys.glob(paste0("data/ls5/*", prcs$prc[i], "*"))[1]
+  }
+  needs <- prcs[prcs$freq == 1,]
+  write.csv(needs, paste0("data/needs/needs_",year,".csv"))
   
-  
-  for(path_row_combo in prcs$prc){
+  foreach(path_row_combo = prcs$prc) %dopar% {
     dir.create("data/scrap")
     if(prcs[prcs$prc == path_row_combo,]$freq > 1){
       t0 <- Sys.time()
@@ -103,9 +109,8 @@ for(year in years){
                       " s3://earthlab-amahood/data/landsat_pixel_replaced/", filenamef))
         gc()
         print(Sys.time() - t0)
-        }else{print("skipping")}
-      }else{print("not enough")
-    }
+      }else{print("skipping")}
+    }else{print("not enough")}
     system("rm -r data/scrap/")
   }
   system("rm -r data/ls5/")
