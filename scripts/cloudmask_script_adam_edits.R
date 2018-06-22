@@ -49,6 +49,7 @@ foreach(year = years) %dopar% {
     if(prcs[prcs$prc == path_row_combo,]$freq > 1){
       t0 <- Sys.time()
       filenamef <- paste("ls5", year, path_row_combo,".tif", sep = "_")
+      system(paste("echo", year, path_row_combo))
       
       if(!file.exists(file.path("data/results/", filenamef))){
         tar_path <- paste0("/home/rstudio/wet_dry/data/ls5/y",year,"/")
@@ -119,7 +120,6 @@ foreach(year = years) %dopar% {
         print(Sys.time() - t0)
       }else{print("skipping")}
     }else{print("not enough")}
-    #system("rm -r data/scrap")
   }
   #system("rm -r data/ls5/")
 }
