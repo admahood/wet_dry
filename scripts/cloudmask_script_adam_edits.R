@@ -51,12 +51,12 @@ foreach(year = years) %dopar% {
       filenamef <- paste("ls5", year, path_row_combo,".tif", sep = "_")
       
       if(!file.exists(file.path("data/results/", filenamef))){
-        tar_path <- paste0("/home/rstudio/wet_dry/data/ls5/y",year)
+        tar_path <- paste0("/home/rstudio/wet_dry/data/ls5/y",year,"/")
         tar_list <- Sys.glob(paste0(tar_path, "LT05", path_row_combo,"*.gz"))
         
         qas <- data.frame(filenames = NA, value66 = NA, goodpix = NA, i = NA)
         for (i in 1:length(tar_list)) {
-          exdir <- paste0("data/scrap/",i)
+          exdir <- paste0("data/scrap/",year, "/",i)
           dir.create(exdir)
           untar(tar_list[i], exdir = exdir)
           qas[i, 1] <- Sys.glob(paste0(exdir, "/*pixel_qa.tif"))
@@ -70,7 +70,7 @@ foreach(year = years) %dopar% {
         
         tifs <- list()
         for(i in 1:length(tar_list)){
-          tifs[[i]] <- Sys.glob(paste0("data/scrap/", i, "/*band*.tif"))
+          tifs[[i]] <- Sys.glob(paste0("data/scrap/",year,"/", i, "/*band*.tif"))
         }
         
         bands <- list()
