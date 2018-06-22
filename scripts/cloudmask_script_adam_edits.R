@@ -23,7 +23,7 @@ year = years[1] # placeholder before loop
 dir.create("data/results")
 dir.create("data/needs")
 
-for(year in years){
+foreach(year = years) %dopar% {
   system(paste0("aws s3 sync s3://earthlab-amahood/data/landsat/landsat_", year,
                 " data/ls5/"))
   prcs <- list.files("data/ls5") %>% substr(5,10) %>% table() %>% as.data.frame()
@@ -37,7 +37,7 @@ for(year in years){
   needs <- prcs[prcs$freq == 1,]
   write.csv(needs, paste0("data/needs/needs_",year,".csv"))
   
-  foreach(path_row_combo = prcs$prc) %dopar% {
+  for(path_row_combo in prcs$prc){
     dir.create("data/scrap")
     if(prcs[prcs$prc == path_row_combo,]$freq > 1){
       t0 <- Sys.time()
