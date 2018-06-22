@@ -221,7 +221,7 @@ terrain_gb <- stack(slope_gb, aspect_gb, TPI_gb, TRI_gb, roughness_gb, flowdir_g
 
 writeRaster(terrain_gb, "home/rstudio/wet_dry/data/terrain_2/terrain_gb.tif")
 
-system("aws s3 cp home/rstudio/wet_dry/data/terrain_2/terrain_gb.tif s3://earthlab-amahood/data/terrain_2/terrain_gb.tif)
+system("aws s3 cp home/rstudio/wet_dry/data/terrain_2/terrain_gb.tif s3://earthlab-amahood/data/terrain_2/terrain_gb.tif")
 # keep only sunny days ----------------------------------------------------------------------
 
 df <- result[result$pixel_qa == 66, ] %>% #select plots without clouds
@@ -250,7 +250,7 @@ df$flowdir <- raster::extract(terrain_gb[[6]], df)
 
 df$folded_aspect = abs(180 - abs(df$aspect - 225))
 
-# doing the mask thing 
+# doing the mask thing
 
 system("aws s3 sync s3://earthlab-amahood/data/landfire_esp_rcl /home/rstudio/wet_dry/data/landfire_esp_rcl")
 shrub_binary <- raster("data/landfire_esp_rcl/shrub_binary.tif") 
