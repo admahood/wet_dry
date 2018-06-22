@@ -57,6 +57,7 @@ foreach(year = years) %dopar% {
         qas <- data.frame(filenames = NA, value66 = NA, goodpix = NA, i = NA)
         for (i in 1:length(tar_list)) {
           exdir <- paste0("data/scrap/",year, "/",i)
+          system(paste0("rm -r ", exdir))
           dir.create(exdir)
           untar(tar_list[i], exdir = exdir)
           qas[i, 1] <- Sys.glob(paste0(exdir, "/*pixel_qa.tif"))
