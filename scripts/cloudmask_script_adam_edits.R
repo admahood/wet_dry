@@ -28,6 +28,7 @@ for(year in years){
                 " data/ls5/"))
   prcs <- list.files("data/ls5") %>% substr(5,10) %>% table() %>% as.data.frame()
   colnames(prcs) <- c("prc", "freq")
+  prcs$prc <- as.character(prcs$prc)
   
   
   for(path_row_combo in prcs$prc){
@@ -106,10 +107,3 @@ for(year in years){
   }
   system("rm -r data/ls5/")
 }
-
-
-
-july6_replaced <- cover(july6_masked, june4_masked)
-
-plotRGB(masked[[1]], stretch = "lin")
-plotRGB(final, stretch = "lin")
