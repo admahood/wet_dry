@@ -30,14 +30,14 @@ registerDoParallel(corz)
 
 foreach(year = years) %dopar% {
   system(paste0("aws s3 sync s3://earthlab-amahood/data/landsat/landsat_", year,
-                " data/ls5/"))
-  prcs <- list.files("data/ls5") %>% substr(5,10) %>% table() %>% as.data.frame()
+                " data/ls5/y",year))
+  prcs <- list.files(paste0("data/ls5/y",year,"/")) %>% substr(5,10) %>% table() %>% as.data.frame()
   colnames(prcs) <- c("prc", "freq")
   prcs$prc <- as.character(prcs$prc)
   prcs$year <- year
   prcs$file = NA
   for(i in 1:nrow(prcs)){
-    prcs[i, 4] <- Sys.glob(paste0("data/ls5/*", prcs$prc[i], "*"))[1]
+    prcs[i, 4] <- Sys.glob(paste0("data/ls5/y", year,"/*", prcs$prc[i], "*"))[1]
   }
   needs <- prcs[prcs$freq == 1,]
   write.csv(needs, paste0("data/needs/needs_",year,".csv"))
@@ -49,7 +49,7 @@ foreach(year = years) %dopar% {
       filenamef <- paste("ls5", year, path_row_combo,".tif", sep = "_")
       
       if(!file.exists(file.path("data/results/", filenamef))){
-        tar_path <- "/home/rstudio/wet_dry/data/ls5/"
+        tar_path <- paste0("/home/rstudio/wet_dry/data/ls5/y",year)
         tar_list <- Sys.glob(paste0(tar_path, "LT05", path_row_combo,"*.gz"))
         
         qas <- data.frame(filenames = NA, value66 = NA, goodpix = NA, i = NA)
@@ -116,7 +116,7 @@ foreach(year = years) %dopar% {
         print(Sys.time() - t0)
       }else{print("skipping")}
     }else{print("not enough")}
-    system("rm -r data/scrap/")
+    #system("rm -r data/scrap")
   }
-  system("rm -r data/ls5/")
+  #system("rm -r data/ls5/")
 }
