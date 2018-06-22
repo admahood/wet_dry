@@ -23,6 +23,7 @@ maskcreate<- function(x, y){
 years <- 1984:2011
 dir.create("data/results")
 dir.create("data/needs")
+dir.create("data/scrap")
 
 corz <- detectCores()-1
 registerDoParallel(corz)
@@ -45,7 +46,6 @@ foreach(year = years) %dopar% {
                 " s3://earthlab-amahood/data/needs/needs_", year, ".csv"))
   
   for(path_row_combo in prcs$prc){
-    dir.create("data/scrap")
     if(prcs[prcs$prc == path_row_combo,]$freq > 1){
       t0 <- Sys.time()
       filenamef <- paste("ls5", year, path_row_combo,".tif", sep = "_")
@@ -82,7 +82,7 @@ foreach(year = years) %dopar% {
         ymaxs <- c()
         for(i in 1:length(tar_list)){
           bands[[i]] <- stack(tifs[[ordered_i[i][1]]])
-          qa[[i]] <- raster(Sys.glob(paste0("data/scrap/",ordered_i[i][1],"/*pixel_qa.tif")))
+          qa[[i]] <- raster(Sys.glob(paste0("data/scrap/",year, "/", ordered_i[i][1],"/*pixel_qa.tif")))
           masked[[i]] <- overlay(x <- bands[[i]], y = qa[[i]], fun = maskcreate) # this takes time
           e <- extent(bands[[i]])
           xmins[i] <- e@xmin
