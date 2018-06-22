@@ -185,7 +185,7 @@ for(i in 1:length(years)){
 
 ####NEW LANDFIRE DEM HERE ----------------------------------------------------------
 system("aws s3 sync s3://earthlab-amahood/data/LF_DEM /home/rstudio/wet_dry/data/dem")
-gb_dem <- raster("data/dem/reproj_lf_dem_gb.tif")
+gb_dem <- raster("data/dem/lf_dem_reproj_full.tif")
 
 # terrain raster --------------------------------------------------------------------------
 ter_s3 <- 's3://earthlab-amahood/data/terrain_2'
