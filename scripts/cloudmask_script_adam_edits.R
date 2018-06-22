@@ -22,6 +22,7 @@ years <- 1984:2011
 path_row_combo <- prcs$prc[1] # placeholder before loop
 year = years[1] # placeholder before loop
 dir.create("data/scrap")
+dir.create("data/results")
 
 for(year in years){
   system(paste0("aws s3 sync s3://earthlab-amahood/data/landsat/landsat_", year,
@@ -35,7 +36,7 @@ for(year in years){
     if(prcs[prcs$prc == path_row_combo,]$freq > 1){
       filenamef <- paste("ls5", year, path_row_combo,".tif", sep = "_")
       
-      if(!file.exists(file.path("data/scrap/", filenamef))){
+      if(!file.exists(file.path("data/results/", filenamef))){
         tar_path <- "/home/rstudio/wet_dry/data/ls5/"
         tar_list <- Sys.glob(paste0(tar_path, "LT05", path_row_combo,"*.gz"))
         
@@ -95,20 +96,16 @@ for(year in years){
         
         names(final) <- c("band_1", "band_2", "band_3", "band_4", "band_5", "band_7")
         
-        writeRaster(final, paste0("data/scrap/",filenamef), overwrite = TRUE)
+        writeRaster(final, paste0("data/results/",filenamef), overwrite = TRUE)
         system(paste0("aws s3 cp",
-                      " data/scrap/", filenamef, 
+                      " data/results/", filenamef, 
                       " s3://earthlab-amahood/data/landsat_pixel_replaced/", filenamef))
         gc()
-      }else{print("skipping")}
-    }else{write.csv(paste("already have", Sys.glob(paste0("data/ls5/*",path_row_combo,"*"))),
-                    paste0("data/scrap/we_need_more", filenamef, ".csv"))
-      system(paste0("aws s3 cp ", paste0("data/scrap/we_need_more", filenamef, ".csv"),
-                    " s3://earthlab-amahood/data/landsat_pixel_replaced/needmore/",
-                    paste0("we_need_more", filenamef, ".csv")))
+        print(Sys.time() - t0)
+        }else{print("skipping")}
+      }else{print("not enough")
     }
     system("rm -r data/scrap/")
-    print(Sys.time() - t0)
   }
   system("rm -r data/ls5/")
 }
