@@ -71,6 +71,8 @@ foreach(year = years) %dopar% {
         qas <- dplyr::arrange(qas, desc(goodpix))
         ordered_i <- qas$i
         
+        system(paste("echo masks created", year, path_row_combo))
+        
         tifs <- list()
         for(i in 1:length(tar_list)){
           tifs[[i]] <- Sys.glob(paste0("data/scrap/",year,"/", i, "/*band*.tif"))
@@ -106,7 +108,7 @@ foreach(year = years) %dopar% {
         
         masked <- lapply(masked, FUN = raster::crop, y = e) # applies crop to a list of rasters
         
-        print(compareRaster(masked[[1]], masked[[2]]))
+        system(paste("echo mask applied", year, path_row_combo))
         
         final <- cover(masked[[1]], masked[[2]])
         
@@ -124,8 +126,8 @@ foreach(year = years) %dopar% {
                       " s3://earthlab-amahood/data/landsat_pixel_replaced/", filenamef))
         gc()
         print(Sys.time() - t0)
-      }else{print("skipping")}
-    }else{print("not enough")}
+      }else{system("echo skipping")}
+    }else{system("echo not enough")}
   }
   #system("rm -r data/ls5/")
 }
