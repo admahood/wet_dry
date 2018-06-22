@@ -1,5 +1,8 @@
-####6/19 code starts here. basic mask creation and application to single scene accomplished 
-#as well as creation of stacks from each scene for figuring out how to replace masked values ####
+# replacing clouds in one landsat scene with pixels from another landsat scene
+# parallelized
+# authors: dylan murphy and adam mahood
+#
+# this script requires over 10GB of ram per core!
 
 # setup ------------------------------------------------------------------------
 library(raster)
