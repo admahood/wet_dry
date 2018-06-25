@@ -102,6 +102,8 @@ foreach(year = years) %dopar% { # note that foreach has a slightly different syn
           # deleting everything from previous loops
           exdir <- paste0("data/scrap/",year, "/",i)
           system(paste0("rm -r ", exdir))
+          
+          # making new subdirectories and unzipping, then sorting by number of good pixels
           dir.create(exdir)
           untar(tar_list[i], exdir = exdir)
           qas[i, 1] <- Sys.glob(paste0(exdir, "/*pixel_qa.tif"))
@@ -116,16 +118,18 @@ foreach(year = years) %dopar% { # note that foreach has a slightly different syn
         
         system(paste("echo masks created", year, path_row_combo))
         
+        # creating lists of the tifs only with band in the name for each scene
         tifs <- list()
         for(i in 1:length(tar_list)){
           tifs[[i]] <- Sys.glob(paste0("data/scrap/",year,"/", i, "/*band*.tif"))
         }
         
-        bands <- list()
-        qa <- list()
-        masked <- list()
-        xmins <- c()
-        xmaxs <- c()
+        bands <- list() # each item of this list will have bands 1-5 & 7
+        qa <- list() # each item of this list will have the qa band
+        masked <- list() # each item of this list will be the masked result
+        
+        xmins <- c() # each of these will have the pieces of the extent objects
+        xmaxs <- c() # to be used to create the extent object that works for all 
         ymins <- c()
         ymaxs <- c()
         for(i in 1:length(tar_list)){
@@ -141,17 +145,19 @@ foreach(year = years) %dopar% { # note that foreach has a slightly different syn
         rm(qa)
         e <- extent(bands[[1]])
         
-        e@xmin <- max(xmins)
+        e@xmin <- max(xmins) # creating the one exent object
         e@xmax <- min(xmaxs)
         e@ymin <- max(ymins)
         e@ymax <- min(ymaxs)
         
         rm(bands)
         
+        # cropping the masked rasters to the one exent using lapply (since everything is in lists)
         masked <- lapply(masked, FUN = raster::crop, y = e) # applies crop to a list of rasters
         
         system(paste("echo mask applied", year, path_row_combo))
         
+        # doing the pixel replacement, then also going at it with the third mask, if it exists
         final <- cover(masked[[1]], masked[[2]])
         
         if(length(tar_list) == 3){
@@ -159,8 +165,10 @@ foreach(year = years) %dopar% { # note that foreach has a slightly different syn
         }else{print('yay')}
         rm(masked)
         
+        # renaming the bands
         names(final) <- c("band_1", "band_2", "band_3", "band_4", "band_5", "band_7")
         
+        #writing everything out an deleting (this script gobbles up an insane amount of space)
         writeRaster(final, paste0("data/results/",filenamef), overwrite = TRUE)
         rm(final)
         system(paste0("aws s3 cp",
@@ -176,5 +184,4 @@ foreach(year = years) %dopar% { # note that foreach has a slightly different syn
     }else{system("echo not enough")}
     }
   }
-  #system("rm -r data/ls5/")
 }
