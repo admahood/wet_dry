@@ -70,10 +70,12 @@ foreach(year = years) %dopar% { # note that foreach has a slightly different syn
   
   for(path_row_combo in prcs$prc){
     
-    # this if statement ensures that we're only going through this whole thing
-    # for path/row combos where we have more than one scene
+    # so we done repeat what we've already finished
     inq <- paste(year, path_row_combo, sep = "_")
     if(!any(done == inq)){
+    # this if statement ensures that we're only going through this whole thing
+    # for path/row combos where we have more than one scene
+    
     if(prcs[prcs$prc == path_row_combo,]$freq > 1){
       
       # this is the result filename, to be used at the end. defnining it here
@@ -161,6 +163,10 @@ foreach(year = years) %dopar% { # note that foreach has a slightly different syn
         system(paste0("aws s3 cp",
                       " data/results/", filenamef, 
                       " s3://earthlab-amahood/data/landsat_pixel_replaced/", filenamef))
+        system(paste0("rm data/results/", filenamef))
+        for(i in 1:length(tar_list)){
+          system(paste0("rm ", tar_list[i]))
+        }
         gc()
         
       }else{system("echo skipping")}
