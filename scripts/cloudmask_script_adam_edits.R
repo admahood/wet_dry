@@ -186,8 +186,8 @@ foreach(year = years) %dopar% { # note that foreach has a slightly different syn
         gc()
         system(paste0("rm -r ", tmpd)) #removing the temporary files
         
-      }
-    }
-    }
+      }else{unlink(paste0("data/ls5/y",year,"/LT05",path_row_combo,year,"*"))}
+    }else{unlink(paste0("data/ls5/y",year,"/LT05",path_row_combo,year,"*"))}
+    }else{unlink(paste0("data/ls5/y",year,"/LT05",path_row_combo,year,"*"))}
   }
 }
