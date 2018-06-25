@@ -12,6 +12,7 @@ library(dplyr)
 library(foreach)
 library(doParallel)
 
+
 # create generic mask creation function for use in overlay (can be done with basic raster arithmetic but overlay is easier on memory)
 # functions should go in the beginning of the script( or in a separate functions file)
 maskcreate <- function(x, y){
@@ -26,6 +27,18 @@ dir.create("data")
 dir.create("data/results")
 dir.create("data/needs")
 dir.create("data/scrap")
+
+# this is grabbing the list of already done files from s3, and intern = TRUE saves the output as a
+# vector, then i'm just trimming the fat and making a nice vector to work with
+done <- system("aws s3 ls s3://earthlab-amahood/data/landsat_pixel_replaced/", intern = TRUE) %>%
+  strsplit("_")
+done <- done[-1]
+for(i in 1:length(done)){
+  done[[i]] <- done[[i]][2:3]
+  done[[i]] <- paste(done[[i]], collapse = "_")
+}
+done <- unlist(done)
+
 
 # parallel prep
 corz <- length(years) # using only 28 cores out of 64 possible due to memory (RAM) needs
@@ -59,6 +72,8 @@ foreach(year = years) %dopar% { # note that foreach has a slightly different syn
     
     # this if statement ensures that we're only going through this whole thing
     # for path/row combos where we have more than one scene
+    inq <- paste(year, path_row_combo, sep = "_")
+    if(!any(done == inq)){
     if(prcs[prcs$prc == path_row_combo,]$freq > 1){
       
       # this is the result filename, to be used at the end. defnining it here
@@ -150,6 +165,7 @@ foreach(year = years) %dopar% { # note that foreach has a slightly different syn
         
       }else{system("echo skipping")}
     }else{system("echo not enough")}
+    }
   }
   #system("rm -r data/ls5/")
 }
