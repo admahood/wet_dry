@@ -47,7 +47,8 @@ registerDoParallel(corz)
 foreach(year = years) %dopar% { # note that foreach has a slightly different syntax
   
   system(paste0("aws s3 sync s3://earthlab-amahood/data/landsat/landsat_", year,
-                " data/ls5/y",year))
+                " data/ls5/y",year,
+                " --only-show-errors"))
   
   # creating a table of path row combinations and how many files of each we have
   prcs <- list.files(paste0("data/ls5/y",year,"/")) %>% substr(5,10) %>% table() %>% as.data.frame()
@@ -64,7 +65,8 @@ foreach(year = years) %dopar% { # note that foreach has a slightly different syn
   write.csv(needs, paste0("data/needs/needs_",year,".csv"))
   system(paste0("aws s3 cp",
                 " data/needs/needs_", year, ".csv",
-                " s3://earthlab-amahood/data/needs/needs_", year, ".csv"))
+                " s3://earthlab-amahood/data/needs/needs_", year, ".csv",
+                " --only-show-errors"))
   
   # using the prc column out of that data frame as our iterator
   
@@ -72,6 +74,7 @@ foreach(year = years) %dopar% { # note that foreach has a slightly different syn
     
     # so we done repeat what we've already finished
     inq <- paste(year, path_row_combo, sep = "_")
+    system(paste("echo", year, path_row_combo, "already done =",any(inq==done)))
     if(!any(done == inq)){
     # this if statement ensures that we're only going through this whole thing
     # for path/row combos where we have more than one scene
@@ -85,7 +88,7 @@ foreach(year = years) %dopar% { # note that foreach has a slightly different syn
       
       # this is the way to have the script print something out from a parallel script
       # the print() function doesn't work in parallel
-      system(paste("echo", year, path_row_combo))
+      
       
       if(!file.exists(file.path("data/results/", filenamef))){
         
