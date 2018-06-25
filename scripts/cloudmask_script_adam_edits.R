@@ -72,6 +72,13 @@ foreach(year = years) %dopar% { # note that foreach has a slightly different syn
   
   for(path_row_combo in prcs$prc){
     
+    #creates unique filepath for temp directory for each parallel worker
+    #very important for not running out of space
+    tmpd<- paste0("data/tmp",year, "_", path_row_combo)
+    dir.create(tmpd)
+    #sets temp directory
+    rasterOptions(tmpdir=tmpd)
+    
     # so we done repeat what we've already finished
     inq <- paste(year, path_row_combo, sep = "_")
     system(paste("echo", year, path_row_combo, "already done =",any(inq==done)))
@@ -97,13 +104,11 @@ foreach(year = years) %dopar% { # note that foreach has a slightly different syn
         tar_list <- Sys.glob(paste0(tar_path, "LT05", path_row_combo,"*.gz"))
         
         qas <- data.frame(filenames = NA, value66 = NA, goodpix = NA, i = NA)
+        
+        # deleting everything from previous loops
+        system(paste0("rm -r data/scrap/",year, "/*"))
         for (i in 1:length(tar_list)) {
-          
-          # deleting everything from previous loops
           exdir <- paste0("data/scrap/",year, "/",i)
-          system(paste0("rm -r ", exdir))
-          
-          # making new subdirectories and unzipping, then sorting by number of good pixels
           dir.create(exdir)
           untar(tar_list[i], exdir = exdir)
           qas[i, 1] <- Sys.glob(paste0(exdir, "/*pixel_qa.tif"))
@@ -179,6 +184,7 @@ foreach(year = years) %dopar% { # note that foreach has a slightly different syn
           system(paste0("rm ", tar_list[i]))
         }
         gc()
+        system(paste0("rm -r ", tmpd)) #removing the temporary files
         
       }else{system("echo skipping")}
     }else{system("echo not enough")}
