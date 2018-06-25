@@ -186,8 +186,8 @@ foreach(year = years) %dopar% { # note that foreach has a slightly different syn
         gc()
         system(paste0("rm -r ", tmpd)) #removing the temporary files
         
-      }else{system("echo skipping")}
-    }else{system("echo not enough")}
+      }
+    }
     }
   }
 }
