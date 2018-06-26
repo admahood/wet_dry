@@ -128,7 +128,7 @@ for(year in years) {  # note that foreach has a slightly different syntax
         # creating lists of the tifs only with band in the name for each scene
         tifs <- list()
         for(i in 1:length(tar_list)){
-          tifs[[i]] <- Sys.glob(paste0("data/scrap/",year,path_row_combo,"/", i, "/*band*.tif"))
+          tifs[[i]] <- Sys.glob(paste0("data/scrap/",year,path_row_combo,"/", i, "/*sr_band*.tif"))
         }
         
         bands <- list() # each item of this list will have bands 1-5 & 7
