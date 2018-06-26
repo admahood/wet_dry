@@ -43,7 +43,7 @@ done <- unlist(done)
 
 # parallel prep
 #corz <- length(years) # using only 28 cores out of 64 possible due to memory (RAM) needs
-corz <- 25
+corz <- 26
 registerDoParallel(corz)
 
 for(year in years) {  # note that foreach has a slightly different syntax
@@ -93,7 +93,7 @@ for(year in years) {  # note that foreach has a slightly different syntax
       # this is the result filename, to be used at the end. defnining it here
       # so that we can avoid creating it a second time if it's already made
       # i.e. that's the upcoming if statement
-      filenamef <- paste("ls5", year, path_row_combo,".tif", sep = "_")
+      filenamef <- paste("ls7", year, path_row_combo,".tif", sep = "_")
       
       # this is the way to have the script print something out from a parallel script
       # the print() function doesn't work in parallel
