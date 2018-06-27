@@ -195,11 +195,16 @@ system(paste("aws s3 sync",
              ter_s3,
              ter_local))
 opts <- c('slope', 'aspect', 'TPI', 'TRI', 'roughness','flowdir')
-for(i in 1:length(opts)){
-  filename <- paste0("data/terrain_2/",opts[i],".tif")
+
+cores <- length(opts)
+
+registerDoParallel(cores)
+
+foreach(i = opts) %dopar% {
+  filename <- paste0("data/terrain_2/", i,".tif")
   if(!file.exists(filename)){
   ter_rst <- terrain(gb_dem,
-                     opt = opts[i],
+                     opt = i,
                      unit = 'degrees',
                      neighbors = 8, 
                      format = 'GTiff',
