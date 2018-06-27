@@ -29,22 +29,17 @@
 #
 # 5. time series -- convergent cross mapping
 #
-#
-# Data structure: long form. each line will have a point, year, veg state
-#
-#
-# visualization idea: animation illustrating the difference
 
-# BEFORE DOING ANYTHING, CLICK THE R PROJECT FILE TO OPEN THE PROJECT
-# BEFORE DOING ANYTHING, CLICK THE R PROJECT FILE TO OPEN THE PROJECT
-# BEFORE DOING ANYTHING, CLICK THE R PROJECT FILE TO OPEN THE PROJECT
-# BEFORE DOING ANYTHING, CLICK THE R PROJECT FILE TO OPEN THE PROJECT
 
 # setup ------------------------------------------------------------------------
 libs <- c("sf", "tidyverse", "raster", "rgdal", "rgeos")
 lapply(libs, library, character.only = TRUE, verbose = FALSE)
 # install.packages("aws.s3")
 # library(aws.s3)
+
+tmpd<- paste0("data/tmp")
+dir.create(tmpd)
+rasterOptions(tmpdir=tmpd)
 
 source("/home/rstudio/wet_dry/scripts/functions.R")
 
@@ -119,7 +114,7 @@ for(i in 1:length(years)){
       tif_file <- paste0(landsat_local,"/ls7_",years[i],"_", path_row_combos[j],"_.tif")
       if(file.exists(tif_file)){
         stk <- raster::stack(tif_file) # this just loads the raster
-        names(stk) <- c("band_1", "band_2", "band_3", "band_4", "band_5", "band_7")
+        names(stk) <- c("sr_band1", "sr_band2", "sr_band3", "sr_band4", "sr_band5", "sr_band7")
         for(k in 1:nlayers(stk)){
           # now we loop through each tif file and extract the values
           gbplots_subset <- raster::extract(stk[[k]], gbplots_subset, sp=TRUE) # and here we extract
@@ -141,6 +136,12 @@ for(i in 1:length(years)){
     counter <- counter + 1 
   }
 }
+system("rm data/tmp/*")
+
+# keep only sunny days ----------------------------------------------------------------------
+
+df <- result[is.na(result$sr_band1) != TRUE, ] %>% #select plots without clouds
+  na.omit()
 
 
 ####NEW LANDFIRE DEM HERE ----------------------------------------------------------
@@ -169,56 +170,34 @@ for(i in 1:length(opts)){
                 " s3://earthlab-amahood/",filename))
   }
 }
+rm(ter_rst)
 
-#### create terrain raster stack ####
-slope_gb <- raster("data/terrain_2/slope.tif")
-aspect_gb <- raster("data/terrain_2/aspect.tif")
-TPI_gb <- raster("data/terrain_2/TPI.tif")
-TRI_gb <- raster("data/terrain_2/TRI.tif")
-roughness_gb <- raster("data/terrain_2/roughness.tif")
-flowdir_gb <- raster("data/terrain_2/flowdir.tif")
+df$elevation <- raster::extract(gb_dem, df)
+df$slope <- raster::extract(raster("data/terrain_2/slope.tif"), df)
+df$aspect <- raster::extract(raster("data/terrain_2/aspect.tif"), df)
+df$TPI <- raster::extract(raster("data/terrain_2/TPI.tif"), df)
+df$TRI <- raster::extract(raster("data/terrain_2/TRI.tif"), df)
+df$roughness <- raster::extract(raster("data/terrain_2/roughness.tif"), df)
+df$flowdir <- raster::extract(raster("data/terrain_2/flowdir.tif"), df)
 
-terrain_gb <- stack(slope_gb, aspect_gb, TPI_gb, TRI_gb, roughness_gb, flowdir_gb, gb_dem)
+system("rm data/tmp/*")
 
-writeRaster(terrain_gb, "home/rstudio/wet_dry/data/terrain_2/terrain_gb.tif")
-
-system("aws s3 cp home/rstudio/wet_dry/data/terrain_2/terrain_gb.tif s3://earthlab-amahood/data/terrain_2/terrain_gb.tif")
-# keep only sunny days ----------------------------------------------------------------------
-
-df <- result[is.na(result$band_1) != TRUE, ] %>% #select plots without clouds
-  na.omit()
+df$folded_aspect = abs(180 - abs(df$aspect - 225))
 
 # Create vegetation indices -------------------------------------------------------------------
 df$NDVI <- get_ndvi(df$sr_band3,df$sr_band4)
 df$EVI <- get_evi(df$sr_band1, df$sr_band3, df$sr_band4)
 df$SAVI <- get_savi(df$sr_band3,df$sr_band4)
 df$SR = get_sr(df$sr_band3,df$sr_band4)
-
 df$greenness <- green7(df$sr_band1,df$sr_band2,df$sr_band3,df$sr_band4,df$sr_band5,df$sr_band7)
 df$brightness <- bright7(df$sr_band1,df$sr_band2,df$sr_band3,df$sr_band4,df$sr_band5,df$sr_band7)
 df$wetness <- wet7(df$sr_band1,df$sr_band2,df$sr_band3,df$sr_band4,df$sr_band5,df$sr_band7)
 
-# extracting elevation and topography -----------------------------------------------
-
-df$elevation <- raster::extract(terrain_gb[[7]], df)
-
-df$slope <- raster::extract(terrain_gb[[1]], df)
-df$aspect <- raster::extract(terrain_gb[[2]], df)
-df$TPI <- raster::extract(terrain_gb[[3]], df)
-df$TRI <- raster::extract(terrain_gb[[4]], df)
-df$roughness <- raster::extract(terrain_gb[[5]], df)
-df$flowdir <- raster::extract(terrain_gb[[6]], df)
-
-df$folded_aspect = abs(180 - abs(df$aspect - 225))
-
 # doing the mask thing
-
 system("aws s3 sync s3://earthlab-amahood/data/landfire_esp_rcl /home/rstudio/wet_dry/data/landfire_esp_rcl")
-shrub_binary <- raster("data/landfire_esp_rcl/shrub_binary.tif") 
-
-df$esp_mask <- raster::extract(binary_clip, df)
+df$esp_mask <- raster::extract(raster("data/landfire_esp_rcl/shrub_binary.tif"), df)
 
 # writing the file and pushing to s3 -----------------------------------------------
-st_write(df, "data/plots_with_landsat.gpkg")
+st_write(df, "data/plots_with_landsat.gpkg", delete_layer = TRUE)
 system("aws s3 cp data/plots_with_landsat.gpkg s3://earthlab-amahood/data/plots_with_landsat.gpkg")
 
