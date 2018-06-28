@@ -184,7 +184,7 @@ for(i in 1:length(years)){
 # gb_srtm_dem <- raster("data/dem/gb_dem.tif")
 
 ####NEW LANDFIRE DEM HERE ----------------------------------------------------------
-system("aws s3 sync s3://earthlab-amahood/data/LF_DEM /home/rstudio/wet_dry/data/dem")
+system("aws s3 sync s3://earthlab-amahood/data/LF_DEM /home/rstudio/wet_dry/data/terrain_2")
 gb_dem <- raster("data/dem/lf_dem_reproj_full.tif")
 
 # terrain raster --------------------------------------------------------------------------
@@ -222,9 +222,11 @@ TRI_gb <- raster("data/terrain_2/TRI.tif")
 roughness_gb <- raster("data/terrain_2/roughness.tif")
 flowdir_gb <- raster("data/terrain_2/flowdir.tif")
 
-terrain_gb <- stack(slope_gb, aspect_gb, TPI_gb, TRI_gb, roughness_gb, flowdir_gb, gb_dem)
+terrain_files <- list.files(ter_local, full.names = T)
+terrain_gb <- stack(terrain_files)
+terrain_gb <- brick(terrain_gb)
 
-writeRaster(terrain_gb, "home/rstudio/wet_dry/data/terrain_2/terrain_gb.tif")
+writeRaster(terrain_gb, "home/rstudio/wet_dry/data/terrain_2/terrain_gb.tif", progress = "text")
 
 system("aws s3 cp home/rstudio/wet_dry/data/terrain_2/terrain_gb.tif s3://earthlab-amahood/data/terrain_2/terrain_gb.tif")
 # keep only sunny days ----------------------------------------------------------------------
