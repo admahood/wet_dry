@@ -149,6 +149,10 @@ system("aws s3 sync s3://earthlab-amahood/data/LF_DEM /home/rstudio/wet_dry/data
 gb_dem <- raster("data/dem/lf_dem_reproj_full.tif")
 
 # terrain raster --------------------------------------------------------------------------
+system("aws s3 sync s3://earthlab-amahood/data/LF_DEM /home/rstudio/wet_dry/data/terrain_2")
+gb_dem <- raster("data/terrain_2/lf_dem_reproj_full.tif")
+
+# terrain raster --------------------------------------------------------------------------
 ter_s3 <- 's3://earthlab-amahood/data/terrain_2'
 ter_local <- '/home/rstudio/wet_dry/data/terrain_2'
 
@@ -156,18 +160,23 @@ system(paste("aws s3 sync",
              ter_s3,
              ter_local))
 opts <- c('slope', 'aspect', 'TPI', 'TRI', 'roughness','flowdir')
-for(i in 1:length(opts)){
-  filename <- paste0("data/terrain_2/",opts[i],".tif")
+
+cores <- length(opts)
+
+registerDoParallel(cores)
+
+foreach(i = opts) %dopar% {
+  filename <- paste0("data/terrain_2/", i,".tif")
   if(!file.exists(filename)){
-  ter_rst <- terrain(gb_dem,
-                     opt = opts[i],
-                     unit = 'degrees',
-                     neighbors = 8, 
-                     format = 'GTiff',
-                     filename = filename)
-  system(paste0("aws s3 cp ",
-                filename,
-                " s3://earthlab-amahood/",filename))
+    ter_rst <- terrain(gb_dem,
+                       opt = i,
+                       unit = 'degrees',
+                       neighbors = 8, 
+                       format = 'GTiff',
+                       filename = filename)
+    system(paste0("aws s3 cp ",
+                  filename,
+                  " s3://earthlab-amahood/",filename))
   }
 }
 rm(ter_rst)
