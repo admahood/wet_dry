@@ -40,7 +40,11 @@ for(i in 1:length(ls5_list)) {
     
     ls5_terrain <- stack(ls, ter_c)
     
-    writeRaster(ls5_terrain, filename = filenamet, overwrite = T)
+    # now put a line to apply the model and write THAT as the raster and send it to s3 (and then delete it)
+    
+    #writeRaster(rasterwithmodelapplied, filename = filenamet, overwrite = T)
+    #system(paste0("aws s3 cp ", filenamet, " s3://earthlab-amahood/data/.....))
+    #unlink(filenamet)
  # }
 }
 
