@@ -83,9 +83,9 @@ gb_data$binary <- as.factor(ifelse(gb_data$NonInvShru < 5, "Grass", "Shrub"))
 data = gb_data@data
 variables <- data.frame(data$sr_band1, data$sr_band2, data$sr_band3, data$sr_band4, data$sr_band5, data$sr_band7, data$NDVI, data$EVI, 
                         data$SAVI, data$SR, data$greenness, data$brightness, data$wetness, data$elevation, data$slope, 
-                        data$aspect, data$TPI, data$TRI, data$roughness, data$flowdir, data$folded_aspect, data$cluster)
+                        data$aspect, data$TPI, data$TRI, data$roughness, data$flowdir, data$cluster)
 colnames(variables) <- c("sr_band1", "sr_band2", "sr_band3", "sr_band4", "sr_band5", "sr_band7", "ndvi", "evi", "savi", "sr", "greenness", "brightness", "wetness", "elevation", "slope", "aspect",
-                                  "tpi", "tri", "roughness", "flowdir", "folded_aspect", "cluster")
+                                  "tpi", "tri", "roughness", "flowdir", "cluster")
 variables$cluster <- as.factor(variables$cluster)
 
 
@@ -93,9 +93,9 @@ variablesplit <- variables
 variablesplit$split <- sample.split(variablesplit$cluster, SplitRatio = .7) #create new variable for splitting plot data into training and test datasets (70% training data)
 
 rf_train <- subset(variablesplit, variablesplit$split == TRUE) #create training dataset
-rf_train <- rf_train[, -23] #remove split variable from training data
+rf_train <- rf_train[, -22] #remove split variable from training data
 rf_test <- subset(variablesplit, variablesplit$split == FALSE) #create test data
-rf_test <- rf_test[, -23] #remove split variable from test data
+rf_test <- rf_test[, -22] #remove split variable from test data
 
 #### Step 7: Run Random Forest ####
 

@@ -9,9 +9,6 @@ tmpd<- paste0("data/tmp") # telling raster where to put its temp files so we can
 dir.create(tmpd)
 rasterOptions(tmpdir=tmpd)
 
-ls5_list <- list.files(local_path, full.names = T) 
-ls5_files <- list.files(local_path)
-
 s3_path <- "s3://earthlab-amahood/data/ls5_pixel_replaced_crop_test"
 local_path <- "data/terrain_crop_test"
 s3_terrain <- "s3://earthlab-amahood/data/terrain_2"
@@ -24,7 +21,8 @@ system(paste0("aws s3 sync ", s3_path, " ", local_path))
 system(paste0("aws s3 sync ", s3_terrain, " ", local_terrain))
 
 #cropping and stacking and applying the model loop --------------------------
-
+ls5_list <- list.files(local_path, full.names = T) 
+ls5_files <- list.files(local_path)
 ter <- stack(list.files(local_terrain, full.names =T))
 
 for(i in 1:length(ls5_list)) {
@@ -47,16 +45,23 @@ for(i in 1:length(ls5_list)) {
   ls5$evi <- get_evi(ls5$sr_band1, ls5$sr_band3, ls5$sr_band4)
   
   ls5 <- stack(ls5, ter_c)
+  
+  names(ls5) <- c("sr_band1", "sr_band2", "sr_band3", "sr_band4", "sr_band5", "sr_band7", "wetness", "brightness", "greenness", "ndvi", "savi", "sr", "evi", "aspect", "flowdir", "elevation", "roughness", "slope", 
+                  "tpi", "tri") #names to match exactly with training data that goes into model. The order matters for these
+  
   print(Sys.time()-t0)
   gc() # for saving memory
-  system("rm data/tmp/*") # so we're not filling up the hard drive
   
+  # now put a line to apply the model and write THAT as the raster and send it to s3 (and then delete the file) 
+  ls5_classed <- predict(ls5, forest_1, type = 'class', progress = 'text', inf.rm = T, na.rm = T)
+
+  print(Sys.time()-t0) #checking elapsed time between creation of big stack and application of model
   
-  # now put a line to apply the model and write THAT as the raster and send it to s3 (and then delete the file)
+  writeRaster(ls5_classed, filename = filenamet, overwrite = T, progress = 'text')
   
-  #writeRaster(rasterwithmodelapplied, filename = filenamet, overwrite = T)
-  #system(paste0("aws s3 cp ", filenamet, " s3://earthlab-amahood/data/.....))
-  #unlink(filenamet)
+  system(paste0("aws s3 cp ", filenamet, " s3://earthlab-amahood/data/ls5_model_results_test"))
+  unlink(filenamet)
+  system("rm data/tmp/*") # so we're not filling up the hard drive (had to move this to the end because the model needs the stuff stored in temp directory - D)
 }
 
 #non looping attempt ------------ 
