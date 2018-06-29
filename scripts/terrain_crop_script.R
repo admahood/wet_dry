@@ -61,3 +61,6 @@ for(i in 1:length(ls5_list)) {
 #non looping attempt ------------ 
 # if you want to test a loop, just type i=1 in the console (or whatever your iterator is)
 # and move through it that way, that way you don't have a bunch of repeated code floating around
+
+
+# then we create another section that loops through each year, creating big mosaics
