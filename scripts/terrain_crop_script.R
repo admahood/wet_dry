@@ -28,19 +28,20 @@ ter <- lapply(list.files(local_terrain, full.names =T), FUN = raster)
 names(ter) <- sub(".tif", "", list.files(local_terrain))
 
 for(i in 1:length(ls5_list)) {
-  ls5_noterrain <- stack(ls5_list[i])
-  
-  filenamet <- paste0("home/rstudio/wet_dry/data/results/",  
-                      sub(pattern = ".tif", 
-                          replacement = "terrain.tif", 
-                          x = ls5_files[i], fixed = T))
-  
-  terrain_cropped <- crop(terrain, ls5_noterrain)
-  
-  ls5_terrain <- stack(ls5_noterrain, terrain_cropped)
-  
-  writeRaster(ls5_terrain, filename = filenamet, overwrite = T)
-  
+ # for(t in 1:length(ter)){
+    ls <- stack(ls5_list[i])
+    names(ls)<- c("sr_band1", "sr_band2","sr_band3", "sr_band4","sr_band5", "sr_band7")
+    filenamet <- paste0("home/rstudio/wet_dry/data/results/",  
+                        sub(pattern = ".tif", 
+                            replacement = "terrain.tif", 
+                            x = ls5_files[i], fixed = T))
+    
+    ter_c <- lapply(ter, raster::crop, y=ls)
+    
+    ls5_terrain <- stack(ls, ter_c)
+    
+    writeRaster(ls5_terrain, filename = filenamet, overwrite = T)
+ # }
 }
 
 #non looping attempt ------------ 
