@@ -5,6 +5,9 @@ source("scripts/functions.R")
 
 # paths -----------------------------------
 dir.create("data/results")
+tmpd<- paste0("data/tmp") # telling raster where to put its temp files so we can easily delete them
+dir.create(tmpd)
+rasterOptions(tmpdir=tmpd)
 ls5_list <- list.files(local_path, full.names = T) 
 ls5_files <- list.files(local_path)
 
@@ -44,6 +47,9 @@ for(i in 1:length(ls5_list)) {
   
   ls5 <- stack(ls5, ter_c)
   print(Sys.time()-t0)
+  gc() # for saving memory
+  system("rm data/tmp/*") # so we're not filling up the hard drive
+  
   
   # now put a line to apply the model and write THAT as the raster and send it to s3 (and then delete the file)
   
