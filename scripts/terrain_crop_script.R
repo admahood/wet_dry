@@ -2,12 +2,13 @@
 libs <- c("sf", "tidyverse", "raster", "rgdal", "rgeos", "foreach", "doParallel", "gdalUtils")
 lapply(libs, library, character.only = TRUE, verbose = FALSE)
 source("scripts/functions.R")
-
+source("scripts/updated_random_forest_script.R")
 # paths -----------------------------------
 dir.create("data/results")
 tmpd<- paste0("data/tmp") # telling raster where to put its temp files so we can easily delete them
 dir.create(tmpd)
 rasterOptions(tmpdir=tmpd)
+
 ls5_list <- list.files(local_path, full.names = T) 
 ls5_files <- list.files(local_path)
 
