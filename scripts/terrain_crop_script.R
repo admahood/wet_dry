@@ -7,10 +7,13 @@ source("scripts/functions.R")
 dir.create("data/results")
 ls5_list <- list.files(local_path, full.names = T) 
 ls5_files <- list.files(local_path)
+
 s3_path <- "s3://earthlab-amahood/data/ls5_pixel_replaced_crop_test"
 local_path <- "data/terrain_crop_test"
 s3_terrain <- "s3://earthlab-amahood/data/terrain_2"
 local_terrain <- "data/terrain_2"
+
+s3_result <- "s3://earthlab-amahood/data/model_applied_scenes"
 
 #s3 sync -------------------------------- 
 system(paste0("aws s3 sync ", s3_path, " ", local_path))
@@ -21,11 +24,12 @@ system(paste0("aws s3 sync ", s3_terrain, " ", local_terrain))
 ter <- stack(list.files(local_terrain, full.names =T))
 
 for(i in 1:length(ls5_list)) {
+  t0 <- Sys.time()
   ls5 <- stack(ls5_list[i])
   names(ls5)<- c("sr_band1", "sr_band2","sr_band3", "sr_band4","sr_band5", "sr_band7")
   filenamet <- paste0("home/rstudio/wet_dry/data/results/",  
                       sub(pattern = ".tif", 
-                          replacement = "terrain.tif", 
+                          replacement = "model_results.tif", 
                           x = ls5_files[i], fixed = T))
   ter_c <-raster::resample(ter,ls5)
   
@@ -39,6 +43,7 @@ for(i in 1:length(ls5_list)) {
   ls5$evi <- get_evi(ls5$sr_band1, ls5$sr_band3, ls5$sr_band4)
   
   ls5 <- stack(ls5, ter_c)
+  print(Sys.time()-t0)
   
   # now put a line to apply the model and write THAT as the raster and send it to s3 (and then delete the file)
   
