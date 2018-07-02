@@ -25,14 +25,16 @@ ls5_list <- list.files(local_path, full.names = T)
 ls5_files <- list.files(local_path)
 ter <- stack(list.files(local_terrain, full.names =T))
 
+
 for(i in 1:length(ls5_list)) {
   t0 <- Sys.time()
   ls5 <- stack(ls5_list[i])
   names(ls5)<- c("sr_band1", "sr_band2","sr_band3", "sr_band4","sr_band5", "sr_band7")
-  filenamet <- paste0("home/rstudio/wet_dry/data/results/",  
+  filenamet <- paste0("data/results/",  
                       sub(pattern = ".tif", 
                           replacement = "model_results.tif", 
-                          x = ls5_files[i], fixed = T))
+                          x = substr(ls5_list[i], 24, 43), fixed = T)) 
+  
   ter_c <-raster::resample(ter,ls5)
   
   # now, make sure all the names of this stack match the names that go into the model and we're golden
@@ -59,7 +61,7 @@ for(i in 1:length(ls5_list)) {
   
   writeRaster(ls5_classed, filename = filenamet, overwrite = T, progress = 'text')
   
-  system(paste0("aws s3 cp ", filenamet, " s3://earthlab-amahood/data/ls5_model_results_test"))
+  system(paste0("aws s3 cp ", filenamet, " s3://earthlab-amahood/data/ls5_model_results_test/"))
   unlink(filenamet)
   system("rm data/tmp/*") # so we're not filling up the hard drive (had to move this to the end because the model needs the stuff stored in temp directory - D)
 }
