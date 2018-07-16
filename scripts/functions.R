@@ -63,6 +63,36 @@ wet5 <- function(band1,band2,band3,band4,band5,band7){
   return(x)
 }
 
+bright8 <- function(band2,band3,band4,band5,band6,band7) {
+  x <- (band2 *0.3029) +
+    (band3 * 0.2786) + 
+    (band4 * 0.4733) +
+    (band5 * 0.5599) +
+    (band6 * 0.508) +
+    (band7 * 0.1872)
+  return(x)
+}
+
+green8 <- function(band2,band3,band4,band5,band6,band7){
+  x <- (band2 *-0.2941) +
+    (band3 * -0.243) + 
+    (band4 * -0.5424) +
+    (band5 * 0.7276) +
+    (band6 * 0.0713) +
+    (band7 * -0.1608)
+  return(x)
+}
+
+wet8 <- function(band2,band3,band4,band5,band6,band7){
+  x <- (band2 * 0.1511) +
+    (band3 * 0.1973) + 
+    (band4 * 0.3283) +
+    (band5 * 0.3407) +
+    (band6 * -0.7117) +
+    (band7 * -0.4559)
+  return(x)
+}
+
 get_ndvi <- function(band3, band4){
   return((band4 - band3)/ (band4 + band3))}
 get_evi <- function(band1,band3,band4){
