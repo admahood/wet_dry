@@ -25,15 +25,19 @@ ls5_list <- list.files(local_path, full.names = T)
 ls5_files <- list.files(local_path)
 ter <- stack(list.files(local_terrain, full.names =T))
 
+cores <- length(ls5_list)
 
-for(i in 1:length(ls5_list)) {
+registerDoParallel(cores)
+
+foreach(i = ls5_list) %dopar% {
+  file <- as.character(i)
   t0 <- Sys.time()
-  ls5 <- stack(ls5_list[i])
+  ls5 <- stack(i)
   names(ls5)<- c("sr_band1", "sr_band2","sr_band3", "sr_band4","sr_band5", "sr_band7")
-  filenamet <- paste0("data/results/",  
+  filenamet <- paste0("data/results/",
                       sub(pattern = ".tif", 
                           replacement = "model_results.tif", 
-                          x = substr(ls5_list[i], 15, 29), fixed = T)) 
+                          x = substr(file, 15, 34), fixed = T)) 
   
   ter_c <-raster::resample(ter,ls5)
   
