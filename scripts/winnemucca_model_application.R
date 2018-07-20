@@ -24,7 +24,7 @@ system(paste0("aws s3 sync ", s3_terrain, " ", local_terrain))
 ls5_list <- list.files(local_path, full.names = T) 
 ls5_files <- list.files(local_path)
 
-cores <- length(ls5_list)
+cores <- length(ls5_list) / 2
 
 registerDoParallel(cores)
 
@@ -62,10 +62,10 @@ foreach(i = ls5_list) %dopar% {
   
   # now put a line to apply the model and write THAT as the raster and send it to s3 (and then delete the file) 
   ls5_classed <- predict(ls5, forest_1, type = 'class', progress = 'text', inf.rm = T, na.rm = T)
-
+  
   system(paste("echo", "model applied", i))
   
-  system(paste("echo", "", i))
+  
   print(Sys.time()-t0) #checking elapsed time between creation of big stack and application of model
   
   writeRaster(ls5_classed, filename = filenamet, overwrite = T, progress = 'text')
