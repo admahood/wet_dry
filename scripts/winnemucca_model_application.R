@@ -20,6 +20,9 @@ s3_result <- "s3://earthlab-amahood/data/model_applied_scenes"
 system(paste0("aws s3 sync ", s3_path, " ", local_path))
 system(paste0("aws s3 sync ", s3_terrain, " ", local_terrain))
 
+##system(paste0("aws s3 sync ", " s3://earthlab-amahood/data/ls5_model_results_test_mucc/", "data/results")) ## figure out how to use an if statement based on this s3 sync
+##to avoid redundant classified images
+
 #cropping and stacking and applying the model loop --------------------------
 ls5_list <- list.files(local_path, full.names = T) 
 ls5_files <- list.files(local_path)
@@ -28,7 +31,10 @@ cores <- length(ls5_list) / 2
 
 registerDoParallel(cores)
 
-foreach(i = ls5_list) %dopar% {
+foreach(i = ls5_list, 
+        .packages = 'raster') %dopar% {
+  
+  source("scripts/functions.R")      
   file <- as.character(i)
   t0 <- Sys.time()
   ter <- stack(list.files(local_terrain, full.names =T))
@@ -38,6 +44,8 @@ foreach(i = ls5_list) %dopar% {
                       sub(pattern = ".tif", 
                           replacement = "model_results.tif", 
                           x = substr(file, 15, 34), fixed = T)) 
+  
+  
   
   ter_c <-raster::resample(ter,ls5)
   system(paste("echo", "terrain cropped", i))
@@ -73,8 +81,10 @@ foreach(i = ls5_list) %dopar% {
   system(paste0("aws s3 cp ", filenamet, " s3://earthlab-amahood/data/ls5_model_results_test_mucc/"))
   system(paste("echo", i, "done"))
   unlink(filenamet)
-  system("rm data/tmp/*") # so we're not filling up the hard drive (had to move this to the end because the model needs the stuff stored in temp directory - D)
-}
+  
+  #it appears the task 2 failed error is coming from the deletion of temp files. I commented it out for now - Dylan
+  #system("rm data/tmp/*") # so we're not filling up the hard drive (had to move this to the end because the model needs the stuff stored in temp directory - D)
+        }
 
 #non looping attempt ------------ 
 # if you want to test a loop, just type i=1 in the console (or whatever your iterator is)
