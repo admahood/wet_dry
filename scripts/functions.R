@@ -101,3 +101,15 @@ get_evi <- function(band1,band3,band4){
 get_savi <- function(band3, band4){
   return(((band4 - band3) / (band4 + band3 + 0.5)) * 1.5)}
 get_sr <- function(band3,band4){return(band4/band3)}
+
+get_satvi <- function(band3, band5, band7, L = 0.5) {
+  x= (band5 - band3) / (band5 + band3 + L)
+  y= x  * (1 + L) 
+  z= y - (band7 / 2)
+  return(y)
+}
+
+get_ndsvi <- function(band3, band5) {
+  x = (band5 - band3) / (band5 + band3)
+  return(x)
+}

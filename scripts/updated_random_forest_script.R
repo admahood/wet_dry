@@ -50,6 +50,10 @@ gb_data$cluster <- as.factor(cutree(comm.bc.clust, 2))
 gb_data$binary <- as.factor(ifelse(gb_data$NonInvShru < 5, "Grass", "Shrub"))
 
 
+gb_data<- gb_data[gb_data$esp_mask == 1, ]
+
+
+
 #### step 5: Determine proper parameters for ntree and mtry - Another step which can be refined later  - for now everything is commented out (6/29) ####
 
 #### for loop for testing number of trees
@@ -82,27 +86,35 @@ gb_data$binary <- as.factor(ifelse(gb_data$NonInvShru < 5, "Grass", "Shrub"))
 #creating an object with desired variables for random forest
 data = gb_data@data
 variables <- data.frame(data$sr_band1, data$sr_band2, data$sr_band3, data$sr_band4, data$sr_band5, data$sr_band7, data$NDVI, data$EVI, 
-                        data$SAVI, data$SR, data$greenness, data$brightness, data$wetness, data$elevation, data$slope, 
-                        data$aspect, data$TPI, data$TRI, data$roughness, data$flowdir, data$cluster)
-colnames(variables) <- c("sr_band1", "sr_band2", "sr_band3", "sr_band4", "sr_band5", "sr_band7", "ndvi", "evi", "savi", "sr", "greenness", "brightness", "wetness", "elevation", "slope", "aspect",
-                                  "tpi", "tri", "roughness", "flowdir", "cluster")
+                        data$SAVI, data$SR, #data$SATVI, 
+                        data$NDSVI, data$greenness, data$brightness, data$wetness, data$elevation, 
+                        data$slope, 
+                        data$aspect, data$TPI, data$TRI, data$roughness, data$flowdir, #data$cluster, 
+                        data$binary)
+colnames(variables) <- c("sr_band1", "sr_band2", "sr_band3", "sr_band4", "sr_band5", "sr_band7", "ndvi", "evi", "savi", "sr", #"satvi", 
+                         "ndsvi", "greenness", "brightness", "wetness", "elevation",
+                         "slope", "aspect",
+                                  "tpi", "tri", "roughness", "flowdir", #"cluster",
+                         "binary")
 variables$cluster <- as.factor(variables$cluster)
 
+variables$binary <- as.factor(variables$binary)
 
 variablesplit <- variables
-variablesplit$split <- sample.split(variablesplit$cluster, SplitRatio = .7) #create new variable for splitting plot data into training and test datasets (70% training data)
+variablesplit$split <- sample.split(variablesplit$binary, SplitRatio = .7) #create new variable for splitting plot data into training and test datasets (70% training data)
 
 rf_train <- subset(variablesplit, variablesplit$split == TRUE) #create training dataset
-rf_train <- rf_train[, -22] #remove split variable from training data
+rf_train <- rf_train[, - 23] #remove split variable from training data
 rf_test <- subset(variablesplit, variablesplit$split == FALSE) #create test data
-rf_test <- rf_test[, -22] #remove split variable from test data
+rf_test <- rf_test[, -23] #remove split variable from test data
 
 #### Step 7: Run Random Forest ####
 
 
 set.seed(11)
 
-forest_1 <- randomForest(cluster ~ . , 
+#changed prediction label from cluster variable to binary variable
+forest_1 <- randomForest(binary ~ . , 
                          data = rf_train, importance = TRUE, ntree = 1000, mtry = 9)
 
 forest_1
@@ -112,15 +124,15 @@ forest_1
 varImpPlot(forest_1)
 #### Step 9: using test data to check model performance -----------------
 
-pred1 <- predict(forest_1, newdata = rf_test, type = "response")
-pred1 <- as.vector(pred1)
-pred1 <- as.numeric(pred1)
-rf_test$cluster <- as.numeric(rf_test$cluster)
-test_data <- rf_test$cluster
-
-prediction1 <- prediction(pred1, rf_test$cluster)
+# pred1 <- predict(forest_1, newdata = rf_test, type = "response")
+# pred1 <- as.vector(pred1)
+# pred1 <- as.numeric(pred1)
+# rf_test$cluster <- as.numeric(rf_test$cluster)
+# test_data <- rf_test$cluster
+# 
+# prediction1 <- prediction(pred1, rf_test$cluster)
 
 ##change second argument to get different performance metrics ie false positive rate accuracy etc.##
-performance1 <- performance(prediction1, "err")
+# performance1 <- performance(prediction1, "err")
 
 

@@ -57,10 +57,13 @@ foreach(i = ls5_list,
   ls5$savi <- get_savi(ls5$sr_band3, ls5$sr_band4)
   ls5$sr <- get_sr(ls5$sr_band3, ls5$sr_band4)
   ls5$evi <- get_evi(ls5$sr_band1, ls5$sr_band3, ls5$sr_band4)
+  #ls5$satvi <- get_satvi(ls5$sr_band3, ls5$sr_band5, ls5$sr_band7)
+  ls5$ndsvi <- get_ndsvi(ls5$sr_band3, ls5$sr_band5)
   
   ls5 <- stack(ls5, ter_c)
   
-  names(ls5) <- c("sr_band1", "sr_band2", "sr_band3", "sr_band4", "sr_band5", "sr_band7", "wetness", "brightness", "greenness", "ndvi", "savi", "sr", "evi", "aspect", "flowdir", "elevation", "roughness", "slope", 
+  names(ls5) <- c("sr_band1", "sr_band2", "sr_band3", "sr_band4", "sr_band5", "sr_band7", "wetness", "brightness", "greenness", "ndvi", "savi", "sr", "evi", #"satvi",
+                  "ndsvi", "aspect", "flowdir", "elevation", "roughness", "slope", 
                   "tpi", "tri") #names to match exactly with training data that goes into model. The order matters for these
   
   system(paste("echo", "stack created", i))
