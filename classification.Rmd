@@ -8,8 +8,6 @@ header-includes:
     - \usepackage{setspace}\doublespacing
     - \usepackage[left]{lineno}
 geometry: margin=1in
-csl: ecology.csl
-bibliography: FF_refs.bib
 ---
 
 ```{r setup, include=FALSE}
@@ -41,7 +39,10 @@ P2: other cheatgrass cover modelling efforts/nlcd/landfire... but there's nothin
 
 **2. Methods**
 
+**2.1 Study Area**
+
 **2.1 Landsat Data**
+
 Landsat aquisition
 
 cloud replacement
@@ -50,6 +51,8 @@ tasseled cap/veg indices
 
 **2.2 Other Data**
 Topography/folded aspect
+
+**2.4 Random Forest Modelling**
 
 random forest modelling
 
