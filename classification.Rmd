@@ -1,0 +1,68 @@
+---
+output:
+  pdf_document: default
+  word_document: default
+  html_document: default
+fontsize: 12pt
+header-includes:
+    - \usepackage{setspace}\doublespacing
+    - \usepackage[left]{lineno}
+geometry: margin=1in
+csl: ecology.csl
+bibliography: FF_refs.bib
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+Running Head:
+
+Title:
+
+Authors: \newline
+\newline
+Adam Mahood \newline
+\newline
+Dylan Murphy \newline
+
+\newpage
+\linenumbers
+
+**ABSTRACT**
+
+**1. Introduction**
+
+P1: Fire/sagebrush/cheatgrass
+
+P2: other cheatgrass cover modelling efforts/nlcd/landfire... but there's nothing for every single year!!
+
+
+
+**2. Methods**
+
+**2.1 Landsat Data**
+Landsat aquisition
+
+cloud replacement
+
+tasseled cap/veg indices
+
+**2.2 Other Data**
+Topography/folded aspect
+
+random forest modelling
+
+using EVT to verify
+using NLCD to verify
+
+calculate landcover change throughout great basin sagebrush
+
+
+**3. Results**
+
+**4. Discussion**
+
+**5. Acknowledgements**
+
+**6. Literature Cited**
