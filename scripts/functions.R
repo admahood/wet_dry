@@ -113,3 +113,26 @@ get_ndsvi <- function(band3, band5) {
   x = (band5 - band3) / (band5 + band3)
   return(x)
 }
+
+#LANDSAT 8 VEG INDICES -------
+get_ndvi8 <- function(band4, band5){
+  return((band5 - band4)/ (band5 + band4))}
+get_evi8 <- function(band2,band4,band5){
+  return(2.5 * ((band5 - band4)/(band5 + (6 * band4) - (7.5 * band2) + 1)))
+}
+get_savi8 <- function(band4, band5){
+  return(((band5 - band4) / (band5 + band4 + 0.5)) * 1.5)}
+get_sr8 <- function(band4,band5){return(band5/band4)}
+
+get_satvi8 <- function(band4, band6, band7, L = 0.5) {
+  x= (band6 - band4) / (band6 + band4 + L)
+  y= x  * (1 + L) 
+  z= y - (band7 / 2)
+  return(y)
+}
+
+get_ndsvi8 <- function(band4, band6) {
+  x = (band6 - band4) / (band6 + band4)
+  return(x)
+}
+

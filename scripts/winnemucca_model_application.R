@@ -72,7 +72,7 @@ foreach(i = ls5_list,
   gc() # for saving memory
   
   # now put a line to apply the model and write THAT as the raster and send it to s3 (and then delete the file) 
-  ls5_classed <- predict(ls5, forest_1, type = 'class', progress = 'text', inf.rm = T, na.rm = T)
+  ls5_classed <- predict(ls5, frst, type = 'class', progress = 'text', inf.rm = T, na.rm = T)
   
   system(paste("echo", "model applied", i))
   

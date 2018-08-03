@@ -1,7 +1,7 @@
 
 # Step 1: Load packages ---------------------------
 libs <- c("caTools", "randomForest", "ROCR", "party", "picante", "rpart", "rpart.plot", "tidyverse", "rgdal","sf")
-#lapply(libs, install.packages, character.only = TRUE, verbose = FALSE)
+lapply(libs, install.packages, character.only = TRUE, verbose = FALSE)
 lapply(libs, library, character.only = TRUE, verbose = FALSE)
 
 source("scripts/functions.R")
@@ -27,18 +27,18 @@ gbd <- st_read("data/plot_data/plots_with_landsat.gpkg", quiet=T) %>%
   st_set_geometry(NULL)
 
   # Step 6: create object with desired variables and datasets to train/test randomForest model -------------
-counter <- 1
-for (i in 1:20){  
+
+ 
   gbd <- mutate(gbd, binary = as.factor(ifelse(total_shrubs < 14, "Grass", "Shrub")))
   
   gbd$NDSVI <- get_ndsvi(gbd$sr_band3, gbd$sr_band5)
   
   variables <- dplyr::select(gbd,
                              sr_band1, sr_band2, sr_band3, sr_band4, sr_band5, sr_band7, 
-                             NDVI, EVI, SAVI, SR, NDSVI, #data$SATVI, 
+                             ndvi = NDVI, evi = EVI, savi = SAVI,sr = SR, ndsvi = NDSVI, #data$SATVI, 
                              greenness, brightness, wetness, 
                              #elevation, 
-                             slope, folded_aspect, TPI, TRI, roughness, flowdir, #data$cluster, 
+                             slope, folded_aspect, tpi = TPI, tri = TRI, roughness, flowdir, #data$cluster, 
                              #total_shrubs)
                              binary)
   
@@ -49,41 +49,13 @@ for (i in 1:20){
   rf_test <- filter(variables, split == FALSE) %>% 
     dplyr::select(-split)          
   
+  
+  frst <- randomForest(binary ~ . , 
+                    data = rf_train, importance = TRUE, ntree = 1000, mtry = 9)
   # Step 7: Run Random Forest ----------------------------------------------
   
   
-  #changed prediction label from cluster variable to binary variable
-  l<-list()
-  for(j in 1:50){
-    l[[j]] = data.frame(variable = NA, error = NA)
-    x <- randomForest(binary ~ . , 
-                           data = rf_train, importance = TRUE, ntree = 1000, mtry = 9)
-    
-    l[[j]][1,1] = dimnames(x$confusion)[[1]][1]
-    l[[j]][1,2] = x$confusion[1,3]
-    l[[j]][2,1] = dimnames(x$confusion)[[1]][2]
-    l[[j]][2,2] = x$confusion[2,3]
-  }
-  df <- do.call("rbind", l)
-  grass <- filter(df, variable == "Grass")
-  shrub <- filter(df, variable == "Shrub")
   
-  which_binary[counter,1] <- i
-  which_binary[counter,2] <- "Grass"
-  which_binary[counter,3] <- mean(grass$error)
-  which_binary[counter,4] <- sd(grass$error)
-  
-  counter <- counter + 1
-  which_binary[counter,1] <- i
-  which_binary[counter,2] <- "Shrub"
-  which_binary[counter,3] <- mean(shrub$error)
-  which_binary[counter,4] <- sd(shrub$error)
-  counter<- counter+1
-}
-
-ggplot(data = which_binary, aes(x=binary_value, y = mean_error)) +
-  geom_errorbar(aes(ymin = mean_error - sd_error, ymax = mean_error+sd_error)) +
-  geom_line(color=variable)
 
 
 #### Step 8: Calculate Variable Importance -----------------
