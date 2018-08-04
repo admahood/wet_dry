@@ -12,49 +12,45 @@ set.seed(11)
 # Step 2: Load Data --------------------------------
 system("aws s3 cp s3://earthlab-amahood/data/plots_with_landsat.gpkg data/plot_data/plots_with_landsat.gpkg")
 
-which_binary <- data.frame(
-  binary_value = NA,
-  variable = NA,
-  mean_error = NA,
-  sd_error = NA
-)
+# which_binary <- data.frame(
+#   binary_value = NA,
+#   variable = NA,
+#   mean_error = NA,
+#   sd_error = NA
+# )
 
 
 
 gbd <- st_read("data/plot_data/plots_with_landsat.gpkg", quiet=T) %>%
   filter(esp_mask == 1) %>%
   mutate(total_shrubs = NonInvShru + SagebrushC) %>%
-  st_set_geometry(NULL)
+  st_set_geometry(NULL) %>%
+  mutate(binary = as.factor(ifelse(total_shrubs < 14, "Grass", "Shrub")))
 
-  # Step 6: create object with desired variables and datasets to train/test randomForest model -------------
+gbd$NDSVI <- get_ndsvi(gbd$sr_band3, gbd$sr_band5)
 
- 
-  gbd <- mutate(gbd, binary = as.factor(ifelse(total_shrubs < 14, "Grass", "Shrub")))
-  
-  gbd$NDSVI <- get_ndsvi(gbd$sr_band3, gbd$sr_band5)
-  
-  variables <- dplyr::select(gbd,
-                             sr_band1, sr_band2, sr_band3, sr_band4, sr_band5, sr_band7, 
-                             ndvi = NDVI, evi = EVI, savi = SAVI,sr = SR, ndsvi = NDSVI, #data$SATVI, 
-                             greenness, brightness, wetness, 
-                             #elevation, 
-                             slope, folded_aspect, tpi = TPI, tri = TRI, roughness, flowdir, #data$cluster, 
-                             #total_shrubs)
-                             binary)
-  
-  variables$split <- sample.split(variables$binary, SplitRatio = .7) #create new variable for splitting plot data into training and test datasets (70% training data)
-  
-  rf_train <- filter(variables, split == TRUE) %>%    #create training dataset
-    dplyr::select(-split)                            #remove split variable from training data
-  rf_test <- filter(variables, split == FALSE) %>% 
-    dplyr::select(-split)          
-  
-  
-  frst <- randomForest(binary ~ . , 
-                    data = rf_train, importance = TRUE, ntree = 1000, mtry = 9)
-  # Step 7: Run Random Forest ----------------------------------------------
-  
-  
+variables <- dplyr::select(gbd,
+                           sr_band1, sr_band2, sr_band3, sr_band4, sr_band5, sr_band7,
+                           ndvi = NDVI, evi = EVI, savi = SAVI,sr = SR, ndsvi = NDSVI, #data$SATVI,
+                           greenness, brightness, wetness,
+                           #elevation,
+                           slope, folded_aspect, tpi = TPI, tri = TRI, roughness, flowdir, #data$cluster,
+                           #total_shrubs)
+                           binary)
+
+variables$split <- sample.split(variables$binary, SplitRatio = .8) #create new variable for splitting plot data into training and test datasets (70% training data)
+
+rf_train <- filter(variables, split == TRUE) %>%    #create training dataset
+  dplyr::select(-split)                            #remove split variable from training data
+rf_test <- filter(variables, split == FALSE) %>%
+  dplyr::select(-split)
+
+
+frst <- randomForest(binary ~ . ,
+                  data = rf_train, importance = TRUE, ntree = 600)
+# optimizing model ----------------------------------------------
+# frst
+# plot(frst) # 600 seems pretty safe
   
 
 
