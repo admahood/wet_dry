@@ -1,6 +1,7 @@
 
 # Step 1: Load packages ---------------------------
-libs <- c("caTools", "randomForest", "ROCR", "party", "picante", "caret", "tidyverse", "rgdal","sf")
+libs <- c("caTools", "randomForest", "ROCR", "party", "picante", "caret", 
+          "tidyverse", "rgdal","sf", "Metrics", "gbm")
 lapply(libs, install.packages, character.only = TRUE, verbose = FALSE)
 lapply(libs, library, character.only = TRUE, verbose = FALSE)
 
@@ -33,7 +34,7 @@ variables <- dplyr::select(gbd,
                            sr_band1, sr_band2, sr_band3, sr_band4, sr_band5, sr_band7,
                            ndvi = NDVI, evi = EVI, savi = SAVI,sr = SR, ndsvi = NDSVI, #data$SATVI,
                            greenness, brightness, wetness,
-                           #elevation,
+                           elevation,
                            slope, folded_aspect, tpi = TPI, tri = TRI, roughness, flowdir, #data$cluster,
                            #total_shrubs)
                            binary)
@@ -64,8 +65,151 @@ paste0("Test Accuracy: ", cm$overall[1])
 paste("oob accuracy")
 print(1 - oob_err)
 
+auc(actual = ifelse(rf_test$binary == "Shrub", 1, 0), 
+    predicted = ifelse(class_prediction == "Shrub",1,0))          
+
+# tuning
+
+res <- tuneRF(x = subset(rf_train, select = -binary),
+              y = rf_train$binary,
+              ntreeTry = 600) # this thing kinda sucks
+
+# manual grid of values method
+# Establish a list of possible values for mtry, nodesize and sampsize
+mtry <- seq(4, ncol(rf_train) * 0.8, 2)
+nodesize <- seq(3, 8, 2)
+sampsize <- nrow(rf_train) * c(0.7, 0.8)
+
+# Create a data frame containing all combinations 
+hyper_grid <- expand.grid(mtry = mtry, nodesize = nodesize, sampsize = sampsize)
+
+# Create an empty vector to store OOB error values
+oob_err <- c()
+
+# Write a loop over the rows of hyper_grid to train the grid of models
+for (i in 1:nrow(hyper_grid)) {
+  
+  # Train a Random Forest model
+  model <- randomForest(formula = binary ~ ., 
+                        data = rf_train,
+                        mtry = hyper_grid$mtry[i],
+                        nodesize = hyper_grid$nodesize[i],
+                        sampsize = hyper_grid$sampsize[i])
+  
+  # Store OOB error for the model                      
+  oob_err[i] <- model$err.rate[nrow(model$err.rate), "OOB"]
+}
+
+# Identify optimal set of hyperparmeters based on OOB error
+opt_i <- which.min(oob_err)
+print(hyper_grid[opt_i,])
+
+frst_2 <- randomForest(binary ~ . ,
+                       data = rf_train, 
+                       importance = TRUE, 
+                       ntree = 1000,
+                       
+                       nodesize = 5,
+                       sampsize = 930)
+
 #### Step 8: Calculate Variable Importance -----------------
 varImpPlot(frst)
+varImpPlot(frst_2)
+
+# gbm
+
+rf_train$binary10 <- ifelse(rf_train$binary == "Shrub", 1, 0)
+rf_test$binary10 <- ifelse(rf_test$binary == "Shrub", 1, 0)
+
+# Train a 10000-tree GBM model
+set.seed(1)
+gbm_mod <- gbm(formula = binary10 ~ ., 
+               distribution = "bernoulli", 
+               data = dplyr::select(rf_train,-binary),
+               n.trees = 10000)
+
+preds1 <- predict(object = gbm_mod, 
+                  newdata = dplyr::select(rf_test,-binary),
+                  n.trees = 10000)
+
+auc(actual = rf_test$binary10, predicted = preds1)
+
+ntree_opt_oob <- gbm.perf(object = gbm_mod, 
+                          method = "OOB", 
+                          oobag.curve = TRUE)
+
+gbm_cv <- gbm(formula = binary10 ~ ., 
+                       distribution = "bernoulli", 
+                       data = dplyr::select(rf_train,-binary),
+                       n.trees = 20000,
+                       cv.folds = 2)
+
+ntree_opt_cv <- gbm.perf(object = gbm_cv, 
+                         method = "cv")
+print(paste0("Optimal n.trees (OOB Estimate): ", ntree_opt_oob)) 
+# Train a CV GBM model
+set.seed(1)
+gbm_cv <- gbm(formula = binary10 ~ ., 
+                       distribution = "bernoulli", 
+                       data =  dplyr::select(rf_train,-binary),
+                       n.trees = 10000,
+                       cv.folds = 10)
+
+# Optimal ntree estimate based on CV
+ntree_opt_cv <- gbm.perf(object = gbm_cv, 
+                         method = "cv")
+
+# Compare the estimates                         
+print(paste0("Optimal n.trees (OOB Estimate): ", ntree_opt_oob))                         
+print(paste0("Optimal n.trees (CV Estimate): ", ntree_opt_cv))
+
+# Generate predictions on the test set using ntree_opt_oob number of trees
+preds1 <- predict(object = credit_model, 
+                  newdata = credit_test,
+                  n.trees = ntree_opt_oob)
+
+# Generate predictions on the test set using ntree_opt_cv number of trees
+preds2 <- predict(object = credit_model, 
+                  newdata = credit_test,
+                  n.trees = ntree_opt_cv)   
+
+# Generate the test set AUCs using the two sets of preditions & compare
+auc1 <- auc(actual = credit_test$default, predicted = preds1)  #OOB
+auc2 <- auc(actual = credit_test$default, predicted = preds2)  #CV 
+
+# Compare AUC 
+print(paste0("Test set AUC (OOB): ", auc1))                         
+print(paste0("Test set AUC (CV): ", auc2))
+
+# comparing different model types
+
+actual <- credit_test$default
+dt_auc <- auc(actual = actual, predicted = dt_preds)
+bag_auc <- auc(actual = actual, predicted = bag_preds)
+rf_auc <- auc(actual = actual, predicted = rf_preds)
+gbm_auc <- auc(actual = actual, predicted = gbm_preds)
+
+# Print results
+sprintf("Decision Tree Test AUC: %.3f", dt_auc)
+sprintf("Bagged Trees Test AUC: %.3f", bag_auc)
+sprintf("Random Forest Test AUC: %.3f", rf_auc)
+sprintf("GBM Test AUC: %.3f", gbm_auc)
+
+
+# List of predictions
+preds_list <- list(dt_preds, bag_preds, rf_preds, gbm_preds)
+
+# List of actual values (same for all)
+m <- length(preds_list)
+actuals_list <- rep(list(credit_test$default), m)
+
+# Plot the ROC curves
+pred <- prediction(preds_list, actuals_list)
+rocs <- performance(pred, "tpr", "fpr")
+plot(rocs, col = as.list(1:m), main = "Test Set ROC Curves")
+legend(x = "bottomright", 
+       legend = c("Decision Tree", "Bagged Trees", "Random Forest", "GBM"),
+       fill = 1:m)
 
 # adam does not understand anything below here
 
