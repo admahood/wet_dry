@@ -1,8 +1,13 @@
 
-# Step 1: Load packages ---------------------------
-libs <- c("caTools", "randomForest", "ROCR", "party", "picante", "caret", 
+# setup ---------------------------
+if(!endsWith(.rs.getProjectDirectory(),"wet_dry")){
+  .rs.api.openProject("/home/a/projects/wet_dry/wet_dry.Rproj")
+}
+
+libs <- c("caTools", "randomForest", "ROCR", "party", "caret", 
           "tidyverse", "rgdal","sf", "Metrics", "gbm")
-lapply(libs, install.packages, character.only = TRUE, verbose = FALSE)
+
+#lapply(libs, install.packages, character.only = TRUE, verbose = FALSE)
 lapply(libs, library, character.only = TRUE, verbose = FALSE)
 
 source("scripts/functions.R")
@@ -10,7 +15,7 @@ source("scripts/functions.R")
 set.seed(11)
 
 
-# Step 2: Load Data --------------------------------
+# Load and manipulate Data ---------------------------------------------
 system("aws s3 cp s3://earthlab-amahood/data/plots_with_landsat.gpkg data/plot_data/plots_with_landsat.gpkg")
 
 # which_binary <- data.frame(
@@ -25,14 +30,15 @@ system("aws s3 cp s3://earthlab-amahood/data/plots_with_landsat.gpkg data/plot_d
 gbd <- st_read("data/plot_data/plots_with_landsat.gpkg", quiet=T) %>%
   filter(esp_mask == 1) %>%
   mutate(total_shrubs = NonInvShru + SagebrushC) %>%
-  st_set_geometry(NULL) %>%
-  mutate(binary = as.factor(ifelse(total_shrubs < 14, "Grass", "Shrub")))
+  st_set_geometry(NULL)
 
-gbd$NDSVI <- get_ndsvi(gbd$sr_band3, gbd$sr_band5)
+gbd <- mutate(gbd, binary = as.factor(ifelse(total_shrubs < 14, "Grass", "Shrub")))
+
+gbd$ndsvi <- get_ndsvi(gbd$sr_band3, gbd$sr_band5)
 
 variables <- dplyr::select(gbd,
                            sr_band1, sr_band2, sr_band3, sr_band4, sr_band5, sr_band7,
-                           ndvi = NDVI, evi = EVI, savi = SAVI,sr = SR, ndsvi = NDSVI, #data$SATVI,
+                           ndvi = NDVI, evi = EVI, savi = SAVI,sr = SR, ndsvi, #data$SATVI,
                            greenness, brightness, wetness,
                            elevation,
                            slope, folded_aspect, tpi = TPI, tri = TRI, roughness, flowdir, #data$cluster,
@@ -41,151 +47,230 @@ variables <- dplyr::select(gbd,
 
 variables$split <- sample.split(variables$binary, SplitRatio = .8) #create new variable for splitting plot data into training and test datasets (70% training data)
 
-rf_train <- filter(variables, split == TRUE) %>%    #create training dataset
+train <- filter(variables, split == TRUE) %>%    #create training dataset
   dplyr::select(-split)                            #remove split variable from training data
-rf_test <- filter(variables, split == FALSE) %>%
+test <- filter(variables, split == FALSE) %>%
   dplyr::select(-split)
 
+# first crack at random forest -------------------------------------------------
 
 frst <- randomForest(binary ~ . ,
-                  data = rf_train, importance = TRUE, ntree = 600)
-# optimizing model- strait from data camp----------------------------------------------
-# frst
+                  data = train, importance = TRUE, ntree = 600)
+# optimizing model - straight from data camp
+
 # plot(frst) # 600 seems pretty safe
 
 oob_err <- frst$err.rate[nrow(frst$err.rate),]
 
 class_prediction <- predict(object = frst,   # model object 
-                            newdata = rf_test,  # test dataset
+                            newdata = test,  # test dataset
                             type = "class")
 cm <- confusionMatrix(data = class_prediction,       # predicted classes
-                      reference = rf_test$binary)  # actual classes
+                      reference = test$binary)  # actual classes
 print(cm)
 paste0("Test Accuracy: ", cm$overall[1])
 paste("oob accuracy")
 print(1 - oob_err)
 
-auc(actual = ifelse(rf_test$binary == "Shrub", 1, 0), 
+auc(actual = ifelse(test$binary == "Shrub", 1, 0), 
     predicted = ifelse(class_prediction == "Shrub",1,0))          
 
-# tuning
+# tuning with hypermatrix-------------------------------------------------------------------
 
-res <- tuneRF(x = subset(rf_train, select = -binary),
-              y = rf_train$binary,
-              ntreeTry = 600) # this thing kinda sucks
+# res <- tuneRF(x = subset(rf_train, select = -binary),
+#               y = rf_train$binary,
+#               ntreeTry = 600) # this thing kinda sucks
 
 # manual grid of values method
 # Establish a list of possible values for mtry, nodesize and sampsize
-mtry <- seq(4, ncol(rf_train) * 0.8, 2)
-nodesize <- seq(3, 8, 2)
-sampsize <- nrow(rf_train) * c(0.7, 0.8)
+# first grid with wider range, more spaced out, second more focused
+mtry <- seq(7, ncol(rf_train) * 0.8,1)
+nodesize <- seq(1, 8, 1)
+sampsize <- nrow(rf_train) * c(0.7, 0.8, 0.9)
+sc <- seq(8,13,1)
 
 # Create a data frame containing all combinations 
-hyper_grid <- expand.grid(mtry = mtry, nodesize = nodesize, sampsize = sampsize)
+hyper_grid <- expand.grid(mtry = mtry, 
+                          nodesize = nodesize, 
+                          sampsize = sampsize,
+                          sc=sc,
+                          oob = NA,
+                          oob_grass = NA,
+                          oob_shrub = NA) ; nrow(hyper_grid)
+
+# 336 different models!
 
 # Create an empty vector to store OOB error values
 oob_err <- c()
-
+models <- list()
 # Write a loop over the rows of hyper_grid to train the grid of models
+# first with elevation
 for (i in 1:nrow(hyper_grid)) {
+  print(paste(i/nrow(hyper_grid)*100,"%"))
+  gbd <- mutate(gbd,
+                  binary = as.factor(
+                    ifelse(
+                      total_shrubs < hyper_grid$sc[i], "Grass", "Shrub")))
+  
+  variables <- dplyr::select(gbd,
+                             sr_band1, sr_band2, sr_band3, sr_band4, sr_band5, sr_band7,
+                             ndvi = NDVI, evi = EVI, savi = SAVI,sr = SR, ndsvi = NDSVI, #data$SATVI,
+                             greenness, brightness, wetness,
+                             elevation,
+                             slope, folded_aspect, tpi = TPI, tri = TRI, roughness, flowdir,
+                             binary)
+  
+  variables$split <- sample.split(variables$binary, SplitRatio = .8) #create new variable for splitting plot data into training and test datasets (70% training data)
+  
+  train <- filter(variables, split == TRUE) %>%    #create training dataset
+    dplyr::select(-split)                            #remove split variable from training data
+  test <- filter(variables, split == FALSE) %>%
+    dplyr::select(-split)
+  
   
   # Train a Random Forest model
-  model <- randomForest(formula = binary ~ ., 
-                        data = rf_train,
+  models[[i]] <- randomForest(formula = binary ~ ., 
+                        data = train,
                         mtry = hyper_grid$mtry[i],
                         nodesize = hyper_grid$nodesize[i],
                         sampsize = hyper_grid$sampsize[i])
   
   # Store OOB error for the model                      
-  oob_err[i] <- model$err.rate[nrow(model$err.rate), "OOB"]
+  hyper_grid$oob[i] <- models[[i]]$err.rate[nrow(models[[i]]$err.rate), "OOB"]
+  hyper_grid$oob_grass[i] <- models[[i]]$err.rate[nrow(models[[i]]$err.rate), "Grass"]
+  hyper_grid$oob_shrub[i] <- models[[i]]$err.rate[nrow(models[[i]]$err.rate), "Shrub"]
+  hyper_grid$comb_err <- hyper_grid$oob_grass + hyper_grid$oob_shrub
 }
+opt_i <- which.min(hyper_grid$oob)
+models[[opt_i]]
+hyper_grid <- arrange(hyper_grid,oob) %>% as_tibble()
+hg2 <- arrange(hyper_grid, comb_err) %>%
+  filter(oob_grass < 0.2 & oob_shrub < 0.2)
 
 # Identify optimal set of hyperparmeters based on OOB error
-opt_i <- which.min(oob_err)
-print(hyper_grid[opt_i,])
+# running the optimal model
+gbd <- mutate(gbd,
+              binary = as.factor(
+                ifelse(
+                  total_shrubs < 13, "Grass", "Shrub")))
+
+variables <- dplyr::select(gbd,
+                           sr_band1, sr_band2, sr_band3, sr_band4, sr_band5, sr_band7,
+                           ndvi = NDVI, evi = EVI, savi = SAVI,sr = SR, ndsvi, #data$SATVI,
+                           greenness, brightness, wetness,
+                           elevation,
+                           #Latitude,
+                           slope, folded_aspect, tpi = TPI, tri = TRI, roughness, flowdir,
+                           binary)
+
+variables$split <- sample.split(variables$binary, SplitRatio = .8) #create new variable for splitting plot data into training and test datasets (70% training data)
+
+train <- filter(variables, split == TRUE) %>%    #create training dataset
+  dplyr::select(-split)                            #remove split variable from training data
+test <- filter(variables, split == FALSE) %>%
+  dplyr::select(-split)
 
 frst_2 <- randomForest(binary ~ . ,
-                       data = rf_train, 
+                       data = train, 
                        importance = TRUE, 
-                       ntree = 1000,
-                       
-                       nodesize = 5,
-                       sampsize = 930)
+                       ntree = 5000,
+                       mtry = 8,
+                       nodesize = 3,
+                       sampsize = 1063);frst_2 ;plot(frst_2)
 
-#### Step 8: Calculate Variable Importance -----------------
+# Calculate Variable Importance 
+
 varImpPlot(frst)
 varImpPlot(frst_2)
 
-# gbm
+# gbm: first crack--------------------------------------------------------------
 
-rf_train$binary10 <- ifelse(rf_train$binary == "Shrub", 1, 0)
-rf_test$binary10 <- ifelse(rf_test$binary == "Shrub", 1, 0)
+gbd <- st_read("data/plot_data/plots_with_landsat.gpkg", quiet=T) %>%
+  filter(esp_mask == 1) %>%
+  mutate(total_shrubs = NonInvShru + SagebrushC,
+         ndsvi = get_ndsvi(gbd$sr_band3, gbd$sr_band5))%>%
+  st_set_geometry(NULL)
 
-# Train a 10000-tree GBM model
+gbd <- mutate(gbd, shrub = ifelse(total_shrubs > 13, 1, 0))
+
+variables <- dplyr::select(gbd,
+                           sr_band1, sr_band2, sr_band3, sr_band4, sr_band5, sr_band7,
+                           ndvi = NDVI, evi = EVI, savi = SAVI,ndsvi, #data$SATVI,
+                           greenness, brightness, wetness,
+                           elevation,
+                           slope, folded_aspect, tpi = TPI, tri = TRI, roughness, flowdir, #data$cluster,
+                           #total_shrubs)
+                           shrub)
+
+variables$split <- sample.split(variables$shrub, SplitRatio = .8) #create new variable for splitting plot data into training and test datasets (70% training data)
+
+train <- filter(variables, split == TRUE) %>%    #create training dataset
+  dplyr::select(-split)                            #remove split variable from training data
+test <- filter(variables, split == FALSE) %>%
+  dplyr::select(-split)
+
 set.seed(1)
-gbm_mod <- gbm(formula = binary10 ~ ., 
+gbm_mod <- gbm(formula = shrub ~ ., 
                distribution = "bernoulli", 
-               data = dplyr::select(rf_train,-binary),
+               data = train,
                n.trees = 10000)
 
 preds1 <- predict(object = gbm_mod, 
-                  newdata = dplyr::select(rf_test,-binary),
+                  newdata = test,
                   n.trees = 10000)
 
-auc(actual = rf_test$binary10, predicted = preds1)
+auc(actual = test$shrub, predicted = preds1)
 
 ntree_opt_oob <- gbm.perf(object = gbm_mod, 
                           method = "OOB", 
                           oobag.curve = TRUE)
 
-gbm_cv <- gbm(formula = binary10 ~ ., 
+gbm_cv <- gbm(formula = shrub ~ ., 
                        distribution = "bernoulli", 
-                       data = dplyr::select(rf_train,-binary),
-                       n.trees = 20000,
-                       cv.folds = 2)
-
-ntree_opt_cv <- gbm.perf(object = gbm_cv, 
-                         method = "cv")
-print(paste0("Optimal n.trees (OOB Estimate): ", ntree_opt_oob)) 
-# Train a CV GBM model
-set.seed(1)
-gbm_cv <- gbm(formula = binary10 ~ ., 
-                       distribution = "bernoulli", 
-                       data =  dplyr::select(rf_train,-binary),
+                       data = train,
                        n.trees = 10000,
-                       cv.folds = 10)
+                       cv.folds = 3)
 
-# Optimal ntree estimate based on CV
 ntree_opt_cv <- gbm.perf(object = gbm_cv, 
-                         method = "cv")
+                         method = "cv",
+                         oobag.curve = T)
+
+gbm.perf(object = gbm_mod, 
+         method = "test")
 
 # Compare the estimates                         
 print(paste0("Optimal n.trees (OOB Estimate): ", ntree_opt_oob))                         
 print(paste0("Optimal n.trees (CV Estimate): ", ntree_opt_cv))
 
 # Generate predictions on the test set using ntree_opt_oob number of trees
-preds1 <- predict(object = credit_model, 
-                  newdata = credit_test,
+preds1 <- predict(object = gbm_mod, 
+                  newdata = test,
                   n.trees = ntree_opt_oob)
 
 # Generate predictions on the test set using ntree_opt_cv number of trees
-preds2 <- predict(object = credit_model, 
-                  newdata = credit_test,
+preds2 <- predict(object = gbm_cv, 
+                  newdata = test,
                   n.trees = ntree_opt_cv)   
 
 # Generate the test set AUCs using the two sets of preditions & compare
-auc1 <- auc(actual = credit_test$default, predicted = preds1)  #OOB
-auc2 <- auc(actual = credit_test$default, predicted = preds2)  #CV 
+auc1 <- auc(actual = test$shrub, predicted = preds1)  #OOB
+auc2 <- auc(actual = test$shrub, predicted = preds2)  #CV 
 
+# hypermatrix for gbm ----------------------------------------------------------
+
+
+
+
+# comparing different types of models ------------------------------------------
 # Compare AUC 
 print(paste0("Test set AUC (OOB): ", auc1))                         
 print(paste0("Test set AUC (CV): ", auc2))
 
 # comparing different model types
 
-actual <- credit_test$default
-dt_auc <- auc(actual = actual, predicted = dt_preds)
-bag_auc <- auc(actual = actual, predicted = bag_preds)
+actual <- test$shrub
+dt_auc <- auc(actual = actual, predicted = preds2)
+bag_auc <- auc(actual = actual, predicted = preds1)
 rf_auc <- auc(actual = actual, predicted = rf_preds)
 gbm_auc <- auc(actual = actual, predicted = gbm_preds)
 
