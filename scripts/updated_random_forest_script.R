@@ -33,7 +33,7 @@ variables <- dplyr::select(gbd,
                            sr_band1, sr_band2, sr_band3, sr_band4, sr_band5, sr_band7,
                            ndvi = NDVI, evi = EVI, savi = SAVI,sr = SR, ndsvi = NDSVI, #data$SATVI,
                            greenness, brightness, wetness,
-                           #elevation,
+                           elevation,
                            slope, folded_aspect, tpi = TPI, tri = TRI, roughness, flowdir, #data$cluster,
                            #total_shrubs)
                            binary)
@@ -47,14 +47,19 @@ rf_test <- filter(variables, split == FALSE) %>%
 
 
 frst <- randomForest(binary ~ . ,
-                  data = rf_train, importance = TRUE, ntree = 600)
+                  data = rf_train, 
+                  importance = TRUE, 
+                  ntree = 2000, 
+                  mtry = 13, 
+                  nodesize = 2, 
+                  sampsize = 1196)
 # optimizing model- strait from data camp----------------------------------------------
 # frst
 # plot(frst) # 600 seems pretty safe
 
 oob_err <- frst$err.rate[nrow(frst$err.rate),]
 
-class_prediction <- predict(object = frst,   # model object 
+class_prediction <- predict(object = frst,   # model object
                             newdata = rf_test,  # test dataset
                             type = "class")
 cm <- confusionMatrix(data = class_prediction,       # predicted classes
