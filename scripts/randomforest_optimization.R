@@ -39,7 +39,7 @@ hyper_grid <- expand.grid(mtry = mtry,
                           oob = NA,
                           oob_grass = NA,
                           oob_shrub = NA) ; nrow(hyper_grid)
-
+# note to self parallelize this
 models <- list()
 for (i in 1:nrow(hyper_grid)) {
   print(paste(i/nrow(hyper_grid)*100,"%"))
@@ -94,7 +94,7 @@ read.csv("data/hg_rf.csv")%>%
 gbd <- mutate(gbd,
               binary = as.factor(
                 ifelse(
-                  total_shrubs < 8, "Grass", "Shrub")))
+                  total_shrubs < 12, "Grass", "Shrub")))
 
 variables <- dplyr::select(gbd,
                            sr_band1, sr_band2, sr_band3, sr_band4, sr_band5, sr_band7,
@@ -111,11 +111,12 @@ train <- filter(variables, split == TRUE) %>%    #create training dataset
 test <- filter(variables, split == FALSE) %>%
   dplyr::select(-split)
 
-frst <- randomForest(formula = binary ~ ., 
-                            data = train,
-                            mtry = hyper_grid$mtry[i],
-                            nodesize = hyper_grid$nodesize[i],
-                            sampsize = hyper_grid$sampsize[i],
+frst <- randomForest(formula = binary ~ .,
+                     data = train,
+                     mtry = 13,
+                     nodesize = 2,
+                     sampsize = 1196,
+                     importance=TRUE,
                      ntree = 2000)
 
 
@@ -131,46 +132,18 @@ paste0("Test Accuracy: ", cm$overall[1])
 paste("oob accuracy")
 print(1 - oob_err)
 
-auc(actual = ifelse(test$binary == "Shrub", 1, 0),
-    predicted = ifelse(class_prediction == "Shrub",1,0))
+rf_auc = auc(actual = test$binary,
+             predicted = class_prediction)
+class_prediction <- predict(object = frst,   # model object
+                            newdata = test,  # test dataset
+                            type = "prob")
 
+pred = prediction(as.numeric(class_prediction[,"Shrub"]), as.numeric(test$binary))
 
-
-# Identify optimal set of hyperparmeters based on OOB error
-# running the optimal model
-gbd <- mutate(gbd,
-              binary = as.factor(
-                ifelse(
-                  total_shrubs < 13, "Grass", "Shrub")))
-
-variables <- dplyr::select(gbd,
-                           sr_band1, sr_band2, sr_band3, sr_band4, sr_band5, sr_band7,
-                           ndvi = NDVI, evi = EVI, savi = SAVI,sr = SR, ndsvi, #data$SATVI,
-                           greenness, brightness, wetness,
-                           elevation,
-                           #Latitude,
-                           slope, folded_aspect, tpi = TPI, tri = TRI, roughness, flowdir,
-                           binary)
-
-variables$split <- sample.split(variables$binary, SplitRatio = .8) #create new variable for splitting plot data into training and test datasets (70% training data)
-
-train <- filter(variables, split == TRUE) %>%    #create training dataset
-  dplyr::select(-split)                            #remove split variable from training data
-test <- filter(variables, split == FALSE) %>%
-  dplyr::select(-split)
-
-frst_2 <- randomForest(binary ~ . ,
-                       data = train, 
-                       importance = TRUE, 
-                       ntree = 5000,
-                       mtry = 8,
-                       nodesize = 3,
-                       sampsize = 1063);frst_2 ;plot(frst_2)
-
-# Calculate Variable Importance 
-
+rocs <- performance(pred, "tpr", "fpr")
+plot(rocs)
 varImpPlot(frst)
-varImpPlot(frst_2)
+
 
 # gbm: first crack--------------------------------------------------------------
 
