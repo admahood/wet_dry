@@ -1,4 +1,3 @@
-
 # setup ---------------------------
 if(!endsWith(.rs.getProjectDirectory(),"wet_dry")){
   .rs.api.openProject("/home/a/projects/wet_dry/wet_dry.Rproj")
@@ -18,75 +17,18 @@ set.seed(11)
 # Load and manipulate Data ---------------------------------------------
 system("aws s3 cp s3://earthlab-amahood/data/plots_with_landsat.gpkg data/plot_data/plots_with_landsat.gpkg")
 
-# which_binary <- data.frame(
-#   binary_value = NA,
-#   variable = NA,
-#   mean_error = NA,
-#   sd_error = NA
-# )
-
-
-
 gbd <- st_read("data/plot_data/plots_with_landsat.gpkg", quiet=T) %>%
   filter(esp_mask == 1) %>%
-  mutate(total_shrubs = NonInvShru + SagebrushC) %>%
+  mutate(total_shrubs = NonInvShru + SagebrushC,
+         ndsvi = get_ndsvi(sr_band3, sr_band5)) %>%
   st_set_geometry(NULL)
-
-gbd <- mutate(gbd, binary = as.factor(ifelse(total_shrubs < 14, "Grass", "Shrub")))
-
-gbd$ndsvi <- get_ndsvi(gbd$sr_band3, gbd$sr_band5)
-
-variables <- dplyr::select(gbd,
-                           sr_band1, sr_band2, sr_band3, sr_band4, sr_band5, sr_band7,
-                           ndvi = NDVI, evi = EVI, savi = SAVI,sr = SR, ndsvi, #data$SATVI,
-                           greenness, brightness, wetness,
-                           elevation,
-                           slope, folded_aspect, tpi = TPI, tri = TRI, roughness, flowdir, #data$cluster,
-                           #total_shrubs)
-                           binary)
-
-variables$split <- sample.split(variables$binary, SplitRatio = .8) #create new variable for splitting plot data into training and test datasets (70% training data)
-
-train <- filter(variables, split == TRUE) %>%    #create training dataset
-  dplyr::select(-split)                            #remove split variable from training data
-test <- filter(variables, split == FALSE) %>%
-  dplyr::select(-split)
-
-# first crack at random forest -------------------------------------------------
-
-frst <- randomForest(binary ~ . ,
-                  data = train, importance = TRUE, ntree = 600)
-# optimizing model - straight from data camp
-
-# plot(frst) # 600 seems pretty safe
-
-oob_err <- frst$err.rate[nrow(frst$err.rate),]
-
-class_prediction <- predict(object = frst,   # model object 
-                            newdata = test,  # test dataset
-                            type = "class")
-cm <- confusionMatrix(data = class_prediction,       # predicted classes
-                      reference = test$binary)  # actual classes
-print(cm)
-paste0("Test Accuracy: ", cm$overall[1])
-paste("oob accuracy")
-print(1 - oob_err)
-
-auc(actual = ifelse(test$binary == "Shrub", 1, 0), 
-    predicted = ifelse(class_prediction == "Shrub",1,0))          
 
 # tuning with hypermatrix-------------------------------------------------------------------
 
-# res <- tuneRF(x = subset(rf_train, select = -binary),
-#               y = rf_train$binary,
-#               ntreeTry = 600) # this thing kinda sucks
 
-# manual grid of values method
-# Establish a list of possible values for mtry, nodesize and sampsize
-# first grid with wider range, more spaced out, second more focused
-mtry <- seq(7, ncol(rf_train) * 0.8,1)
+mtry <- seq(7, 22 * 0.8,1) # 22 = # cols in the yet to be created training set
 nodesize <- seq(1, 8, 1)
-sampsize <- nrow(rf_train) * c(0.7, 0.8, 0.9)
+sampsize <- nrow(gbd)*0.8 * c(0.632, 0.7, 0.8, 0.9)
 sc <- seq(8,13,1)
 
 # Create a data frame containing all combinations 
@@ -98,23 +40,17 @@ hyper_grid <- expand.grid(mtry = mtry,
                           oob_grass = NA,
                           oob_shrub = NA) ; nrow(hyper_grid)
 
-# 336 different models!
-
-# Create an empty vector to store OOB error values
-oob_err <- c()
 models <- list()
-# Write a loop over the rows of hyper_grid to train the grid of models
-# first with elevation
 for (i in 1:nrow(hyper_grid)) {
   print(paste(i/nrow(hyper_grid)*100,"%"))
   gbd <- mutate(gbd,
-                  binary = as.factor(
-                    ifelse(
-                      total_shrubs < hyper_grid$sc[i], "Grass", "Shrub")))
+                binary = as.factor(
+                  ifelse(
+                    total_shrubs < hyper_grid$sc[i], "Grass", "Shrub")))
   
   variables <- dplyr::select(gbd,
                              sr_band1, sr_band2, sr_band3, sr_band4, sr_band5, sr_band7,
-                             ndvi = NDVI, evi = EVI, savi = SAVI,sr = SR, ndsvi = NDSVI, #data$SATVI,
+                             ndvi = NDVI, evi = EVI, savi = SAVI,sr = SR, ndsvi, #data$SATVI,
                              greenness, brightness, wetness,
                              elevation,
                              slope, folded_aspect, tpi = TPI, tri = TRI, roughness, flowdir,
@@ -130,10 +66,10 @@ for (i in 1:nrow(hyper_grid)) {
   
   # Train a Random Forest model
   models[[i]] <- randomForest(formula = binary ~ ., 
-                        data = train,
-                        mtry = hyper_grid$mtry[i],
-                        nodesize = hyper_grid$nodesize[i],
-                        sampsize = hyper_grid$sampsize[i])
+                              data = train,
+                              mtry = hyper_grid$mtry[i],
+                              nodesize = hyper_grid$nodesize[i],
+                              sampsize = hyper_grid$sampsize[i])
   
   # Store OOB error for the model                      
   hyper_grid$oob[i] <- models[[i]]$err.rate[nrow(models[[i]]$err.rate), "OOB"]
@@ -141,11 +77,64 @@ for (i in 1:nrow(hyper_grid)) {
   hyper_grid$oob_shrub[i] <- models[[i]]$err.rate[nrow(models[[i]]$err.rate), "Shrub"]
   hyper_grid$comb_err <- hyper_grid$oob_grass + hyper_grid$oob_shrub
 }
+write.csv(hyper_grid, "data/hg_rf.csv")
+
 opt_i <- which.min(hyper_grid$oob)
 models[[opt_i]]
 hyper_grid <- arrange(hyper_grid,oob) %>% as_tibble()
 hg2 <- arrange(hyper_grid, comb_err) %>%
   filter(oob_grass < 0.2 & oob_shrub < 0.2)
+
+
+# fitting the optimum model ----------------------------------------------------
+read.csv("data/hg_rf.csv")%>%
+  arrange(oob) %>%
+  as_tibble()
+
+gbd <- mutate(gbd,
+              binary = as.factor(
+                ifelse(
+                  total_shrubs < 8, "Grass", "Shrub")))
+
+variables <- dplyr::select(gbd,
+                           sr_band1, sr_band2, sr_band3, sr_band4, sr_band5, sr_band7,
+                           ndvi = NDVI, evi = EVI, savi = SAVI,sr = SR, ndsvi, #data$SATVI,
+                           greenness, brightness, wetness,
+                           elevation,
+                           slope, folded_aspect, tpi = TPI, tri = TRI, roughness, flowdir,
+                           binary)
+
+variables$split <- sample.split(variables$binary, SplitRatio = .8) #create new variable for splitting plot data into training and test datasets (70% training data)
+
+train <- filter(variables, split == TRUE) %>%    #create training dataset
+  dplyr::select(-split)                            #remove split variable from training data
+test <- filter(variables, split == FALSE) %>%
+  dplyr::select(-split)
+
+frst <- randomForest(formula = binary ~ ., 
+                            data = train,
+                            mtry = hyper_grid$mtry[i],
+                            nodesize = hyper_grid$nodesize[i],
+                            sampsize = hyper_grid$sampsize[i],
+                     ntree = 2000)
+
+
+oob_err <- frst$err.rate[nrow(frst$err.rate),]
+
+class_prediction <- predict(object = frst,   # model object
+                            newdata = test,  # test dataset
+                            type = "class")
+cm <- confusionMatrix(data = class_prediction,       # predicted classes
+                      reference = test$binary)  # actual classes
+print(cm)
+paste0("Test Accuracy: ", cm$overall[1])
+paste("oob accuracy")
+print(1 - oob_err)
+
+auc(actual = ifelse(test$binary == "Shrub", 1, 0),
+    predicted = ifelse(class_prediction == "Shrub",1,0))
+
+
 
 # Identify optimal set of hyperparmeters based on OOB error
 # running the optimal model
