@@ -159,7 +159,7 @@ ter_local <- '/home/rstudio/wet_dry/data/terrain_2'
 system(paste("aws s3 sync",
              ter_s3,
              ter_local))
-opts <- c('slope', 'aspect', 'TPI', 'TRI', 'roughness','flowdir')
+opts <- c('slope', 'aspect', 'TPI', 'TRI', 'roughness','flowdir', 'folded_aspect')
 
 cores <- length(opts)
 
@@ -181,6 +181,16 @@ foreach(i = opts) %dopar% {
 }
 rm(ter_rst)
 
+# create folded aspect raster
+aspect <- raster("data/terrain_2/aspect.tif")
+
+folded_aspect <- get_folded_aspect(aspect)
+
+writeRaster(folded_aspect, "data/terrain_2/folded_aspect.tif")
+
+system("aws s3 cp data/terrain_2/folded_aspect.tif s3://earthlab-amahood/data/terrain_2/folded_aspect.tif")
+
+#extract terrain raster values
 df$elevation <- raster::extract(gb_dem, df)
 df$slope <- raster::extract(raster("data/terrain_2/slope.tif"), df)
 df$aspect <- raster::extract(raster("data/terrain_2/aspect.tif"), df)
