@@ -20,6 +20,7 @@ s3_result <- "s3://earthlab-amahood/data/model_applied_scenes"
 system(paste0("aws s3 sync ", s3_path, " ", local_path))
 system(paste0("aws s3 sync ", s3_terrain, " ", local_terrain))
 
+system("aws s3 sync s3://earthlab-amahood/data/landfire_esp_rcl/ data/esp_binary")
 ##system(paste0("aws s3 sync ", " s3://earthlab-amahood/data/ls5_model_results_test_mucc/", "data/results")) ## figure out how to use an if statement based on this s3 sync
 ##to avoid redundant classified images
 

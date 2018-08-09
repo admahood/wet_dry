@@ -25,7 +25,7 @@ gbd <- st_read("data/plot_data/plots_with_landsat.gpkg", quiet=T) %>%
   filter(esp_mask == 1) %>%
   mutate(total_shrubs = NonInvShru + SagebrushC) %>%
   st_set_geometry(NULL) %>%
-  mutate(binary = as.factor(ifelse(total_shrubs < 14, "Grass", "Shrub")))
+  mutate(binary = as.factor(ifelse(total_shrubs < 12, "Grass", "Shrub")))
 
 gbd$NDSVI <- get_ndsvi(gbd$sr_band3, gbd$sr_band5)
 
