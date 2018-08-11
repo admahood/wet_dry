@@ -5,6 +5,10 @@
 # this script requires over 10GB of ram per core!
 
 # setup ------------------------------------------------------------------------
+if(is.null(.rs.getProjectDirectory())){
+  .rs.api.openProject("/home/rstudio/wet_dry/wet_dry.Rproj")
+}
+
 library(raster)
 library(rgdal)
 library(rgeos)
