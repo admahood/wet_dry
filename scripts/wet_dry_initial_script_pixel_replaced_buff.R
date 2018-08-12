@@ -185,16 +185,25 @@ if(!file.exists("data/terrain_2/aspect.tif")){
   system("aws s3 cp data/terrain_2/folded_aspect.tif s3://earthlab-amahood/data/terrain_2/folded_aspect.tif")
 }
 
-names <- c("lf_dem_reproj_full", "slope", "aspect", "TPI", "TRI", "roughness", "flowdir", "folded_aspect")
-files <- file.path(ter_local, paste0(names, ".tif"))
+# names <- c("lf_dem_reproj_full", "slope", "aspect", "TPI", "TRI", "roughness", "flowdir", "folded_aspect")
+# files <- file.path(ter_local, paste0(names, ".tif"))
+# 
+# registerDoParallel(cores = 8)
+# rasters <- lapply(files, raster)
+# 
+# par_l <- list()
+# par_res <-foreach (r = 1:length(rasters)) %dopar% {
+#   par_l[[r]] <- raster::extract(rasters[r], df, fun = mean, na.rm=TRUE)
+# }
 
-registerDoParallel(cores = 8)
-rasters <- lapply(files, raster)
-
-par_l <- list()
-par_res <-foreach (r = 1:length(rasters)) %dopar% {
-  par_l[[r]] <- raster::extract(rasters[r], df, fun = mean, na.rm=TRUE)
-}
+df$elevation <- raster::extract(raster("data/terrain_2/lf_dem_reproj_full.tif"), df,fun = mean, na.rm=TRUE)
+df$slope <- raster::extract(raster("data/terrain_2/slope.tif"), df,fun = mean, na.rm=TRUE)
+df$aspect <- raster::extract(raster("data/terrain_2/aspect.tif"), df,fun = mean, na.rm=TRUE)
+df$tpi <- raster::extract(raster("data/terrain_2/TPI.tif"), df,fun = mean, na.rm=TRUE)
+df$tri <- raster::extract(raster("data/terrain_2/TRI.tif"), df,fun = mean, na.rm=TRUE)
+df$roughness <- raster::extract(raster("data/terrain_2/roughness.tif"), df,fun = mean, na.rm=TRUE)
+df$flowdir <- raster::extract(raster("data/terrain_2/flowdir.tif"), df,fun = mean, na.rm=TRUE)
+df$folded_aspect <- raster::extract(raster("data/terrain_2/folded_aspect.tif"), df,fun = mean, na.rm=TRUE)
 
 system("rm data/tmp/*")
 
