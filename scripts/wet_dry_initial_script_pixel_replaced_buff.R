@@ -1,38 +1,10 @@
-################################### script for the wet_dry project ###################################
+#### data extraction from pixel-replaced landsat scenes ------------------------
 # Authors: Adam Mahood and Dylan Murphy
 # Began: Sept 2017
-# Last Modified:
-#
-# Question: does precipitation affect the probability of fire differently in sagebrush shrublands 
-# and cheatgrass-dominated annual grasslands? -- how does veg structure affect disturbance probability 
-# -- i.e. resilience
-#
-# Hypothesis: Annual grasslands will maintain a relatively high burn probability across precipitation
-# levels, whereas shrublands will have significantly lower probabilities in dry years than wet years.
-#
-# Basic idea for the workflow: -- steps 1 & 2 possibly feasable by end of semester
-# 1. use BLM plot data to classify landsat pixels as either shrubland or grassland
-#     1a. clip to great basin
-#     a. download landsat images for each year that blm plots were monitored somewhere around peak green
-# (joe analytics hub guy is downloading landsat)
-#     b. extract landsat band values for each plot location and add to the data frame
-#     c. use machine learning/random forests/soemthing better? (account for autocorrelation?) to classify
-#        landsat pixels
-# 2. then classify all (or some number of random points) landsat pixels for the study area for each year (1984-2014)
-#     a. mask ag roads water etc    clouds
-#     i. identify points in time where pixels switched from shrub to grassland?
-# 3. use fire data - mtbs, baecv - to figure out burn probabilities (need to figure out exactly what this means)
-#         i. some kind of thing where there is a timeline of sorts for every plot?
-#         ii. number of fires before and after transition points?
-# 4. extract climate data to each point for each year
-#     a. antecedent precipitation 1 and 2 winters prior
-#
-# 5. time series -- convergent cross mapping
-#
 
 
 # setup ------------------------------------------------------------------------
-libs <- c("sf", "tidyverse", "raster", "rgdal", "rgeos")
+libs <- c("sf", "tidyverse", "raster", "rgdal", "rgeos", "foreach", "doParallel")
 lapply(libs, library, character.only = TRUE, verbose = FALSE)
 # install.packages("aws.s3")
 # library(aws.s3)
@@ -77,7 +49,7 @@ gb_plots <- st_intersection(gb_plots,scenes[,9:10]) # grabbing only the row and 
 gb_plots$path_row <- as.character(paste0("0",gb_plots$PATH,"0",gb_plots$ROW)) 
 # creating a handy dandy field that outputs the exact string that is in the filename
 
-# extract landsat data to plots ------------------------------------------------
+# extract landsat data to buffered points ------------------------------------------------
 
 landsat_s3 <- "s3://earthlab-amahood/data/landsat7_pixel_replaced"
 landsat_local <- "/home/rstudio/wet_dry/data/landsat7" 
@@ -144,23 +116,15 @@ system("rm data/tmp/*")
 df <- result[is.na(result$sr_band1) != TRUE, ] %>% #select plots without clouds
   na.omit()
 
-
-####NEW LANDFIRE DEM HERE ----------------------------------------------------------
-system("aws s3 sync s3://earthlab-amahood/data/LF_DEM /home/rstudio/wet_dry/data/dem")
-gb_dem <- raster("data/dem/lf_dem_reproj_full.tif")
-
-# terrain raster --------------------------------------------------------------------------
-system("aws s3 sync s3://earthlab-amahood/data/LF_DEM /home/rstudio/wet_dry/data/terrain_2")
-gb_dem <- raster("data/terrain_2/lf_dem_reproj_full.tif")
-
-# terrain raster --------------------------------------------------------------------------
+# terrain rasters --------------------------------------------------------------------------
 ter_s3 <- 's3://earthlab-amahood/data/terrain_2'
 ter_local <- '/home/rstudio/wet_dry/data/terrain_2'
 
 system(paste("aws s3 sync",
              ter_s3,
              ter_local))
-opts <- c('slope', 'aspect', 'TPI', 'TRI', 'roughness','flowdir', 'folded_aspect')
+
+opts <- c('slope', 'aspect', 'TPI', 'TRI', 'roughness','flowdir')
 
 cores <- length(opts)
 
@@ -183,26 +147,25 @@ foreach(i = opts) %dopar% {
 rm(ter_rst)
 
 # create folded aspect raster
-aspect <- raster("data/terrain_2/aspect.tif")
 
-folded_aspect <- get_folded_aspect(aspect)
-
-writeRaster(folded_aspect, "data/terrain_2/folded_aspect.tif")
-
-system("aws s3 cp data/terrain_2/folded_aspect.tif s3://earthlab-amahood/data/terrain_2/folded_aspect.tif")
+if(!file.exists("data/terrain_2/folded_aspect.tif")){
+  aspect <- raster("data/terrain_2/aspect.tif")
+  folded_aspect <- get_folded_aspect(aspect)
+  writeRaster(folded_aspect, "data/terrain_2/folded_aspect.tif")
+  system("aws s3 cp data/terrain_2/folded_aspect.tif s3://earthlab-amahood/data/terrain_2/folded_aspect.tif")
+}
 
 #extract terrain raster values
-df$elevation <- raster::extract(gb_dem, df)
-df$slope <- raster::extract(raster("data/terrain_2/slope.tif"), df)
-df$aspect <- raster::extract(raster("data/terrain_2/aspect.tif"), df)
-df$TPI <- raster::extract(raster("data/terrain_2/TPI.tif"), df)
-df$TRI <- raster::extract(raster("data/terrain_2/TRI.tif"), df)
-df$roughness <- raster::extract(raster("data/terrain_2/roughness.tif"), df)
-df$flowdir <- raster::extract(raster("data/terrain_2/flowdir.tif"), df)
-
+df$elevation <- raster::extract(gb_dem, df, fun=mean, na.rm=TRUE)
+df$slope <- raster::extract(raster("data/terrain_2/slope.tif"), df, fun=mean, na.rm=TRUE)
+df$aspect <- raster::extract(raster("data/terrain_2/aspect.tif"), df, fun=mean, na.rm=TRUE)
+df$TPI <- raster::extract(raster("data/terrain_2/TPI.tif"), df, fun=mean, na.rm=TRUE)
+df$TRI <- raster::extract(raster("data/terrain_2/TRI.tif"), df, fun=mean, na.rm=TRUE)
+df$roughness <- raster::extract(raster("data/terrain_2/roughness.tif"), df, fun=mean, na.rm=TRUE)
+df$flowdir <- raster::extract(raster("data/terrain_2/flowdir.tif"), df, fun=mean, na.rm=TRUE)
+df$folded_aspect <- raster::extract(raster("data/terrain_2/folded_aspect.tif"), df, fun=mean, na.rm=TRUE)
 system("rm data/tmp/*")
 
-df$folded_aspect = abs(180 - abs(df$aspect - 225))
 
 # Create vegetation indices -------------------------------------------------------------------
 df$ndvi <- get_ndvi(df$sr_band3,df$sr_band4)
@@ -221,5 +184,5 @@ df$esp_mask <- raster::extract(raster("data/landfire_esp_rcl/shrub_binary.tif"),
 
 # writing the file and pushing to s3 -----------------------------------------------
 st_write(df, "data/plots_with_landsat.gpkg", delete_layer = TRUE)
-system("aws s3 cp data/plots_with_landsat.gpkg s3://earthlab-amahood/data/plots_with_landsat.gpkg")
+system("aws s3 cp data/plots_with_landsat.gpkg s3://earthlab-amahood/data/plots_with_landsat_buffed.gpkg")
 
