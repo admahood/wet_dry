@@ -37,6 +37,7 @@ lapply(libs, library, character.only = TRUE, verbose = FALSE)
 # install.packages("aws.s3")
 # library(aws.s3)
 
+dir.create("data")
 tmpd<- paste0("data/tmp")
 dir.create(tmpd)
 rasterOptions(tmpdir=tmpd)
@@ -92,7 +93,8 @@ gb_plots <- st_transform(gb_plots, crs=st_crs(plot_data))
 
 system(paste0("aws s3 sync ",
               landsat_s3, " ",
-              landsat_local))
+              landsat_local,
+              " --only-show-errors"))
 
 
 gbplots_list <- list()
@@ -139,19 +141,11 @@ for(i in 1:length(years)){
 }
 system("rm data/tmp/*")
 
-# keep only sunny days ----------------------------------------------------------------------
+# keep only sunny days
 
 df <- result[is.na(result$sr_band1) != TRUE, ] %>% #select plots without clouds
   na.omit()
 
-
-####NEW LANDFIRE DEM HERE ----------------------------------------------------------
-system("aws s3 sync s3://earthlab-amahood/data/LF_DEM /home/rstudio/wet_dry/data/dem")
-gb_dem <- raster("data/dem/lf_dem_reproj_full.tif")
-
-# terrain raster --------------------------------------------------------------------------
-system("aws s3 sync s3://earthlab-amahood/data/LF_DEM /home/rstudio/wet_dry/data/terrain_2")
-gb_dem <- raster("data/terrain_2/lf_dem_reproj_full.tif")
 
 # terrain raster --------------------------------------------------------------------------
 ter_s3 <- 's3://earthlab-amahood/data/terrain_2'
@@ -160,10 +154,11 @@ ter_local <- '/home/rstudio/wet_dry/data/terrain_2'
 system(paste("aws s3 sync",
              ter_s3,
              ter_local))
-opts <- c('slope', 'aspect', 'TPI', 'TRI', 'roughness','flowdir', 'folded_aspect')
 
+gb_dem <- raster("data/terrain_2/lf_dem_reproj_full.tif")
+
+opts <- c('slope', 'aspect', 'TPI', 'TRI', 'roughness','flowdir')
 cores <- length(opts)
-
 registerDoParallel(cores)
 
 foreach(i = opts) %dopar% {
@@ -183,26 +178,24 @@ foreach(i = opts) %dopar% {
 rm(ter_rst)
 
 # create folded aspect raster
-aspect <- raster("data/terrain_2/aspect.tif")
-
-folded_aspect <- get_folded_aspect(aspect)
-
-writeRaster(folded_aspect, "data/terrain_2/folded_aspect.tif")
-
-system("aws s3 cp data/terrain_2/folded_aspect.tif s3://earthlab-amahood/data/terrain_2/folded_aspect.tif")
+if(!file.exists("data/terrain_2/aspect.tif")){
+  aspect <- raster("data/terrain_2/aspect.tif")
+  folded_aspect <- get_folded_aspect(aspect)
+  writeRaster(folded_aspect, "data/terrain_2/folded_aspect.tif")
+  system("aws s3 cp data/terrain_2/folded_aspect.tif s3://earthlab-amahood/data/terrain_2/folded_aspect.tif")
+}
 
 #extract terrain raster values
-df$elevation <- raster::extract(gb_dem, df)
-df$slope <- raster::extract(raster("data/terrain_2/slope.tif"), df)
-df$aspect <- raster::extract(raster("data/terrain_2/aspect.tif"), df)
-df$TPI <- raster::extract(raster("data/terrain_2/TPI.tif"), df)
-df$TRI <- raster::extract(raster("data/terrain_2/TRI.tif"), df)
-df$roughness <- raster::extract(raster("data/terrain_2/roughness.tif"), df)
-df$flowdir <- raster::extract(raster("data/terrain_2/flowdir.tif"), df)
+df$elevation <- raster::extract(gb_dem, df, fun = mean, na.rm=TRUE)
+df$slope <- raster::extract(raster("data/terrain_2/slope.tif"), df, fun = mean, na.rm=TRUE)
+df$aspect <- raster::extract(raster("data/terrain_2/aspect.tif"), df, fun = mean, na.rm=TRUE)
+df$tpi <- raster::extract(raster("data/terrain_2/TPI.tif"), df, fun = mean, na.rm=TRUE)
+df$tri <- raster::extract(raster("data/terrain_2/TRI.tif"), df, fun = mean, na.rm=TRUE)
+df$roughness <- raster::extract(raster("data/terrain_2/roughness.tif"), df, fun = mean, na.rm=TRUE)
+df$flowdir <- raster::extract(raster("data/terrain_2/flowdir.tif"), df, fun = mean, na.rm=TRUE)
+df$folded_aspect <- raster::extract(raster("data/terrain_2/folded_aspect.tif"), df, fun = mean, na.rm=TRUE)
 
 system("rm data/tmp/*")
-
-df$folded_aspect = abs(180 - abs(df$aspect - 225))
 
 # Create vegetation indices -------------------------------------------------------------------
 df$ndvi <- get_ndvi(df$sr_band3,df$sr_band4)
@@ -221,5 +214,5 @@ df$esp_mask <- raster::extract(raster("data/landfire_esp_rcl/shrub_binary.tif"),
 
 # writing the file and pushing to s3 -----------------------------------------------
 st_write(df, "data/plots_with_landsat.gpkg", delete_layer = TRUE)
-system("aws s3 cp data/plots_with_landsat.gpkg s3://earthlab-amahood/data/plots_with_landsat.gpkg")
+system("aws s3 cp data/plots_with_landsat.gpkg s3://earthlab-amahood/data/plots_with_landsat_buffed.gpkg")
 
