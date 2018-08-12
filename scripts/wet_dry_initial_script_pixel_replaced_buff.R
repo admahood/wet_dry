@@ -32,7 +32,7 @@
 
 
 # setup ------------------------------------------------------------------------
-libs <- c("sf", "tidyverse", "raster", "rgdal", "rgeos")
+libs <- c("sf", "tidyverse", "raster", "rgdal", "rgeos", "doParallel", "foreach")
 lapply(libs, library, character.only = TRUE, verbose = FALSE)
 # install.packages("aws.s3")
 # library(aws.s3)
@@ -185,32 +185,33 @@ if(!file.exists("data/terrain_2/aspect.tif")){
   system("aws s3 cp data/terrain_2/folded_aspect.tif s3://earthlab-amahood/data/terrain_2/folded_aspect.tif")
 }
 
-#extract terrain raster values
-df$elevation <- raster::extract(gb_dem, df, fun = mean, na.rm=TRUE)
-df$slope <- raster::extract(raster("data/terrain_2/slope.tif"), df, fun = mean, na.rm=TRUE)
-df$aspect <- raster::extract(raster("data/terrain_2/aspect.tif"), df, fun = mean, na.rm=TRUE)
-df$tpi <- raster::extract(raster("data/terrain_2/TPI.tif"), df, fun = mean, na.rm=TRUE)
-df$tri <- raster::extract(raster("data/terrain_2/TRI.tif"), df, fun = mean, na.rm=TRUE)
-df$roughness <- raster::extract(raster("data/terrain_2/roughness.tif"), df, fun = mean, na.rm=TRUE)
-df$flowdir <- raster::extract(raster("data/terrain_2/flowdir.tif"), df, fun = mean, na.rm=TRUE)
-df$folded_aspect <- raster::extract(raster("data/terrain_2/folded_aspect.tif"), df, fun = mean, na.rm=TRUE)
+names <- c("lf_dem_reproj_full", "slope", "aspect", "TPI", "TRI", "roughness", "flowdir", "folded_aspect")
+files <- file.path(ter_local, paste0(names, ".tif"))
+
+registerDoParallel(cores = 8)
+rasters <- lapply(files, raster)
+
+par_l <- list()
+par_res <-foreach (r = 1:length(rasters)) %dopar% {
+  par_l[[r]] <- raster::extract(rasters[r], df, fun = mean, na.rm=TRUE)
+}
 
 system("rm data/tmp/*")
 
 # Create vegetation indices -------------------------------------------------------------------
-df$ndvi <- get_ndvi(df$sr_band3,df$sr_band4)
-df$evi <- get_evi(df$sr_band1, df$sr_band3, df$sr_band4)
-df$savi <- get_savi(df$sr_band3,df$sr_band4)
-df$sr = get_sr(df$sr_band3,df$sr_band4)
-#df$SATVI <- get_satvi(df$sr_band3, df$sr_band5, df$sr_band7) ------#FIX THIS FORMULA
-df$ndsvi <- get_ndsvi(df$sr_band3, df$sr_band5)
-df$greenness <- green7(df$sr_band1,df$sr_band2,df$sr_band3,df$sr_band4,df$sr_band5,df$sr_band7)
-df$brightness <- bright7(df$sr_band1,df$sr_band2,df$sr_band3,df$sr_band4,df$sr_band5,df$sr_band7)
-df$wetness <- wet7(df$sr_band1,df$sr_band2,df$sr_band3,df$sr_band4,df$sr_band5,df$sr_band7)
+df<- mutate(df,
+            ndvi = get_ndvi(sr_band3, sr_band4),
+            evi = get_evi(sr_band1, sr_band3, sr_band4),
+            savi = get_savi(sr_band3, sr_band4),
+            sr = get_sr(sr_band3, sr_band4),
+            ndsvi = get_ndsvi(sr_band3, sr_band5),
+            greenness = green7(sr_band1, sr_band2, sr_band3, sr_band4, sr_band5, sr_band7),
+            brightness = bright7(sr_band1, sr_band2, sr_band3, sr_band4, sr_band5, sr_band7),
+            wetness = wet7(sr_band1, sr_band2, sr_band3, sr_band4, sr_band5, sr_band7))
 
 # doing the mask thing
 system("aws s3 sync s3://earthlab-amahood/data/landfire_esp_rcl /home/rstudio/wet_dry/data/landfire_esp_rcl")
-df$esp_mask <- raster::extract(raster("data/landfire_esp_rcl/shrub_binary.tif"), df)
+df$esp_mask <- raster::extract(raster("data/landfire_esp_rcl/shrub_binary.tif"), df,fun = mean, na.rm=TRUE)
 
 # writing the file and pushing to s3 -----------------------------------------------
 st_write(df, "data/plots_with_landsat.gpkg", delete_layer = TRUE)
