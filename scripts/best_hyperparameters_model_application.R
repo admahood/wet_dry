@@ -26,6 +26,7 @@ system("aws s3 sync s3://earthlab-amahood/data/landfire_esp_rcl/ data/esp_binary
 
 #cropping and stacking and applying the model loop --------------------------
 scene <- list.files("data/ls5_mucc")
+scene_full <- list.files("data/ls5_mucc", full.names = T)
 
 cores <- length(model_list)
 
@@ -38,12 +39,12 @@ foreach(i = model_list,
   file <- as.character(scene)
   t0 <- Sys.time()
   ter <- stack(list.files(local_terrain, full.names =T))
-  ls5 <- stack(scene)
+  ls5 <- stack(scene_full)
   names(ls5)<- c("sr_band1", "sr_band2","sr_band3", "sr_band4","sr_band5", "sr_band7")
-  filenamet <- paste0("data/results/",
+  filenamet <- paste0("data/results/", as.character(names(i)), "_",
                       sub(pattern = ".tif", 
                           replacement = "model_results.tif", 
-                          x = substr(file, 15, 34), fixed = T), "_", i) 
+                          x = file, fixed = T)) 
   
   
   
@@ -62,9 +63,9 @@ foreach(i = model_list,
   
   ls5 <- stack(ls5, ter_c)
   
-  names(ls5) <- c("sr_band1", "sr_band2", "sr_band3", "sr_band4", "sr_band5", "sr_band7", "wetness", "brightness", "greenness", "ndvi", "savi", "sr", "evi", #"satvi",
-                  "ndsvi", "aspect", "flowdir", "elevation", "roughness", "slope", 
-                  "tpi", "tri") #names to match exactly with training data that goes into model. The order matters for these
+  names(ls5) <- c("sr_band1", "sr_band2", "sr_band3", "sr_band4", "sr_band5", "sr_band7", "ndvi", "evi", "savi", "sr", #"satvi",
+                  "ndsvi", "greenness", "brightness", "wetness","elevation", "slope", "folded_aspect", "tpi", "tri", "roughness", "flowdir" 
+                  ) #names to match exactly with training data that goes into model. The order matters for these
   
   system(paste("echo", "stack created", i))
   
