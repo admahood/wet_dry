@@ -49,7 +49,7 @@ foreach(i = model_list,
   
   
   ter_c <-raster::resample(ter,ls5)
-  system(paste("echo", "terrain cropped", i))
+  system(paste("echo", "terrain cropped"))
   # now, make sure all the names of this stack match the names that go into the model and we're golden
   ls5$wetness <- wet5(ls5$sr_band1,ls5$sr_band2,ls5$sr_band3,ls5$sr_band4,ls5$sr_band5,ls5$sr_band7)
   ls5$brightness <- bright5(ls5$sr_band1,ls5$sr_band2,ls5$sr_band3,ls5$sr_band4,ls5$sr_band5,ls5$sr_band7)
@@ -63,27 +63,27 @@ foreach(i = model_list,
   
   ls5 <- stack(ls5, ter_c)
   
-  names(ls5) <- c("sr_band1", "sr_band2", "sr_band3", "sr_band4", "sr_band5", "sr_band7", "ndvi", "evi", "savi", "sr", #"satvi",
-                  "ndsvi", "greenness", "brightness", "wetness","elevation", "slope", "folded_aspect", "tpi", "tri", "roughness", "flowdir" 
+  names(ls5) <- c("sr_band1", "sr_band2", "sr_band3", "sr_band4", "sr_band5", "sr_band7", "wetness", "brightness", "greenness",  "ndvi", "savi", "sr", "evi",  #"satvi",
+                  "ndsvi", "flowdir", "folded_aspect","elevation", "roughness", "slope", "tpi", "tri"
                   ) #names to match exactly with training data that goes into model. The order matters for these
   
-  system(paste("echo", "stack created", i))
+  system(paste("echo", "stack created"))
   
   print(Sys.time()-t0)
   gc() # for saving memory
-  
+  frst <- i[[1]]
   # now put a line to apply the model and write THAT as the raster and send it to s3 (and then delete the file) 
-  ls5_classed <- predict(ls5, i, type = 'class', progress = 'text', inf.rm = T, na.rm = T)
+  ls5_classed <- predict(ls5, frst, type = 'class', progress = 'text', inf.rm = T, na.rm = T)
   
-  system(paste("echo", "model applied", i))
+  system(paste("echo", "model applied"))
   
   
   print(Sys.time()-t0) #checking elapsed time between creation of big stack and application of model
   
   writeRaster(ls5_classed, filename = filenamet, overwrite = T, progress = 'text')
   
-  system(paste0("aws s3 cp ", filenamet, " s3://earthlab-amahood/data/ls5_mucc_2011/"))
-  system(paste("echo", i, "done"))
+  system(paste0("aws s3 cp ", filenamet, " s3://earthlab-amahood/data/ls5_mucc_2011/", substr(filenamet, 14, 63)))
+  system(paste("echo", "done"))
   unlink(filenamet)
   
   #it appears the task 2 failed error is coming from the deletion of temp files. I commented it out for now - Dylan
