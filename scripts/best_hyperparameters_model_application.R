@@ -32,7 +32,7 @@ cores <- length(model_list)
 
 registerDoParallel(cores)
 
-foreach(i = model_list, 
+foreach(i = 1:length(model_list), 
         .packages = 'raster') %dopar% {
   
   source("scripts/functions.R")      
@@ -71,7 +71,7 @@ foreach(i = model_list,
   
   print(Sys.time()-t0)
   gc() # for saving memory
-  frst <- i[[1]]
+  frst <- model_list[[i]]
   # now put a line to apply the model and write THAT as the raster and send it to s3 (and then delete the file) 
   ls5_classed <- predict(ls5, frst, type = 'class', progress = 'text', inf.rm = T, na.rm = T)
   
