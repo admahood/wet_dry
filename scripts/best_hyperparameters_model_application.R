@@ -21,7 +21,9 @@ system(paste0("aws s3 sync ", s3_path, " ", local_path))
 system(paste0("aws s3 sync ", s3_terrain, " ", local_terrain))
 
 system("aws s3 sync s3://earthlab-amahood/data/landfire_esp_rcl/ data/esp_binary")
-##system(paste0("aws s3 sync ", " s3://earthlab-amahood/data/ls5_model_results_test_mucc/", "data/results")) ## figure out how to use an if statement based on this s3 sync
+# system(paste0("aws s3 sync ", 
+# " s3://earthlab-amahood/data/ls5_model_results_test_mucc/", 
+# "data/results")) ## figure out how to use an if statement based on this s3 sync
 ##to avoid redundant classified images
 
 #cropping and stacking and applying the model loop --------------------------
@@ -56,9 +58,13 @@ ls5$ndsvi <- get_ndsvi(ls5$sr_band3, ls5$sr_band5)
 
 ls5 <- stack(ls5, ter_c)
 
-names(ls5) <- c("sr_band1", "sr_band2", "sr_band3", "sr_band4", "sr_band5", "sr_band7", "wetness", "brightness", "greenness",  "ndvi", "savi", "sr", "evi",  #"satvi",
-                "ndsvi", "flowdir", "folded_aspect","elevation", "roughness", "slope", "tpi", "tri"
-) #names to match exactly with training data that goes into model. The order matters for these
+names <- c("sr_band1", "sr_band2", "sr_band3", "sr_band4", 
+           "sr_band5", "sr_band7", "wetness", "brightness", 
+           "greenness",  "ndvi", "savi", "sr", "evi",  #"satvi",
+           "ndsvi", "flowdir", "folded_aspect","elevation", 
+           "roughness", "slope", "tpi", "tri")
+# names to match exactly with training data that goes into model. 
+# The order matters for these
 
 system(paste("echo", "stack created"))
 
@@ -90,10 +96,3 @@ foreach(i = 1:length(model_list),
   #it appears the task 2 failed error is coming from the deletion of temp files. I commented it out for now - Dylan
   #system("rm data/tmp/*") # so we're not filling up the hard drive (had to move this to the end because the model needs the stuff stored in temp directory - D)
 }
-
-#non looping attempt ------------ 
-# if you want to test a loop, just type i=1 in the console (or whatever your iterator is)
-# and move through it that way, that way you don't have a bunch of repeated code floating around
-
-
-# then we create another section that loops through each year, creating big mosaics
