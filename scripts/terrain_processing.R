@@ -3,7 +3,7 @@
 # setup ------------------------------------------------------------------------
 libs <- c("sf", "tidyverse", "raster", "rgdal", "rgeos", "doParallel", "foreach")
 lapply(libs, library, character.only = TRUE, verbose = FALSE)
-
+source("scripts/functions.R")
 dir.create("data")
 #grabbing the dem from lanfire
 system(paste0("aws s3 cp s3://earthlab-amahood/data/landfire_dem/lf_dem_cus.zip data/lf_dem_cus.zip"))
@@ -37,7 +37,7 @@ system("aws s3 cp data/elevation_gb.tif s3://earthlab-amahood/data/terrain_gb/el
 
 opt <- c('slope','aspect', 'TPI', 'TRI', 'roughness', 'flowdir')
 opt1 <- c('slope','aspect', 'tpi', 'tri', 'roughness', 'flowdir')
-corz <- detectCores()
+corz <- round(detectCores()/1.5) #2gb per core
 registerDoParallel(corz)
 
 foreach(o = 1:length(opt)) %dopar% {
@@ -49,3 +49,12 @@ foreach(o = 1:length(opt)) %dopar% {
                 "s3://earthlab-amahood/data/terrain_gb/", opt1[o], ".tif",
                 " --only-show-errors"))
 }
+
+fa <- terrain(elevation_gb, opt = "aspect") %>%
+  get_folded_aspect() %>%
+  writeRaster("folded_aspect.tif")
+
+system(paste0("aws s3 cp ",
+             "folded_aspect.tif ",
+              "s3://earthlab-amahood/data/terrain_gb/","folded_aspect.tif",
+              " --only-show-errors"))
