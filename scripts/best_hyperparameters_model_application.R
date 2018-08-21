@@ -11,7 +11,7 @@ rasterOptions(tmpdir=tmpd)
 
 s3_path <- "s3://earthlab-amahood/data/ls5_mucc_2011"
 local_path <- "data/ls5_mucc"
-s3_terrain <- "s3://earthlab-amahood/data/terrain_2"
+s3_terrain <- "s3://earthlab-amahood/data/terrain_gb"
 local_terrain <- "data/terrain_2"
 
 s3_result <- "s3://earthlab-amahood/data/model_applied_scenes"
