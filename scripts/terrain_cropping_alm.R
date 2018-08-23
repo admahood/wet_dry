@@ -1,6 +1,6 @@
 library("raster")
 system("aws s3 sync s3://earthlab-amahood/data/terrain_gb data/terrain")
-
+dir.create("data/mucc_ter")
 ter_files <- list.files("data/terrain", full.names = T)
 ter_names <- list.files("data/terrain", full.names = F)
 
@@ -19,8 +19,8 @@ res(ne) <- 30
 
 for (i in 1:length(ter_files)){
   t <- raster(ter_files[i])
-  c <- crop(t)
-  rp <- projectRaster(c,ne)
+  c <- crop(t, ne)
+  rp <- projectRaster(c,ls5)
   rs <- resample(rp,ls5)
   writeRaster(rs, paste0("data/mucc_ter/", ter_names[i]))
   system(paste0("aws s3 cp data/mucc_ter/",ter_names[i], 
