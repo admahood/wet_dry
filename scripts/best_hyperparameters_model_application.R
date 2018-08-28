@@ -11,7 +11,7 @@ rasterOptions(tmpdir=tmpd)
 
 s3_path <- "s3://earthlab-amahood/data/ls5_mucc_2011"
 local_path <- "data/ls5_mucc"
-s3_terrain <- "s3://earthlab-amahood/data/terrain_gb"
+s3_terrain <- "s3://earthlab-amahood/data/terrain_mucc"
 local_terrain <- "data/terrain_2"
 
 s3_result <- "s3://earthlab-amahood/data/model_applied_scenes"
@@ -61,7 +61,7 @@ ls5 <- stack(ls5, ter_c)
 names <- c("sr_band1", "sr_band2", "sr_band3", "sr_band4", 
            "sr_band5", "sr_band7", "wetness", "brightness", 
            "greenness",  "ndvi", "savi", "sr", "evi",  #"satvi",
-           "ndsvi", "flowdir", "folded_aspect","elevation", 
+           "ndsvi", "elevation", "flowdir", "folded_aspect",
            "roughness", "slope", "tpi", "tri")
 # names to match exactly with training data that goes into model. 
 # The order matters for these
