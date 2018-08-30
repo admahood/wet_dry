@@ -104,7 +104,7 @@ filenamet <- paste0("data/results/", as.character(names(model_list[i])), "_",
                         x = file, fixed = T)) 
 # frst <- model_list[[i]]
 # now put a line to apply the model and write THAT as the raster and send it to s3 (and then delete the file) 
-ls5_classed <- predict(object = ls5, model_list[[i]], type = 'class', inf.rm = T, na.rm = T)
+ls5_classed <- predict(object = ls5_small, model_list[[i]], type = 'class', inf.rm = T, na.rm = T)
 
 system(paste("echo", "model applied"))
 
@@ -118,10 +118,10 @@ system(paste("echo", "done"))
 unlink(filenamet)
 
 e = extent(ls5)
-> f = e
-> f@xmin = f@xmin + 200000
-> f@xmax = f@xmax - 40000
-> f@ymin = f@ymin + 200000
-> f@ymax = f@ymax -15000
-> plot(f)
-> ls5_small -> crop(ls5, f)
+f = e
+f@xmin = f@xmin + 160000
+ f@xmax = f@xmax - 80000
+f@ymin = f@ymin + 150000
+ f@ymax = f@ymax -65000
+ plot(f)
+ls5_small = crop(ls5, f)
