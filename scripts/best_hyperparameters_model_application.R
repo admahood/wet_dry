@@ -98,6 +98,18 @@ foreach(i = 1:length(model_list),
         }
 
 
+#making a smaller stack for troubleshooting possible RAM issues
+e = extent(ls5)
+f = e
+f@xmin = f@xmin + 160500
+f@xmax = f@xmax - 80500
+f@ymin = f@ymin + 151000
+f@ymax = f@ymax -66250
+plot(f)
+ls5_small = crop(ls5, f)
+plot(ls5_small[[1]])
+
+#single iteration of model apply foreach loop ---------
 filenamet <- paste0("data/results/", as.character(names(model_list[i])), "_",
                     sub(pattern = ".tif", 
                         replacement = "model_results.tif", 
@@ -117,11 +129,4 @@ system(paste0("aws s3 cp ", filenamet, " s3://earthlab-amahood/data/ls5_mucc_201
 system(paste("echo", "done"))
 unlink(filenamet)
 
-e = extent(ls5)
-f = e
-f@xmin = f@xmin + 160000
- f@xmax = f@xmax - 80000
-f@ymin = f@ymin + 150000
- f@ymax = f@ymax -65000
- plot(f)
-ls5_small = crop(ls5, f)
+
