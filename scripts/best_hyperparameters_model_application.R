@@ -58,7 +58,7 @@ ls5$ndsvi <- get_ndsvi(ls5$sr_band3, ls5$sr_band5)
 
 ls5 <- stack(ls5, ter_c)
 
-names <- c("sr_band1", "sr_band2", "sr_band3", "sr_band4", 
+names(ls5) <- c("sr_band1", "sr_band2", "sr_band3", "sr_band4", 
            "sr_band5", "sr_band7", "wetness", "brightness", 
            "greenness",  "ndvi", "savi", "sr", "evi",  #"satvi",
            "ndsvi", "elevation", "flowdir", "folded_aspect",
@@ -70,29 +70,58 @@ system(paste("echo", "stack created"))
 
 print(Sys.time()-t0)
 gc() # for saving memory
-          
+
 #only parallelize this part
 foreach(i = 1:length(model_list), 
-                  .packages = 'raster') %dopar% {         
-  filenamet <- paste0("data/results/", as.character(names(model_list[i])), "_",
-                      sub(pattern = ".tif", 
-                          replacement = "model_results.tif", 
-                          x = file, fixed = T)) 
-  frst <- model_list[[i]]
-  # now put a line to apply the model and write THAT as the raster and send it to s3 (and then delete the file) 
-  ls5_classed <- predict(ls5, frst, type = 'class', inf.rm = T, na.rm = T)
-  
-  system(paste("echo", "model applied"))
-  
-  
-  print(Sys.time()-t0) #checking elapsed time between creation of big stack and application of model
-  
-  writeRaster(ls5_classed, filename = filenamet, overwrite = T, progress = 'text')
-  
-  system(paste0("aws s3 cp ", filenamet, " s3://earthlab-amahood/data/ls5_mucc_2011/", substr(filenamet, 14, 63)))
-  system(paste("echo", "done"))
-  unlink(filenamet)
-  
-  #it appears the task 2 failed error is coming from the deletion of temp files. I commented it out for now - Dylan
-  #system("rm data/tmp/*") # so we're not filling up the hard drive (had to move this to the end because the model needs the stuff stored in temp directory - D)
-}
+        .packages = 'raster') %dopar% {         
+          filenamet <- paste0("data/results/", as.character(names(model_list[i])), "_",
+                              sub(pattern = ".tif", 
+                                  replacement = "model_results.tif", 
+                                  x = file, fixed = T)) 
+          # frst <- model_list[[i]]
+          # now put a line to apply the model and write THAT as the raster and send it to s3 (and then delete the file) 
+          ls5_classed <- predict(ls5, model_list[[i]], type = 'response', inf.rm = T, na.rm = T)
+          
+          system(paste("echo", "model applied"))
+          
+          
+          print(Sys.time()-t0) #checking elapsed time between creation of big stack and application of model
+          
+          writeRaster(ls5_classed, filename = filenamet, overwrite = T, progress = 'text')
+          
+          system(paste0("aws s3 cp ", filenamet, " s3://earthlab-amahood/data/ls5_mucc_2011/", substr(filenamet, 14, 63)))
+          system(paste("echo", "done"))
+          unlink(filenamet)
+          
+          #it appears the task 2 failed error is coming from the deletion of temp files. I commented it out for now - Dylan
+          #system("rm data/tmp/*") # so we're not filling up the hard drive (had to move this to the end because the model needs the stuff stored in temp directory - D)
+        }
+
+
+filenamet <- paste0("data/results/", as.character(names(model_list[i])), "_",
+                    sub(pattern = ".tif", 
+                        replacement = "model_results.tif", 
+                        x = file, fixed = T)) 
+# frst <- model_list[[i]]
+# now put a line to apply the model and write THAT as the raster and send it to s3 (and then delete the file) 
+ls5_classed <- predict(object = ls5, model_list[[i]], type = 'class', inf.rm = T, na.rm = T)
+
+system(paste("echo", "model applied"))
+
+
+print(Sys.time()-t0) #checking elapsed time between creation of big stack and application of model
+
+writeRaster(ls5_classed, filename = filenamet, overwrite = T, progress = 'text')
+
+system(paste0("aws s3 cp ", filenamet, " s3://earthlab-amahood/data/ls5_mucc_2011/", substr(filenamet, 14, 63)))
+system(paste("echo", "done"))
+unlink(filenamet)
+
+e = extent(ls5)
+> f = e
+> f@xmin = f@xmin + 200000
+> f@xmax = f@xmax - 40000
+> f@ymin = f@ymin + 200000
+> f@ymax = f@ymax -15000
+> plot(f)
+> ls5_small -> crop(ls5, f)
