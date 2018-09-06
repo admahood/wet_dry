@@ -80,7 +80,7 @@ foreach(i = 1:length(model_list),
                                   x = file, fixed = T)) 
           # frst <- model_list[[i]]
           # now put a line to apply the model and write THAT as the raster and send it to s3 (and then delete the file) 
-          ls5_classed <- predict(ls5, model_list[[i]], type = 'response', inf.rm = T, na.rm = T)
+          ls5_classed <- raster::predict(ls5, model_list[[i]], type = 'response', inf.rm = T, na.rm = T)
           
           system(paste("echo", "model applied"))
           
@@ -116,7 +116,7 @@ filenamet <- paste0("data/results/", as.character(names(model_list[i])), "_",
                         x = file, fixed = T)) 
 # frst <- model_list[[i]]
 # now put a line to apply the model and write THAT as the raster and send it to s3 (and then delete the file) 
-ls5_classed <- predict(object = ls5_small, model_list[[i]], type = 'class', inf.rm = T, na.rm = T)
+ls5_classed <- predict(object = ls5_small, frst, type = 'class', inf.rm = T, na.rm = T)
 
 system(paste("echo", "model applied"))
 

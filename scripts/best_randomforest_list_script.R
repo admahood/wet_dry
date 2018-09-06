@@ -1,7 +1,7 @@
 
 # Step 1: Load packages ---------------------------
 libs <- c("randomForest", "dplyr","sf")
-lapply(libs, install.packages, character.only = TRUE, verbose = FALSE)
+# lapply(libs, install.packages, character.only = TRUE, verbose = FALSE)
 lapply(libs, library, character.only = TRUE, verbose = FALSE)
 
 source("scripts/functions.R")
@@ -63,9 +63,9 @@ if(best10$elevation[i] == "no") {dplyr::select(gbd,-elevation)}
 model_list[[i]] <- randomForest(binary ~ . ,
                   data = gbd, 
                   ntree = 2000, 
-                  mtry = best10$mtry[i], 
-                  nodesize = best10$nodesize[i], 
-                  sampsize = best10$sampsize[i])
+                  mtry = best10$mtry[[i]], 
+                  nodesize = best10$nodesize[[i]], 
+                  sampsize = round(best10$sampsize[[i]]))
 }
 
 names(model_list) <- model_names
