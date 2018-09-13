@@ -38,7 +38,8 @@ best_hyper2 <- hypergrid_2[c(1, 2, 3, 4, 7),] %>% arrange(oob) %>% mutate(elevat
 
 best10 <- rbind(best_hyper, best_hyper2)
 
-model_names <- paste("sc",best10[1:10,]$sc,"mtry", best10[1:10,]$mtry, sep="_")
+#create names for models based on presence of elevation variable and sc/mtry values
+model_names <- paste(ifelse(best10[1:10,]$elevation == "yes", "elev", "noelev"), "sc",best10[1:10,]$sc,"mtry", best10[1:10,]$mtry, sep="_")
 
 model_list <- list()
 

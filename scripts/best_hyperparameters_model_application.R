@@ -42,6 +42,11 @@ ter <- stack(list.files(local_terrain, full.names =T))
 ls5 <- stack(scene_full)
 names(ls5)<- c("sr_band1", "sr_band2","sr_band3", "sr_band4","sr_band5", "sr_band7")
 
+# create esp mask object and match projection/extent 
+
+esp_mask <- raster("data/esp_binary/clipped_binary.tif")
+esp_mask <- projectRaster(esp_mask, ls5, res = 30)
+
 
 ter_c <-raster::resample(ter,ls5)
 system(paste("echo", "terrain cropped"))
@@ -57,6 +62,7 @@ ls5$evi <- get_evi(ls5$sr_band1, ls5$sr_band3, ls5$sr_band4)
 ls5$ndsvi <- get_ndsvi(ls5$sr_band3, ls5$sr_band5)
 
 ls5 <- stack(ls5, ter_c)
+ls5 <- mask(ls5, esp_mask, maskvalue = 0)
 
 names(ls5) <- c("sr_band1", "sr_band2", "sr_band3", "sr_band4", 
            "sr_band5", "sr_band7", "wetness", "brightness", 
@@ -74,13 +80,13 @@ gc() # for saving memory
 #only parallelize this part
 foreach(i = 1:length(model_list), 
         .packages = 'raster') %dopar% {         
-          filenamet <- paste0("data/results/", as.character(names(model_list[i])), "_",
+          filenamet <- paste0("data/results/", "buff_", as.character(names(model_list[i])), "_",
                               sub(pattern = ".tif", 
                                   replacement = "model_results.tif", 
                                   x = file, fixed = T)) 
           # frst <- model_list[[i]]
           # now put a line to apply the model and write THAT as the raster and send it to s3 (and then delete the file) 
-          ls5_classed <- raster::predict(ls5, model_list[[i]], type = 'response', inf.rm = T, na.rm = T)
+          ls5_classed <- raster::predict(ls5, model_list[[i]], inf.rm = T, na.rm = T)
           
           system(paste("echo", "model applied"))
           
@@ -89,7 +95,7 @@ foreach(i = 1:length(model_list),
           
           writeRaster(ls5_classed, filename = filenamet, overwrite = T, progress = 'text')
           
-          system(paste0("aws s3 cp ", filenamet, " s3://earthlab-amahood/data/ls5_mucc_2011/", substr(filenamet, 14, 63)))
+          system(paste0("aws s3 cp ", filenamet, " s3://earthlab-amahood/data/ls5_hyperparameter_test_results/", substr(filenamet, 14, 63)))
           system(paste("echo", "done"))
           unlink(filenamet)
           
