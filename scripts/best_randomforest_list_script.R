@@ -1,7 +1,7 @@
 
 # Step 1: Load packages ---------------------------
 libs <- c("randomForest", "dplyr","sf")
-lapply(libs, install.packages, character.only = TRUE, verbose = FALSE)
+# lapply(libs, install.packages, character.only = TRUE, verbose = FALSE)
 lapply(libs, library, character.only = TRUE, verbose = FALSE)
 
 source("scripts/functions.R")
@@ -10,7 +10,7 @@ set.seed(11)
 
 
 # Step 2: Load Data --------------------------------
-system("aws s3 cp s3://earthlab-amahood/data/plots_with_landsat.gpkg data/plot_data/plots_with_landsat.gpkg")
+system("aws s3 cp s3://earthlab-amahood/data/plots_with_landsat_buffed.gpkg data/plot_data/plots_with_landsat_buffed.gpkg")
 system("aws s3 sync s3://earthlab-amahood/data/hypergrids data/hypergrids")
 # which_binary <- data.frame(
 #   binary_value = NA,
@@ -21,17 +21,20 @@ system("aws s3 sync s3://earthlab-amahood/data/hypergrids data/hypergrids")
 
 
 
-hypergrid <- read_csv("data/hypergrids/hg_rf.csv") %>% arrange(oob)
+hypergrid <- read.csv("data/hypergrids/hg_w_elev_rf_aug13_ntree2000.csv") %>% arrange(oob)
 
-hypergrid_2 <- read_csv("data/hypergrids/hg_rf_noelev.csv") %>% arrange(oob)
+hypergrid_2 <- read.csv("data/hypergrids/hg_no_elev_rf_aug13_ntree2000.csv") %>% arrange(oob)
 
 
 #best model parameters chosen according to the following: 
-#best two oob errors, most balanced two shrub/grass oob errors out of the top 15 avg oob error 
-#out of top 15 avg oob error parameter combos, the remaining parameter group with an uncommon shrub cover split
-best_hyper <- hypergrid[c(1, 2, 6, 10, 12),] %>% arrange(oob) %>% mutate(elevation = "yes")
 
-best_hyper2 <- hypergrid_2[c(1, 2, 7, 13, 14),] %>% arrange(oob) %>% mutate(elevation = "no")
+#(hyper_w_elev) -- two lowest oob errors(1,2); two lowest oob errors w/ higher shrub cover split (3, 6) -- this results in a more even dist. of error between classes
+#highest shrub cover split in 25 best oob error parameter sets (25)
+best_hyper <- hypergrid[c(1, 2, 3, 6, 25),] %>% arrange(oob) %>% mutate(elevation = "yes")
+
+#(hyper_no_elev) -- two lowest oob errors(1,2); two lowest oob errors w/ higher shrub cover split (3,4) -- this results in a more even dist. of error between classes
+# highest shrub cover split in 25 lowest oob error parameter sets (7)
+best_hyper2 <- hypergrid_2[c(1, 2, 3, 4, 7),] %>% arrange(oob) %>% mutate(elevation = "no")
 
 best10 <- rbind(best_hyper, best_hyper2)
 
@@ -41,17 +44,17 @@ model_list <- list()
 
 for(i in 1:nrow(best10)) {
 
-gbd <- st_read("data/plot_data/plots_with_landsat.gpkg", quiet=T) %>%
+gbd <- st_read("data/plot_data/plots_with_landsat_buffed.gpkg", quiet=T) %>%
   filter(esp_mask == 1) %>%
   mutate(total_shrubs = NonInvShru + SagebrushC) %>%
   st_set_geometry(NULL) %>%
   mutate(binary = as.factor(ifelse(total_shrubs < best10$sc[i], "Grass", "Shrub")),
                             ndsvi=get_ndsvi(sr_band3, sr_band5)) %>%
   dplyr::select(sr_band1, sr_band2, sr_band3, sr_band4, sr_band5, sr_band7,
-                           ndvi = NDVI, evi = EVI, savi = SAVI,sr = SR, ndsvi, #data$SATVI,
+                           ndvi, evi, savi, sr, ndsvi, #data$SATVI,
                            greenness, brightness, wetness,
                            elevation,
-                           slope, folded_aspect, tpi = TPI, tri = TRI, roughness, flowdir, #data$cluster,
+                           slope, folded_aspect, tpi, tri, roughness, flowdir, #data$cluster,
                            #total_shrubs)
                            binary)
 
@@ -60,9 +63,9 @@ if(best10$elevation[i] == "no") {dplyr::select(gbd,-elevation)}
 model_list[[i]] <- randomForest(binary ~ . ,
                   data = gbd, 
                   ntree = 2000, 
-                  mtry = best10$mtry[i], 
-                  nodesize = best10$nodesize[i], 
-                  sampsize = best10$sampsize[i])
+                  mtry = best10$mtry[[i]], 
+                  nodesize = best10$nodesize[[i]], 
+                  sampsize = round(best10$sampsize[[i]]))
 }
 
 names(model_list) <- model_names

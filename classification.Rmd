@@ -56,6 +56,9 @@ Topography/folded aspect
 
 random forest modelling
 
+hypergrid tuning
+shrub cover breakpoint vs cluster
+
 using EVT to verify
 using NLCD to verify
 

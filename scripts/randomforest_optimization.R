@@ -15,9 +15,9 @@ set.seed(11)
 
 
 # Load and manipulate Data ---------------------------------------------
-system("aws s3 cp s3://earthlab-amahood/data/plots_with_landsat.gpkg data/plot_data/plots_with_landsat.gpkg")
+system("aws s3 cp s3://earthlab-amahood/data/plots_with_landsat_buffed.gpkg data/plot_data/plots_with_landsat_buffed.gpkg")
 
-gbd <- st_read("data/plot_data/plots_with_landsat.gpkg", quiet=T) %>%
+gbd <- st_read("data/plot_data/plots_with_landsat_buffed.gpkg", quiet=T) %>%
   filter(esp_mask == 1) %>%
   mutate(total_shrubs = NonInvShru + SagebrushC,
          ndsvi = get_ndsvi(sr_band3, sr_band5)) %>%
@@ -40,6 +40,9 @@ hyper_grid <- expand.grid(mtry = mtry,
                           oob_grass = NA,
                           oob_shrub = NA) ; nrow(hyper_grid)
 # note to self parallelize this
+# 
+# with elevation ---------------------------------------------------------------
+
 models <- list()
 for (i in 1:nrow(hyper_grid)) {
   print(paste(i/nrow(hyper_grid)*100,"%"))
@@ -50,10 +53,10 @@ for (i in 1:nrow(hyper_grid)) {
   
   variables <- dplyr::select(gbd,
                              sr_band1, sr_band2, sr_band3, sr_band4, sr_band5, sr_band7,
-                             ndvi = NDVI, evi = EVI, savi = SAVI,sr = SR, ndsvi, #data$SATVI,
+                             ndvi, evi, savi,sr, ndsvi,
                              greenness, brightness, wetness,
                              elevation,
-                             slope, folded_aspect, tpi = TPI, tri = TRI, roughness, flowdir,
+                             slope, folded_aspect, tpi, tri, roughness, flowdir,
                              binary)
   
   variables$split <- sample.split(variables$binary, SplitRatio = .8) #create new variable for splitting plot data into training and test datasets (70% training data)
@@ -69,7 +72,8 @@ for (i in 1:nrow(hyper_grid)) {
                               data = train,
                               mtry = hyper_grid$mtry[i],
                               nodesize = hyper_grid$nodesize[i],
-                              sampsize = hyper_grid$sampsize[i])
+                              sampsize = hyper_grid$sampsize[i],
+                              ntree = 2000)
   
   # Store OOB error for the model                      
   hyper_grid$oob[i] <- models[[i]]$err.rate[nrow(models[[i]]$err.rate), "OOB"]
@@ -77,7 +81,62 @@ for (i in 1:nrow(hyper_grid)) {
   hyper_grid$oob_shrub[i] <- models[[i]]$err.rate[nrow(models[[i]]$err.rate), "Shrub"]
   hyper_grid$comb_err <- hyper_grid$oob_grass + hyper_grid$oob_shrub
 }
-write.csv(hyper_grid, "data/hg_rf.csv")
+write.csv(hyper_grid, "data/hg_w_elev_rf.csv")
+
+# without elevation-------------------------------------------------------------
+
+hyper_grid <- expand.grid(mtry = mtry, 
+                          nodesize = nodesize, 
+                          sampsize = sampsize,
+                          sc=sc,
+                          oob = NA,
+                          oob_grass = NA,
+                          oob_shrub = NA) ; nrow(hyper_grid)
+# note to self parallelize this
+models <- list()
+for (i in 1:nrow(hyper_grid)) {
+  print(paste(i/nrow(hyper_grid)*100,"%"))
+  gbd <- mutate(gbd,
+                binary = as.factor(
+                  ifelse(
+                    total_shrubs < hyper_grid$sc[i], "Grass", "Shrub")))
+  
+  variables <- dplyr::select(gbd,
+                             sr_band1, sr_band2, sr_band3, sr_band4, sr_band5, sr_band7,
+                             ndvi, evi, savi,sr, ndsvi,
+                             greenness, brightness, wetness,
+                             #elevation,
+                             slope, folded_aspect, tpi, tri, roughness, flowdir,
+                             binary)
+  
+  variables$split <- sample.split(variables$binary, SplitRatio = .8) #create new variable for splitting plot data into training and test datasets (70% training data)
+  
+  train <- filter(variables, split == TRUE) %>%    #create training dataset
+    dplyr::select(-split)                            #remove split variable from training data
+  test <- filter(variables, split == FALSE) %>%
+    dplyr::select(-split)
+  
+  
+  # Train a Random Forest model
+  models[[i]] <- randomForest(formula = binary ~ ., 
+                              data = train,
+                              mtry = hyper_grid$mtry[i],
+                              nodesize = hyper_grid$nodesize[i],
+                              sampsize = hyper_grid$sampsize[i],
+                              ntree = 2000)
+  
+  # Store OOB error for the model                      
+  hyper_grid$oob[i] <- models[[i]]$err.rate[nrow(models[[i]]$err.rate), "OOB"]
+  hyper_grid$oob_grass[i] <- models[[i]]$err.rate[nrow(models[[i]]$err.rate), "Grass"]
+  hyper_grid$oob_shrub[i] <- models[[i]]$err.rate[nrow(models[[i]]$err.rate), "Shrub"]
+  hyper_grid$comb_err <- hyper_grid$oob_grass + hyper_grid$oob_shrub
+}
+write.csv(hyper_grid, "data/hg_no_elev_rf.csv")
+
+# checking out which models are best -------------------------------------------
+hg_w_elev <- read.csv("data/hg_w_elev_rf.csv")
+arrange(hg_w_elev, oob) %>% as_tibble()
+
 
 opt_i <- which.min(hyper_grid$oob)
 models[[opt_i]]
@@ -87,7 +146,7 @@ hg2 <- arrange(hyper_grid, comb_err) %>%
 
 
 # fitting the optimum model ----------------------------------------------------
-read.csv("data/hg_rf.csv")%>%
+read.csv("data/hg_w_elev_rf.csv")%>%
   arrange(oob) %>%
   as_tibble()
 
@@ -113,9 +172,9 @@ test <- filter(variables, split == FALSE) %>%
 
 frst <- randomForest(formula = binary ~ .,
                      data = train,
-                     mtry = 13,
+                     mtry = 14,
                      nodesize = 2,
-                     sampsize = 1196,
+                     sampsize = 742,
                      importance=TRUE,
                      ntree = 2000)
 
@@ -341,28 +400,4 @@ plot(perf1)
 
 #### for loop for testing number of trees
 
-# ntree = 2500
-#  for (i in 1:10) {
-#     forest_1 <- randomForest(cluster ~ sr_band1 +sr_band2 +sr_band3 +sr_band4 +sr_band5 + sr_band7 + NDVI + EVI + SAVI, data = gb_data, importance = TRUE, ntree = ntree)
-#     print(forest_1)
-# }
-
 #Determined that 1000 trees provided most stable error rate
-
-# ####code to find mtry value which minimizes error
-#
-# data = gb_data@data
-# variables <- data.frame(data$sr_band1, data$sr_band2, data$sr_band3, data$sr_band4, data$sr_band5, data$sr_band7, data$NDVI, data$EVI, data$SAVI, data$elevation, data$slope, data$folded_aspect, data$TPI, data$TRI, data$roughness, data$greenness, data$brightness, data$wetness, data$cluster)
-# colnames(variables) <- c("sr_band1", "sr_band2", "sr_band3", "sr_band4", "sr_band5", "sr_band7", "NDVI", "EVI", "SAVI", "elevation", "slope", "aspect", "TPI", "TRI", "roughness", "greenness", "brightness", "wetness", "cluster")
-# 
-# mtry <- tuneRF(variables, variables$cluster, ntreeTry=1000,
-#                stepFactor=1.5,improve= T, trace=TRUE, plot=TRUE)
-# 
-# best.m <- mtry[mtry[, 2] == min(mtry[, 2]), 1]
-# 
-# print(mtry)
-# print(best.m)
-
-### the optimal mtry value is 9 
-
-
