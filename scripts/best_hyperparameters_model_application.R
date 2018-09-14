@@ -65,10 +65,10 @@ ls5 <- stack(ls5, ter_c)
 ls5 <- mask(ls5, esp_mask, maskvalue = 0)
 
 names(ls5) <- c("sr_band1", "sr_band2", "sr_band3", "sr_band4", 
-           "sr_band5", "sr_band7", "wetness", "brightness", 
-           "greenness",  "ndvi", "savi", "sr", "evi",  #"satvi",
-           "ndsvi", "elevation", "flowdir", "folded_aspect",
-           "roughness", "slope", "tpi", "tri")
+                "sr_band5", "sr_band7", "wetness", "brightness", 
+                "greenness",  "ndvi", "savi", "sr", "evi",  #"satvi",
+                "ndsvi", "elevation", "flowdir", "folded_aspect",
+                "roughness", "slope", "tpi", "tri")
 # names to match exactly with training data that goes into model. 
 # The order matters for these
 
@@ -80,7 +80,7 @@ gc() # for saving memory
 #only parallelize this part
 foreach(i = 1:length(model_list), 
         .packages = 'raster') %dopar% {         
-          filenamet <- paste0("data/results/", "buff_", as.character(names(model_list[i])), "_",
+          filenamet <- paste0("data/results/", "nobuff_", as.character(names(model_list[i])), "_",
                               sub(pattern = ".tif", 
                                   replacement = "model_results.tif", 
                                   x = file, fixed = T)) 
@@ -134,5 +134,4 @@ writeRaster(ls5_classed, filename = filenamet, overwrite = T, progress = 'text')
 system(paste0("aws s3 cp ", filenamet, " s3://earthlab-amahood/data/ls5_mucc_2011/", substr(filenamet, 14, 63)))
 system(paste("echo", "done"))
 unlink(filenamet)
-
 
