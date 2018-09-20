@@ -19,8 +19,9 @@ s3_result <- "s3://earthlab-amahood/data/model_applied_scenes"
 #s3 sync -------------------------------- 
 system(paste0("aws s3 sync ", s3_path, " ", local_path))
 system(paste0("aws s3 sync ", s3_terrain, " ", local_terrain))
-
+#s3 sync masks
 system("aws s3 sync s3://earthlab-amahood/data/landfire_esp_rcl/ data/esp_binary")
+system("aws s3 sync s3://earthlab-amahood/data/landfire_urban_ag_water_mask/ data/urban_ag_mask")
 # system(paste0("aws s3 sync ", 
 # " s3://earthlab-amahood/data/ls5_model_results_test_mucc/", 
 # "data/results")) ## figure out how to use an if statement based on this s3 sync
@@ -47,6 +48,9 @@ names(ls5)<- c("sr_band1", "sr_band2","sr_band3", "sr_band4","sr_band5", "sr_ban
 esp_mask <- raster("data/esp_binary/clipped_binary.tif")
 esp_mask <- projectRaster(esp_mask, ls5, res = 30)
 
+#create urban_ag mask and match projection/extent
+urb_mask <- raster("data/urban_ag_mask/lf_msk_rclss1.tif")
+urb_mask <- projectRaster(urb_mask, ls5, res = 30)
 
 ter_c <-raster::resample(ter,ls5)
 system(paste("echo", "terrain cropped"))
@@ -63,6 +67,7 @@ ls5$ndsvi <- get_ndsvi(ls5$sr_band3, ls5$sr_band5)
 
 ls5 <- stack(ls5, ter_c)
 ls5 <- mask(ls5, esp_mask, maskvalue = 0)
+ls5 <- mask(ls5, urb_mask, maskvalue = 1)
 
 names(ls5) <- c("sr_band1", "sr_band2", "sr_band3", "sr_band4", 
                 "sr_band5", "sr_band7", "wetness", "brightness", 
