@@ -131,7 +131,7 @@ for(i in 1:length(years)){
         
         
         kounter <- kounter + 1
-      }else {print("nofile");needs$y[n] <- years[i];needs$pr[n] <- path_row_combos[j];n<-n+1}
+      }else {print("nofile");needs[n,1] <- years[i];needs[n,2] <- path_row_combos[j];n<-n+1}
     }else{print("nopoints")}
     counter <- counter + 1 
     
