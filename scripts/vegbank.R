@@ -189,7 +189,8 @@ system("aws s3 sync s3://earthlab-amahood/data/terrain_gb /home/rstudio/wet_dry/
 # system("aws s3 cp home/rstudio/wet_dry/data/terrain_2/terrain_gb.tif s3://earthlab-amahood/data/terrain_2/terrain_gb.tif")
 # keep only sunny days ----------------------------------------------------------------------
 
-df <- result[result$pixel_qa == 66, ] %>% #select plots without clouds
+df <- result[result$pixel_qa == 66, ] %>%
+  dplyr::select(-percentbaresoil,-slopeaspect, -elevation, -slopegradient) %>%
   na.omit()
 
 # Create vegetation indices -------------------------------------------------------------------
@@ -216,7 +217,7 @@ df$flowdir <- raster::extract(raster("data/terrain/flowdir.tif"), df)
 df$folded_aspect = abs(180 - abs(df$aspect - 225))
 
 # writing the file and pushing to s3 -----------------------------------------------
-st_write(df, "data/vegbank_plots_with_landsat.gpkg")
+st_write(df, "data/vegbank_plots_with_landsat.gpkg", delete_layer = TRUE)
 system("aws s3 cp data/vegbank_plots_with_landsat.gpkg s3://earthlab-amahood/data/vegbank_plots_with_landsat.gpkg")
 
 
