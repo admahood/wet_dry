@@ -36,14 +36,8 @@
 # visualization idea: animation illustrating the difference
 
 # setup ------------------------------------------------------------------------
-if(is.null(.rs.getProjectDirectory())){
-  .rs.api.openProject("/home/rstudio/wet_dry/wet_dry.Rproj")
-}
-
 libs <- c("sf", "tidyverse", "raster", "rgdal", "rgeos")
 lapply(libs, library, character.only = TRUE, verbose = FALSE)
-# install.packages("aws.s3")
-# library(aws.s3)
 
 source("/home/rstudio/wet_dry/scripts/functions.R")
 
