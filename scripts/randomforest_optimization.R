@@ -109,7 +109,7 @@ hr <- foreach (i = 1:4, .combine = rbind) %dopar% {
     oob = m$err.rate[nrow(m$err.rate), "OOB"],
     oob_grass = m$err.rate[nrow(m$err.rate), "Grass"],
     oob_shrub = m$err.rate[nrow(m$err.rate), "Shrub"],
-    comb_err = m$err.rate[nrow(m$err.rate), "Grass"] +  m$err.rate[nrow(m$err.rate), "Shrub"],
+    oob_balanced = m$err.rate[nrow(m$err.rate), "Grass"] +  m$err.rate[nrow(m$err.rate), "Shrub"],
     accuracy = as.numeric(cm$overall[1]),
     kappa = as.numeric(cm$overall[2]),
     ac_lower = as.numeric(cm$overall[3]),
