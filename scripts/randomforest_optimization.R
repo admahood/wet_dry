@@ -1,6 +1,6 @@
 # setup ---------------------------
 libs <- c("caTools", "randomForest", "ROCR", "party", "caret", 
-          "tidyverse", "rgdal","sf", "Metrics", "gbm", "foreach", "parallel")
+          "tidyverse", "rgdal","sf", "Metrics", "gbm", "foreach", "doParallel")
 
 #lapply(libs, install.packages, character.only = TRUE, verbose = FALSE)
 
@@ -56,9 +56,9 @@ hyper_grid <- expand.grid(mtry = mtry,
 # with elevation ---------------------------------------------------------------
 
 # models <- list()
-registerDoParallel(2)
+registerDoParallel(corz)
 
-hr <- foreach (i = 1:4, .combine = rbind) %dopar% {
+hr <- foreach (i = 1:nrow(hyper_grid), .combine = rbind) %dopar% {
   
   train <- mutate(gbd,
                 binary = as.factor(
