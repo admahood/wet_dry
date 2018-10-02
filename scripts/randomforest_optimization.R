@@ -32,10 +32,10 @@ vbd <- st_read("data/plot_data/vegbank_plots_with_landsat.gpkg", quiet=T) %>%
   st_set_geometry(NULL)
 
 # tuning with hypermatrix-------------------------------------------------------------------
-mtry <- seq(7, 22 * 0.8,1) # 22 = # cols in the yet to be created training set
-nodesize <- seq(1, 8, 1)
-sampsize <- round(nrow(gbd)*0.8 * c(0.632, 0.7, 0.8, 0.9))
-sc <- seq(8,15,1)
+mtry <- seq(1,10,1) # 22 = # cols in the yet to be created training set
+nodesize <- seq(1, 7, 1)
+sampsize <- round(nrow(gbd)*0.8 * c(0.632))
+sc <- seq(8,25,1)
 
 # Create a data frame containing all combinations 
 hyper_grid <- expand.grid(mtry = mtry, 
@@ -107,10 +107,10 @@ write.csv(hyper_grid, "data/hg_w_elev_vb.csv")
 system("aws s3 cp data/hg_w_elev_vb.csv s3://earthlab-amahood/data/hypergrids_vb/hg_w_elev_vb.csv")
 
 # without elevation-------------------------------------------------------------
-mtry <- seq(7, 22 * 0.8,1) # 22 = # cols in the yet to be created training set
-nodesize <- seq(1, 8, 1)
-sampsize <- round(nrow(gbd)*0.8 * c(0.632, 0.7, 0.8, 0.9))
-sc <- seq(8,15,1)
+mtry <- seq(1,10,1) # 22 = # cols in the yet to be created training set
+nodesize <- seq(1, 7, 1)
+sampsize <- round(nrow(gbd)*0.8 * c(0.632))
+sc <- seq(8,25,1)
 
 # Create a data frame containing all combinations 
 hyper_grid <- expand.grid(mtry = mtry, 
