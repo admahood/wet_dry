@@ -105,7 +105,7 @@ hr <- foreach (i = 1:4, .combine = rbind) %dopar% {
     nodesize = hyper_grid$nodesize[i], 
     sampsize = hyper_grid$sampsize[i],
     sc=hyper_grid$sc[i],
-    elevation = elevation[i],
+    elevation = hyper_grid$elevation[i],
     oob = m$err.rate[nrow(m$err.rate), "OOB"],
     oob_grass = m$err.rate[nrow(m$err.rate), "Grass"],
     oob_shrub = m$err.rate[nrow(m$err.rate), "Shrub"],
