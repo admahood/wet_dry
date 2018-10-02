@@ -123,7 +123,7 @@ hr <- foreach (i = 1:4, .combine = rbind) %dopar% {
     balanced_accuracy = as.numeric(cm$byClass[11])
   )
   gc()
-  system(paste("echo", as.numeric(cm$byClass[11]), paste(round(i/nrow(hyper_grid)*100,2),"%")))
+  system(paste("echo", round(as.numeric(cm$byClass[11]),2), paste(round(i/nrow(hyper_grid)*100,2),"%")))
   return(w)
 }
 
