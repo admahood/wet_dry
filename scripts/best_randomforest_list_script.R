@@ -9,8 +9,8 @@ set.seed(11)
 
 
 # Step 2: Load Data --------------------------------
-system("aws s3 cp s3://earthlab-amahood/data/plots_with_landsat_buffed.gpkg data/plot_data/plots_with_landsat_buffed.gpkg")
-system("aws s3 sync s3://earthlab-amahood/data/hypergrids data/hypergrids")
+system("aws s3 cp s3://earthlab-amahood/data/plots_with_landsat.gpkg data/plot_data/plots_with_landsat.gpkg")
+system("aws s3 sync s3://earthlab-amahood/data/hypergrids_vb data/hypergrids")
 # which_binary <- data.frame(
 #   binary_value = NA,
 #   variable = NA,
@@ -20,28 +20,34 @@ system("aws s3 sync s3://earthlab-amahood/data/hypergrids data/hypergrids")
 
 
 
-hypergrid <- read.csv("data/hypergrids/hg_rf.csv") %>% arrange(oob)
+hypergrid <- read.csv("data/hypergrids/hg_w_elev_vb.csv") %>% arrange(desc(balanced_accuracy))
 
-hypergrid_2 <- read.csv("data/hypergrids/hg_rf_noelev.csv") %>% arrange(oob)
+#w/elev and w/o elev both stored in same hypergrid now
+#hypergrid_2 <- read.csv("data/hypergrids/hg_rf_noelev.csv") %>% arrange(oob)
 
 
 #best model parameters chosen according to the following: 
 
 #(hyper_w_elev) -- two lowest oob errors(1,2); two lowest oob errors w/ higher shrub cover split (3, 6) -- this results in a more even dist. of error between classes
 #highest shrub cover split in 25 best oob error parameter sets (25)
-best_hyper <- hypergrid[c(1, 2, 6, 10, 12),] %>% arrange(oob) %>% mutate(elevation = "yes")
+#best_hyper <- hypergrid[c(1, 2, 6, 10, 12),] %>% arrange(oob) %>% mutate(elevation = "yes")
+#^^^disregard above, looking for models with highest balanced accuracy now
+
+#top 5 balanced accuracies with and without elevation
+best_hyper <- hypergrid[c(1:8, 10, 12),] %>% arrange(desc(balanced_accuracy))
 
 #best hyper (buffered) - so we know which numbers we used for buffered hypergrids
 #best_hyper <- hypergrid[c(1, 2, 3, 6, 25),] %>% arrange(oob) %>% mutate(elevation = "yes")
 
 #(hyper_no_elev) -- two lowest oob errors(1,2); two lowest oob errors w/ higher shrub cover split (3,4) -- this results in a more even dist. of error between classes
 # highest shrub cover split in 25 lowest oob error parameter sets (7)
-best_hyper2 <- hypergrid_2[c(1, 2, 7, 13, 14),] %>% arrange(oob) %>% mutate(elevation = "no")
+#best_hyper2 <- hypergrid_2[c(1, 2, 7, 13, 14),] %>% arrange(oob) %>% mutate(elevation = "no")
 
 #best hyper (buffered) no elevation: so we know which numbers we used for buffered hypergrids
 #best_hyper2 <- hypergrid_2[c(1, 2, 3, 4, 7),] %>% arrange(oob) %>% mutate(elevation = "no")
 
-best10 <- rbind(best_hyper, best_hyper2)
+#best10 <- rbind(best_hyper, best_hyper2)
+best10 <- best_hyper
 
 #create names for models based on presence of elevation variable and sc/mtry values
 model_names <- paste(ifelse(best10[1:10,]$elevation == "yes", "elev", "noelev"), "sc",best10[1:10,]$sc,"mtry", best10[1:10,]$mtry, sep="_")
