@@ -100,7 +100,7 @@ foreach(i = 1:length(model_list),
           
           writeRaster(ls5_classed, filename = filenamet, overwrite = T, progress = 'text')
           
-          system(paste0("aws s3 cp ", filenamet, " s3://earthlab-amahood/data/ls5_hyperparameter_test_results/", substr(filenamet, 14, 63)))
+          system(paste0("aws s3 cp ", filenamet, " s3://earthlab-amahood/data/ls5_hyperparameter_test_results/", substr(filenamet, 14, 100)))
           system(paste("echo", "done"))
           unlink(filenamet)
           

@@ -50,7 +50,7 @@ best_hyper <- hypergrid[c(1:8, 10, 12),] %>% arrange(desc(balanced_accuracy))
 best10 <- best_hyper
 
 #create names for models based on presence of elevation variable and sc/mtry values
-model_names <- paste(ifelse(best10[1:10,]$elevation == "yes", "elev", "noelev"), "sc",best10[1:10,]$sc,"mtry", best10[1:10,]$mtry, sep="_")
+model_names <- paste(ifelse(best10[1:10,]$elevation == "yes", "elev", "noelev"), "sc",best10[1:10,]$sc,"mtry", best10[1:10,]$mtry, "nodes", best10[1:10,]$nodesize, sep="_")
 
 model_list <- list()
 
