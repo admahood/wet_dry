@@ -13,6 +13,7 @@ lapply(libs, library, character.only = TRUE, verbose = FALSE)
 
 source("scripts/functions.R")
 
+date <- paste(strsplit(date()," ")[[1]][c(2,4,6)],collapse="_")
 set.seed(11)
 
 corz <- detectCores()-1
@@ -24,38 +25,48 @@ gbd <- st_read("data/plot_data/plots_with_landsat.gpkg", quiet=T) %>%
   filter(esp_mask == 1) %>%
   mutate(total_shrubs = NonInvShru + SagebrushC,
          ndsvi = get_ndsvi(sr_band3, sr_band5)) %>%
+  dplyr::select(sr_band1, sr_band2, sr_band3, sr_band4, sr_band5, sr_band7,
+                ndvi=NDVI, evi=EVI, savi=SAVI,sr=SR, ndsvi,
+                greenness, brightness, wetness,
+                total_shrubs,
+                elevation,
+                slope, folded_aspect, tpi=TPI, tri=TRI, roughness, flowdir) %>%
   st_set_geometry(NULL)
 
 vbd <- st_read("data/plot_data/vegbank_plots_with_landsat.gpkg", quiet=T) %>%
   mutate(ndsvi = get_ndsvi(sr_band3, sr_band5)) %>%
   rename(total_shrubs = shrubcover) %>%
-  st_set_geometry(NULL)
+  dplyr::select(sr_band1, sr_band2, sr_band3, sr_band4, sr_band5, sr_band7,
+                ndvi, evi, savi,sr, ndsvi,
+                greenness, brightness, wetness,
+                total_shrubs,
+                elevation,
+                slope, folded_aspect, tpi, tri, roughness, flowdir)  %>%
+  st_set_geometry(NULL) %>%
+  mutate(split = 1,
+         split = sample.split(split, SplitRatio=0.5))
+
+
+dev <- filter(vbd, split==TRUE)
+write.csv(dev, paste("dev",date,".csv"))
+system(paste("aws s3 cp dev",date,".csv s3://earthlab-amahood/data/dev",date,".csv"))
+
+test <- filter(vbd, split==FALSE)
+write.csv(test, "test",date,".csv")
+system("aws s3 cp test",date,".csv s3://earthlab-amahood/data/test",date,".csv")
 
 # tuning with hypermatrix-------------------------------------------------------------------
-mtry <- seq(1,10,1) # 22 = # cols in the yet to be created training set
-nodesize <- seq(1, 7, 1)
-sampsize <- round(nrow(gbd)*0.8 * c(0.632))
-sc <- seq(8,25,1)
+mtry <- seq(1,5,1) # 22 = # cols in the yet to be created training set
+sc <- seq(3,25,1)
+nodesize <- seq(1,4,1)
 elevation <- c("yes","no")
 
 # Create a data frame containing all combinations 
 hyper_grid <- expand.grid(mtry = mtry, 
                           nodesize = nodesize, 
-                          sampsize = sampsize,
                           sc=sc,
-                          elevation = elevation,
-                          oob = NA,
-                          oob_grass = NA,
-                          oob_shrub = NA,
-                          accuracy = NA,
-                          accuracy_p = NA,
-                          mcnemar_p = NA,
-                          balanced_accuracy = NA) ; nrow(hyper_grid)
-# note to self parallelize this
-# 
-# with elevation ---------------------------------------------------------------
+                          elevation = elevation) ; nrow(hyper_grid)
 
-# models <- list()
 registerDoParallel(corz)
 
 hr <- foreach (i = 1:nrow(hyper_grid), .combine = rbind) %dopar% {
@@ -63,7 +74,107 @@ hr <- foreach (i = 1:nrow(hyper_grid), .combine = rbind) %dopar% {
   train <- mutate(gbd,
                 binary = as.factor(
                   ifelse(
+                    total_shrubs < hyper_grid$sc[i], "Grass", "Shrub"))) %>%
+    dplyr::select(-total_shrubs)
+    
+  if(hyper_grid$elevation[i] == "no"){dplyr::select(train,-elevation)}
+  
+  # Train a Random Forest model
+  m <- randomForest(formula = binary ~ ., 
+                              data = train,
+                              nodesize = hyper_grid$nodesize[i],
+                              mtry = hyper_grid$mtry[i],
+                              ntree = 3000)
+  #validate with vegbank
+  dev1  <- mutate(dev,
+                binary = as.factor(
+                  ifelse(
                     total_shrubs < hyper_grid$sc[i], "Grass", "Shrub")))%>%
+    dplyr::select(-total_shrubs)
+  
+  if(hyper_grid$elevation[i] == "no"){dplyr::select(dev1,-elevation)}
+  
+  
+  class_prediction <- predict(object = m,   # model object
+                              newdata = dev1,  # test dataset
+                              type = "class")
+  
+  cm <- confusionMatrix(data = class_prediction,       # predicted classes
+                        reference = dev1$binary)  # actual classes
+    # Store OOB error for the model                      
+  w<- data.frame(
+    mtry = hyper_grid$mtry[i], 
+    nodesize = hyper_grid$nodesize[i], 
+    sc=hyper_grid$sc[i],
+    elevation = hyper_grid$elevation[i],
+    oob = m$err.rate[nrow(m$err.rate), "OOB"],
+    oob_grass = m$err.rate[nrow(m$err.rate), "Grass"],
+    oob_shrub = m$err.rate[nrow(m$err.rate), "Shrub"],
+    oob_balanced = m$err.rate[nrow(m$err.rate), "Grass"] +  m$err.rate[nrow(m$err.rate), "Shrub"],
+    accuracy = as.numeric(cm$overall[1]),
+    kappa = as.numeric(cm$overall[2]),
+    ac_lower = as.numeric(cm$overall[3]),
+    ac_upper = as.numeric(cm$overall[4]),
+    ac_null = as.numeric(cm$overall[5]),
+    accuracy_p = as.numeric(cm$overall[6]),
+    mcnemar_p = as.numeric(cm$overall[7]),
+    sensitivity = as.numeric(cm$byClass[1]),
+    specificity = as.numeric(cm$byClass[2]),
+    precision = as.numeric(cm$byClass[4]),
+    balanced_accuracy = as.numeric(cm$byClass[11])
+  )
+  gc()
+  system(paste("echo", round(as.numeric(cm$byClass[11]),2), paste(round(i/nrow(hyper_grid)*100,2),"%")))
+  return(w)
+}
+
+write.csv(hr, "data/hg",date,".csv")
+system("aws s3 cp data/hg_w_elev_vb.csv s3://earthlab-amahood/data/hypergrids_vb/hg",date,".csv")
+
+# mixing blm and vegbank and then splitting -------------------------------------------------------------------------------------------------------------------
+
+all_data <- rbind(gbd, dplyr::select(vbd,-split)) %>%
+  mutate(split = 1,
+         split = sample.split(split, SplitRatio=0.7))
+
+
+train_a <- filter(all_data, split==TRUE)
+write.csv(train_a, paste("train_a_",date,".csv"))
+system(paste("aws s3 cp train_a_",date,".csv s3://earthlab-amahood/data/train_a_",date,".csv"))
+
+dev_test <- filter(all_data, split == FALSE) %>%
+  mutate(split = 1,
+         split = sample.split(split, SplitRatio=0.5))
+
+
+dev_a <- filter(dev_test, split==TRUE)
+write.csv(dev_a, "dev_a_",date,".csv")
+system("aws s3 cp dev_a_",date,".csv s3://earthlab-amahood/data/dev_a_",date,".csv")
+
+test_a <- filter(dev_test, split==FALSE)
+write.csv(test_a, "test_a_",date,".csv")
+system("aws s3 cp test_a_",date,".csv s3://earthlab-amahood/data/test_a_",date,".csv")
+
+mtry <- seq(1,5,1) # 22 = # cols in the yet to be created training set
+sc <- seq(3,25,1)
+nodesize <- seq(1,4,1)
+elevation <- c("yes","no")
+
+# Create a data frame containing all combinations 
+hyper_grid <- expand.grid(mtry = mtry, 
+                          nodesize = nodesize, 
+                          sc=sc,
+                          elevation = elevation) ; nrow(hyper_grid)
+
+
+registerDoParallel(corz)
+
+hr <- foreach (i = 1:nrow(hyper_grid), .combine = rbind) %dopar% {
+  
+  train <- mutate(gbd,
+                  binary = as.factor(
+                    ifelse(
+                      total_shrubs < hyper_grid$sc[i], "Grass", "Shrub")))%>%
     dplyr::select(sr_band1, sr_band2, sr_band3, sr_band4, sr_band5, sr_band7,
                   ndvi=NDVI, evi=EVI, savi=SAVI,sr=SR, ndsvi,
                   greenness, brightness, wetness,
@@ -74,32 +185,30 @@ hr <- foreach (i = 1:nrow(hyper_grid), .combine = rbind) %dopar% {
   
   # Train a Random Forest model
   m <- randomForest(formula = binary ~ ., 
-                              data = train,
-                              mtry = hyper_grid$mtry[i],
-                              nodesize = hyper_grid$nodesize[i],
-                              sampsize = hyper_grid$sampsize[i],
-                              ntree = 3000)
+                    data = train,
+                    mtry = hyper_grid$mtry[i],
+                    ntree = 3000)
   #validate with vegbank
-  test  <- mutate(vbd,
-                binary = as.factor(
-                  ifelse(
-                    total_shrubs < hyper_grid$sc[i], "Grass", "Shrub")))%>%
+  dev1  <- mutate(dev,
+                  binary = as.factor(
+                    ifelse(
+                      total_shrubs < hyper_grid$sc[i], "Grass", "Shrub")))%>%
     dplyr::select(sr_band1, sr_band2, sr_band3, sr_band4, sr_band5, sr_band7,
                   ndvi, evi, savi,sr, ndsvi,
                   greenness, brightness, wetness,
                   elevation,
                   slope, folded_aspect, tpi, tri, roughness, flowdir,
                   binary)  
-  if(hyper_grid$elevation[i] == "no"){dplyr::select(test,-elevation)}
+  if(hyper_grid$elevation[i] == "no"){dplyr::select(dev1,-elevation)}
   
   
   class_prediction <- predict(object = m,   # model object
-                              newdata = test,  # test dataset
+                              newdata = dev1,  # test dataset
                               type = "class")
   
   cm <- confusionMatrix(data = class_prediction,       # predicted classes
-                        reference = test$binary)  # actual classes
-    # Store OOB error for the model                      
+                        reference = dev1$binary)  # actual classes
+  # Store OOB error for the model                      
   w<- data.frame(
     mtry = hyper_grid$mtry[i], 
     nodesize = hyper_grid$nodesize[i], 
@@ -127,8 +236,13 @@ hr <- foreach (i = 1:nrow(hyper_grid), .combine = rbind) %dopar% {
   return(w)
 }
 
-write.csv(hr, "data/hg_w_elev_vb.csv")
-system("aws s3 cp data/hg_w_elev_vb.csv s3://earthlab-amahood/data/hypergrids_vb/hg_w_elev_vb.csv")
+write.csv(hr, "data/hg",date,".csv")
+system("aws s3 cp data/hg_w_elev_vb.csv s3://earthlab-amahood/data/hypergrids_vb/hg",date,".csv")
+
+
+
+
+
 
 # checking out which models are best -------------------------------------------
 hg_w_elev <- read.csv("data/hg_w_elev_rf.csv")
