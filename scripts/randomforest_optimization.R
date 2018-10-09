@@ -163,7 +163,7 @@ system(paste0("aws s3 cp test_a_",date,".csv s3://earthlab-amahood/data/test_a_"
 
 # creating the hypergrid
 
-mtry <- seq(1,5,1) # 22 = # cols in the yet to be created training set
+mtry <- seq(1,10,1) # 22 = # cols in the yet to be created training set
 sc <- seq(3,25,1)
 nodesize <- seq(1,4,1)
 elevation <- c("yes","no")
@@ -183,7 +183,7 @@ hr <- foreach (i = 1:nrow(hyper_grid), .combine = rbind) %dopar% {
                   binary = as.factor(
                     ifelse(
                       total_shrubs < hyper_grid$sc[i], "Grass", "Shrub"))) %>%
-    dplyr::select(-total_shrubs)
+    dplyr::select(-total_shrubs,-ds)
   
   if(hyper_grid$elevation[i] == "no"){dplyr::select(train_a,-elevation)}
   
@@ -198,7 +198,7 @@ hr <- foreach (i = 1:nrow(hyper_grid), .combine = rbind) %dopar% {
                   binary = as.factor(
                     ifelse(
                       total_shrubs < hyper_grid$sc[i], "Grass", "Shrub")))%>%
-    dplyr::select(-total_shrubs)
+    dplyr::select(-total_shrubs,-ds)
   
   if(hyper_grid$elevation[i] == "no"){dplyr::select(dev1,-elevation)}
   
