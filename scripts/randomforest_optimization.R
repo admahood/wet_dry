@@ -243,7 +243,7 @@ hr <- foreach (i = 1:nrow(hyper_grid), .combine = rbind) %dopar% {
   return(w)
 }
 
-write.csv(hr, "data/hg_a_",date,".csv")
+write.csv(hr, paste0("data/hg_a_",date,".csv"))
 system(paste0("aws s3 cp data/hg_a_",date,".csv s3://earthlab-amahood/data/hypergrids_vb/hg_a_",date,".csv"))
 
 
