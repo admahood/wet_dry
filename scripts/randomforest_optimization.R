@@ -135,8 +135,8 @@ hr <- foreach (i = 1:nrow(hyper_grid), .combine = rbind) %dopar% {
   return(w)
 }
 
-write.csv(hr, paset0("data/hg",date,".csv"))
-system(paste0("aws s3 cp data/hg_w_elev_vb.csv s3://earthlab-amahood/data/hypergrids_vb/hg",date,".csv"))
+write.csv(hr, paste0("data/hg",date,".csv"))
+system(paste0("aws s3 cp data/hg",date,".csv s3://earthlab-amahood/data/hypergrids_vb/hg",date,".csv"))
 
 # mixing blm and vegbank and then splitting -------------------------------------------------------------------------------------------------------------------
 
@@ -188,7 +188,7 @@ hr <- foreach (i = 1:nrow(hyper_grid), .combine = rbind) %dopar% {
   
   # Train a Random Forest model
   m <- randomForest(formula = binary ~ ., 
-                    data = train_a,
+                    data = train,
                     nodesize = hyper_grid$nodesize[i],
                     mtry = hyper_grid$mtry[i],
                     ntree = 3000)
