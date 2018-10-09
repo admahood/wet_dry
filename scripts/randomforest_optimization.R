@@ -47,11 +47,11 @@ vbd <- st_read("data/plot_data/vegbank_plots_with_landsat.gpkg", quiet=T) %>%
          split = sample.split(split, SplitRatio=0.5))
 
 
-dev <- filter(vbd, split==TRUE)
+dev <- filter(vbd, split==TRUE) %>% dplyr::select(-split)
 write.csv(dev, paste0("dev",date,".csv"))
 system(paste0("aws s3 cp dev",date,".csv s3://earthlab-amahood/data/dev",date,".csv"))
 
-test <- filter(vbd, split==FALSE)
+test <- filter(vbd, split==FALSE) %>% dplyr::select(-split)
 write.csv(test, paste0("test",date,".csv"))
 system(paste0("aws s3 cp test",date,".csv s3://earthlab-amahood/data/test",date,".csv"))
 
@@ -140,27 +140,28 @@ system(paste0("aws s3 cp data/hg",date,".csv s3://earthlab-amahood/data/hypergri
 
 # mixing blm and vegbank and then splitting -------------------------------------------------------------------------------------------------------------------
 
-all_data <- rbind(gbd, dplyr::select(vbd,-split)) %>%
-  mutate(split = 1,
-         split = sample.split(split, SplitRatio=0.7))
+all_data <- rbind(mutate(gbd, ds = "BLM"), 
+                  mutate(vbd, ds = "vegbank")) %>%
+  mutate(split = sample.split(ds, SplitRatio=0.7))
 
 
-train_a <- filter(all_data, split==TRUE)
+train_a <- filter(all_data, split==TRUE) %>% dplyr::select(-split)
 write.csv(train_a, paste0("train_a_",date,".csv"))
 system(paste0("aws s3 cp train_a_",date,".csv s3://earthlab-amahood/data/train_a_",date,".csv"))
 
 dev_test <- filter(all_data, split == FALSE) %>%
-  mutate(split = 1,
-         split = sample.split(split, SplitRatio=0.5))
+  mutate(split = sample.split(ds, SplitRatio=0.5))
 
 
-dev_a <- filter(dev_test, split==TRUE)
+dev_a <- filter(dev_test, split==TRUE) %>% dplyr::select(-split)
 write.csv(dev_a, paste0("dev_a_",date,".csv"))
 system(paste0("aws s3 cp dev_a_",date,".csv s3://earthlab-amahood/data/dev_a_",date,".csv"))
 
-test_a <- filter(dev_test, split==FALSE)
+test_a <- filter(dev_test, split==FALSE) %>% dplyr::select(-split)
 write.csv(test_a, paste0("test_a_",date,".csv"))
 system(paste0("aws s3 cp test_a_",date,".csv s3://earthlab-amahood/data/test_a_",date,".csv"))
+
+# creating the hypergrid
 
 mtry <- seq(1,5,1) # 22 = # cols in the yet to be created training set
 sc <- seq(3,25,1)
