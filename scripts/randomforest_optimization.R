@@ -48,12 +48,12 @@ vbd <- st_read("data/plot_data/vegbank_plots_with_landsat.gpkg", quiet=T) %>%
 
 
 dev <- filter(vbd, split==TRUE)
-write.csv(dev, paste("dev",date,".csv"))
-system(paste("aws s3 cp dev",date,".csv s3://earthlab-amahood/data/dev",date,".csv"))
+write.csv(dev, paste0("dev",date,".csv"))
+system(paste0("aws s3 cp dev",date,".csv s3://earthlab-amahood/data/dev",date,".csv"))
 
 test <- filter(vbd, split==FALSE)
-write.csv(test, "test",date,".csv")
-system("aws s3 cp test",date,".csv s3://earthlab-amahood/data/test",date,".csv")
+write.csv(test, paste0("test",date,".csv"))
+system(paste0("aws s3 cp test",date,".csv s3://earthlab-amahood/data/test",date,".csv"))
 
 # tuning with hypermatrix-------------------------------------------------------------------
 mtry <- seq(1,5,1) # 22 = # cols in the yet to be created training set
@@ -120,7 +120,14 @@ hr <- foreach (i = 1:nrow(hyper_grid), .combine = rbind) %dopar% {
     mcnemar_p = as.numeric(cm$overall[7]),
     sensitivity = as.numeric(cm$byClass[1]),
     specificity = as.numeric(cm$byClass[2]),
-    precision = as.numeric(cm$byClass[4]),
+    pos_pred_value = as.numeric(cm$byClass[3]),
+    neg_pred_value = as.numeric(cm$byClass[4]),
+    precision = as.numeric(cm$byClass[5]),
+    recall = as.numeric(cm$byClass[6]),
+    F1 = as.numeric(cm$byClass[7]),
+    prevalence = as.numeric(cm$byClass[8]),
+    detection_rate = as.numeric(cm$byClass[9]),
+    detection_prevalence = as.numeric(cm$byClass[10]),
     balanced_accuracy = as.numeric(cm$byClass[11])
   )
   gc()
@@ -128,8 +135,8 @@ hr <- foreach (i = 1:nrow(hyper_grid), .combine = rbind) %dopar% {
   return(w)
 }
 
-write.csv(hr, "data/hg",date,".csv")
-system("aws s3 cp data/hg_w_elev_vb.csv s3://earthlab-amahood/data/hypergrids_vb/hg",date,".csv")
+write.csv(hr, paset0("data/hg",date,".csv"))
+system(paste0("aws s3 cp data/hg_w_elev_vb.csv s3://earthlab-amahood/data/hypergrids_vb/hg",date,".csv"))
 
 # mixing blm and vegbank and then splitting -------------------------------------------------------------------------------------------------------------------
 
@@ -139,8 +146,8 @@ all_data <- rbind(gbd, dplyr::select(vbd,-split)) %>%
 
 
 train_a <- filter(all_data, split==TRUE)
-write.csv(train_a, paste("train_a_",date,".csv"))
-system(paste("aws s3 cp train_a_",date,".csv s3://earthlab-amahood/data/train_a_",date,".csv"))
+write.csv(train_a, paste0("train_a_",date,".csv"))
+system(paste0("aws s3 cp train_a_",date,".csv s3://earthlab-amahood/data/train_a_",date,".csv"))
 
 dev_test <- filter(all_data, split == FALSE) %>%
   mutate(split = 1,
@@ -148,12 +155,12 @@ dev_test <- filter(all_data, split == FALSE) %>%
 
 
 dev_a <- filter(dev_test, split==TRUE)
-write.csv(dev_a, "dev_a_",date,".csv")
-system("aws s3 cp dev_a_",date,".csv s3://earthlab-amahood/data/dev_a_",date,".csv")
+write.csv(dev_a, paste0("dev_a_",date,".csv"))
+system(paste0("aws s3 cp dev_a_",date,".csv s3://earthlab-amahood/data/dev_a_",date,".csv"))
 
 test_a <- filter(dev_test, split==FALSE)
-write.csv(test_a, "test_a_",date,".csv")
-system("aws s3 cp test_a_",date,".csv s3://earthlab-amahood/data/test_a_",date,".csv")
+write.csv(test_a, paste0("test_a_",date,".csv"))
+system(paste0("aws s3 cp test_a_",date,".csv s3://earthlab-amahood/data/test_a_",date,".csv"))
 
 mtry <- seq(1,5,1) # 22 = # cols in the yet to be created training set
 sc <- seq(3,25,1)
@@ -171,34 +178,27 @@ registerDoParallel(corz)
 
 hr <- foreach (i = 1:nrow(hyper_grid), .combine = rbind) %dopar% {
   
-  train <- mutate(gbd,
+  train <- mutate(train_a,
                   binary = as.factor(
                     ifelse(
-                      total_shrubs < hyper_grid$sc[i], "Grass", "Shrub")))%>%
-    dplyr::select(sr_band1, sr_band2, sr_band3, sr_band4, sr_band5, sr_band7,
-                  ndvi=NDVI, evi=EVI, savi=SAVI,sr=SR, ndsvi,
-                  greenness, brightness, wetness,
-                  elevation,
-                  slope, folded_aspect, tpi=TPI, tri=TRI, roughness, flowdir,
-                  binary)
-  if(hyper_grid$elevation[i] == "no"){dplyr::select(train,-elevation)}
+                      total_shrubs < hyper_grid$sc[i], "Grass", "Shrub"))) %>%
+    dplyr::select(-total_shrubs)
+  
+  if(hyper_grid$elevation[i] == "no"){dplyr::select(train_a,-elevation)}
   
   # Train a Random Forest model
   m <- randomForest(formula = binary ~ ., 
-                    data = train,
+                    data = train_a,
+                    nodesize = hyper_grid$nodesize[i],
                     mtry = hyper_grid$mtry[i],
                     ntree = 3000)
   #validate with vegbank
-  dev1  <- mutate(dev,
+  dev1  <- mutate(dev_a,
                   binary = as.factor(
                     ifelse(
                       total_shrubs < hyper_grid$sc[i], "Grass", "Shrub")))%>%
-    dplyr::select(sr_band1, sr_band2, sr_band3, sr_band4, sr_band5, sr_band7,
-                  ndvi, evi, savi,sr, ndsvi,
-                  greenness, brightness, wetness,
-                  elevation,
-                  slope, folded_aspect, tpi, tri, roughness, flowdir,
-                  binary)  
+    dplyr::select(-total_shrubs)
+  
   if(hyper_grid$elevation[i] == "no"){dplyr::select(dev1,-elevation)}
   
   
@@ -212,7 +212,6 @@ hr <- foreach (i = 1:nrow(hyper_grid), .combine = rbind) %dopar% {
   w<- data.frame(
     mtry = hyper_grid$mtry[i], 
     nodesize = hyper_grid$nodesize[i], 
-    sampsize = hyper_grid$sampsize[i],
     sc=hyper_grid$sc[i],
     elevation = hyper_grid$elevation[i],
     oob = m$err.rate[nrow(m$err.rate), "OOB"],
@@ -228,7 +227,14 @@ hr <- foreach (i = 1:nrow(hyper_grid), .combine = rbind) %dopar% {
     mcnemar_p = as.numeric(cm$overall[7]),
     sensitivity = as.numeric(cm$byClass[1]),
     specificity = as.numeric(cm$byClass[2]),
-    precision = as.numeric(cm$byClass[4]),
+    pos_pred_value = as.numeric(cm$byClass[3]),
+    neg_pred_value = as.numeric(cm$byClass[4]),
+    precision = as.numeric(cm$byClass[5]),
+    recall = as.numeric(cm$byClass[6]),
+    F1 = as.numeric(cm$byClass[7]),
+    prevalence = as.numeric(cm$byClass[8]),
+    detection_rate = as.numeric(cm$byClass[9]),
+    detection_prevalence = as.numeric(cm$byClass[10]),
     balanced_accuracy = as.numeric(cm$byClass[11])
   )
   gc()
@@ -236,8 +242,8 @@ hr <- foreach (i = 1:nrow(hyper_grid), .combine = rbind) %dopar% {
   return(w)
 }
 
-write.csv(hr, "data/hg",date,".csv")
-system("aws s3 cp data/hg_w_elev_vb.csv s3://earthlab-amahood/data/hypergrids_vb/hg",date,".csv")
+write.csv(hr, "data/hg_a_",date,".csv")
+system(paste0("aws s3 cp data/hg_a_",date,".csv s3://earthlab-amahood/data/hypergrids_vb/hg_a_",date,".csv"))
 
 
 
