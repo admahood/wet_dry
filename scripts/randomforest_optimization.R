@@ -141,7 +141,7 @@ system(paste0("aws s3 cp data/hg",date,".csv s3://earthlab-amahood/data/hypergri
 # mixing blm and vegbank and then splitting -------------------------------------------------------------------------------------------------------------------
 
 all_data <- rbind(mutate(gbd, ds = "BLM"), 
-                  mutate(vbd, ds = "vegbank")) %>%
+                  mutate(dplyr::select(vbd,-split), ds = "vegbank")) %>%
   mutate(split = sample.split(ds, SplitRatio=0.7))
 
 
