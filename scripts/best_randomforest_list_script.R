@@ -20,21 +20,30 @@ system("aws s3 sync s3://earthlab-amahood/data/hypergrids_vb data/hypergrids")
 
 
 
-hypergrid <- read.csv("data/hypergrids/hg_w_elev_vb.csv") %>% arrange(desc(balanced_accuracy))
+hypergrid_original <- read.csv("data/hypergrids/hgOct_10_2018.csv") %>% arrange(desc(balanced_accuracy))
 
+hypergrid_combine <- read.csv("data/hypergrids/hg_a_Oct_9_2018.csv") %>% arrange(desc(balanced_accuracy))
 #w/elev and w/o elev both stored in same hypergrid now
 #hypergrid_2 <- read.csv("data/hypergrids/hg_rf_noelev.csv") %>% arrange(oob)
 
 
 #best model parameters chosen according to the following: 
 
+#Oct 9 - Testing overpredicting models & data split methods
+
+best_hyper_orig <- hypergrid_original[c(1, 4:7, 19, 25, 89, 249, 537, 621, 1194, 1537), ] %>% arrange(desc(balanced_accuracy))
+# (models with high balanced accuracy selected for middle ground and higher/lower sc value (overpredicting) models, also selected models with most extreme sc values but lower balanced accuracy (3 & 25) for visual comparison)
+best_hyper_comb <- hypergrid_combine[c(1, 7, 8, 33, 68, 387, 575, 630, 1178, 1295, 1557),] %>% arrange(desc(balanced_accuracy))
+
+####model testing/selection history ####
 #(hyper_w_elev) -- two lowest oob errors(1,2); two lowest oob errors w/ higher shrub cover split (3, 6) -- this results in a more even dist. of error between classes
 #highest shrub cover split in 25 best oob error parameter sets (25)
 #best_hyper <- hypergrid[c(1, 2, 6, 10, 12),] %>% arrange(oob) %>% mutate(elevation = "yes")
 #^^^disregard above, looking for models with highest balanced accuracy now
 
-#top 5 balanced accuracies with and without elevation
-best_hyper <- hypergrid[c(1:8, 10, 12),] %>% arrange(desc(balanced_accuracy))
+
+#top 5 balanced accuracies with and without elevation -- Oct 2
+# best_hyper <- hypergrid[c(1:8, 10, 12),] %>% arrange(desc(balanced_accuracy))
 
 #best hyper (buffered) - so we know which numbers we used for buffered hypergrids
 #best_hyper <- hypergrid[c(1, 2, 3, 6, 25),] %>% arrange(oob) %>% mutate(elevation = "yes")
@@ -47,10 +56,11 @@ best_hyper <- hypergrid[c(1:8, 10, 12),] %>% arrange(desc(balanced_accuracy))
 #best_hyper2 <- hypergrid_2[c(1, 2, 3, 4, 7),] %>% arrange(oob) %>% mutate(elevation = "no")
 
 #best10 <- rbind(best_hyper, best_hyper2)
-best10 <- best_hyper
+#### model list application ####
+best10 <- best_hyper_orig
 
-#create names for models based on presence of elevation variable and sc/mtry values
-model_names <- paste(ifelse(best10[1:10,]$elevation == "yes", "elev", "noelev"), "sc",best10[1:10,]$sc,"mtry", best10[1:10,]$mtry, "nodes", best10[1:10,]$nodesize, sep="_")
+
+
 
 model_list <- list()
 
@@ -62,6 +72,7 @@ for(i in 1:nrow(best10)) {
     st_set_geometry(NULL) %>%
     mutate(binary = as.factor(ifelse(total_shrubs < best10$sc[i], "Grass", "Shrub")),
            ndsvi=get_ndsvi(sr_band3, sr_band5)) %>%
+    #dplyr::select(-X1, -total_shrubs, -ds) 
     dplyr::select(sr_band1, sr_band2, sr_band3, sr_band4, sr_band5, sr_band7,
                   ndvi = NDVI, evi = EVI, savi = SAVI, sr = SR, ndsvi = NDSVI, #data$SATVI,
                   greenness, brightness, wetness,
@@ -77,9 +88,12 @@ for(i in 1:nrow(best10)) {
                                   ntree = 2000, 
                                   mtry = best10$mtry[[i]], 
                                   nodesize = best10$nodesize[[i]], 
-                                  sampsize = round(best10$sampsize[[i]]))
+                                 )
+  print("models created")
 }
 
+#create names for models based on presence of elevation variable and sc/mtry values
+model_names <- paste("orig", ifelse(best10[1:13,]$elevation == "yes", "elev", "noelev"), "sc",best10[1:11,]$sc,"mtry", best10[1:11,]$mtry, "nodes", best10[1:11,]$nodesize, sep="_")
 names(model_list) <- model_names
 
 # # optimizing model- strait from data camp----------------------------------------------

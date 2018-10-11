@@ -35,7 +35,7 @@ gbd <- st_read("data/plot_data/plots_with_landsat.gpkg", quiet=T) %>%
 
 vbd <- st_read("data/plot_data/vegbank_plots_with_landsat.gpkg", quiet=T) %>%
   mutate(ndsvi = get_ndsvi(sr_band3, sr_band5)) %>%
-  rename(total_shrubs = shrubcover) %>%
+  rename(total_shrubs = shrubcover, esp_mask = binary) %>%
   dplyr::select(sr_band1, sr_band2, sr_band3, sr_band4, sr_band5, sr_band7,
                 ndvi, evi, savi,sr, ndsvi,
                 greenness, brightness, wetness,
@@ -56,7 +56,7 @@ write.csv(test, paste0("test",date,".csv"))
 system(paste0("aws s3 cp test",date,".csv s3://earthlab-amahood/data/test",date,".csv"))
 
 # tuning with hypermatrix-------------------------------------------------------------------
-mtry <- seq(1,5,1) # 22 = # cols in the yet to be created training set
+mtry <- seq(1,10,1) # 22 = # cols in the yet to be created training set
 sc <- seq(3,25,1)
 nodesize <- seq(1,4,1)
 elevation <- c("yes","no")
@@ -136,7 +136,7 @@ hr <- foreach (i = 1:nrow(hyper_grid), .combine = rbind) %dopar% {
 }
 
 write.csv(hr, paste0("data/hg",date,".csv"))
-system(paste0("aws s3 cp data/hg",date,".csv s3://earthlab-amahood/data/hypergrids_vb/hg",date,".csv"))
+system(paste0("aws s3 cp data/hg",date,".csv s3://earthlab-amahood/data/hypergrids_vb/hg", date,".csv"))
 
 # mixing blm and vegbank and then splitting -------------------------------------------------------------------------------------------------------------------
 

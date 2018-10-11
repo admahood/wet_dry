@@ -14,7 +14,6 @@ local_path <- "data/ls5_mucc"
 s3_terrain <- "s3://earthlab-amahood/data/terrain_mucc"
 local_terrain <- "data/terrain_2"
 
-s3_result <- "s3://earthlab-amahood/data/model_applied_scenes"
 
 #s3 sync -------------------------------- 
 system(paste0("aws s3 sync ", s3_path, " ", local_path))
@@ -85,7 +84,7 @@ gc() # for saving memory
 #only parallelize this part
 foreach(i = 1:length(model_list), 
         .packages = 'raster') %dopar% {         
-          filenamet <- paste0("data/results/", "nobuff_", as.character(names(model_list[i])), "_",
+          filenamet <- paste0("data/results/", as.character(names(model_list[i])), "_",
                               sub(pattern = ".tif", 
                                   replacement = "model_results.tif", 
                                   x = file, fixed = T)) 
@@ -100,7 +99,7 @@ foreach(i = 1:length(model_list),
           
           writeRaster(ls5_classed, filename = filenamet, overwrite = T, progress = 'text')
           
-          system(paste0("aws s3 cp ", filenamet, " s3://earthlab-amahood/data/ls5_hyperparameter_test_results/", substr(filenamet, 14, 100)))
+          system(paste0("aws s3 cp ", filenamet, " s3://earthlab-amahood/data/ls5_hyperparameter_test_results/", substr(filenamet, 14, 120)))
           system(paste("echo", "done"))
           unlink(filenamet)
           
