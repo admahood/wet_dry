@@ -13,7 +13,7 @@ lapply(libs, library, character.only = TRUE, verbose = FALSE)
 
 source("scripts/functions.R")
 
-date <- paste(strsplit(date()," ")[[1]][c(2,4,6)],collapse="_")
+date <- paste(strsplit(date()," ")[[1]][c(2,3,5)],collapse="_")
 set.seed(11)
 
 corz <- detectCores()-1
@@ -32,6 +32,8 @@ gbd <- st_read("data/plot_data/plots_with_landsat.gpkg", quiet=T) %>%
                 elevation,
                 slope, folded_aspect, tpi=TPI, tri=TRI, roughness, flowdir) %>%
   st_set_geometry(NULL)
+
+  
 
 vbd <- st_read("data/plot_data/vegbank_plots_with_landsat.gpkg", quiet=T) %>%
   mutate(ndsvi = get_ndsvi(sr_band3, sr_band5)) %>%
@@ -76,6 +78,18 @@ hr <- foreach (i = 1:nrow(hyper_grid), .combine = rbind) %dopar% {
                   ifelse(
                     total_shrubs < hyper_grid$sc[i], "Grass", "Shrub"))) %>%
     dplyr::select(-total_shrubs)
+  
+  if(nrow(train[train$binary == "Grass",])<nrow(train[train$binary == "Shrub",])){
+    gps <- train[train$binary == "Grass",]
+    sps <- train[train$binary == "Shrub",]
+    nsps <- sample_n(sps, nrow(gps))
+    train <- rbind(gps,nsps)
+  }else{
+    gps <- train[train$binary == "Grass",]
+    sps <- train[train$binary == "Shrub",]
+    ngps <- sample_n(gps, nrow(sps))
+    train <- rbind(sps,ngps)
+  }
     
   if(hyper_grid$elevation[i] == "no"){dplyr::select(train,-elevation)}
   
@@ -91,6 +105,18 @@ hr <- foreach (i = 1:nrow(hyper_grid), .combine = rbind) %dopar% {
                   ifelse(
                     total_shrubs < hyper_grid$sc[i], "Grass", "Shrub")))%>%
     dplyr::select(-total_shrubs)
+  
+  if(nrow(dev1[dev1$binary == "Grass",])<nrow(dev1[dev1$binary == "Shrub",])){
+    gps <- dev1[dev1$binary == "Grass",]
+    sps <- dev1[dev1$binary == "Shrub",]
+    nsps <- sample_n(sps, nrow(gps))
+    dev1 <- rbind(gps,nsps)
+  }else{
+    gps <- dev1[dev1$binary == "Grass",]
+    sps <- dev1[dev1$binary == "Shrub",]
+    ngps <- sample_n(gps, nrow(sps))
+    dev1 <- rbind(sps,ngps)
+  }
   
   if(hyper_grid$elevation[i] == "no"){dplyr::select(dev1,-elevation)}
   
@@ -183,7 +209,7 @@ hr <- foreach (i = 1:nrow(hyper_grid), .combine = rbind) %dopar% {
                   binary = as.factor(
                     ifelse(
                       total_shrubs < hyper_grid$sc[i], "Grass", "Shrub"))) %>%
-    dplyr::select(-total_shrubs,-ds)
+    dplyr::select(-total_shrubs)
   
   if(hyper_grid$elevation[i] == "no"){dplyr::select(train_a,-elevation)}
   
@@ -198,7 +224,7 @@ hr <- foreach (i = 1:nrow(hyper_grid), .combine = rbind) %dopar% {
                   binary = as.factor(
                     ifelse(
                       total_shrubs < hyper_grid$sc[i], "Grass", "Shrub")))%>%
-    dplyr::select(-total_shrubs,-ds)
+    dplyr::select(-total_shrubs)
   
   if(hyper_grid$elevation[i] == "no"){dplyr::select(dev1,-elevation)}
   
