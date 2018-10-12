@@ -209,7 +209,7 @@ hr <- foreach (i = 1:nrow(hyper_grid), .combine = rbind) %dopar% {
                   binary = as.factor(
                     ifelse(
                       total_shrubs < hyper_grid$sc[i], "Grass", "Shrub"))) %>%
-    dplyr::select(-total_shrubs)
+    dplyr::select(-total_shrubs,-ds)
   
   if(hyper_grid$elevation[i] == "no"){dplyr::select(train_a,-elevation)}
   
@@ -224,7 +224,7 @@ hr <- foreach (i = 1:nrow(hyper_grid), .combine = rbind) %dopar% {
                   binary = as.factor(
                     ifelse(
                       total_shrubs < hyper_grid$sc[i], "Grass", "Shrub")))%>%
-    dplyr::select(-total_shrubs)
+    dplyr::select(-total_shrubs,-ds)
   
   if(hyper_grid$elevation[i] == "no"){dplyr::select(dev1,-elevation)}
   
