@@ -25,7 +25,7 @@ hypergrid_original <- read.csv("data/hypergrids/hgOct_10_2018.csv") %>% arrange(
 
 hypergrid_combine <- read.csv("data/hypergrids/hg_a_Oct_9_2018.csv") %>% arrange(desc(balanced_accuracy))
 
-hypergrid_balanced <- read.csv("data/hypergrids/hgOct_12_2018.csv")
+hypergrid_balanced <- read.csv("data/hypergrids/hgOct_12_2018.csv") %>% arrange(desc(balanced_accuracy))
 #w/elev and w/o elev both stored in same hypergrid now
 #hypergrid_2 <- read.csv("data/hypergrids/hg_rf_noelev.csv") %>% arrange(oob)
 
