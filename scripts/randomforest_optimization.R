@@ -31,6 +31,7 @@ gbd <- st_read("data/plot_data/plots_with_landsat.gpkg", quiet=T) %>%
                 total_shrubs,
                 elevation,
                 slope, folded_aspect, tpi=TPI, tri=TRI, roughness, flowdir) %>%
+  mutate(satvi = get_satvi(sr_band3, sr_band5,sr_band7)) %>%
   st_set_geometry(NULL)
 
   
@@ -44,6 +45,7 @@ vbd <- st_read("data/plot_data/vegbank_plots_with_landsat.gpkg", quiet=T) %>%
                 total_shrubs,
                 elevation,
                 slope, folded_aspect, tpi, tri, roughness, flowdir)  %>%
+  mutate(satvi = get_satvi(sr_band3, sr_band5,sr_band7)) %>%
   st_set_geometry(NULL) %>%
   mutate(split = 1,
          split = sample.split(split, SplitRatio=0.5))
@@ -166,7 +168,7 @@ system(paste0("aws s3 cp data/hg",date,".csv s3://earthlab-amahood/data/hypergri
 
 # mixing blm and vegbank and then splitting -------------------------------------------------------------------------------------------------------------------
 
-all_data <- rbind(mutate(gbd, ds = "BLM"), 
+all_data <- rbind(mutate(gbd, ds = "BLM"),
                   mutate(dplyr::select(vbd,-split), ds = "vegbank")) %>%
   mutate(split = sample.split(ds, SplitRatio=0.7))
 
@@ -205,13 +207,13 @@ registerDoParallel(corz)
 
 hr <- foreach (i = 1:nrow(hyper_grid), .combine = rbind) %dopar% {
   
-  train <- mutate(train_a,
+  train <- mutate(gbd,
                   binary = as.factor(
                     ifelse(
                       total_shrubs < hyper_grid$sc[i], "Grass", "Shrub"))) %>%
     dplyr::select(-total_shrubs,-ds)
   
-  if(hyper_grid$elevation[i] == "no"){dplyr::select(train_a,-elevation)}
+  if(hyper_grid$elevation[i] == "no"){dplyr::select(train,-elevation)}
   
   # Train a Random Forest model
   m <- randomForest(formula = binary ~ ., 
@@ -220,7 +222,7 @@ hr <- foreach (i = 1:nrow(hyper_grid), .combine = rbind) %dopar% {
                     mtry = hyper_grid$mtry[i],
                     ntree = 3000)
   #validate with vegbank
-  dev1  <- mutate(dev_a,
+  dev1  <- mutate(dev,
                   binary = as.factor(
                     ifelse(
                       total_shrubs < hyper_grid$sc[i], "Grass", "Shrub")))%>%
