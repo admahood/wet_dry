@@ -61,8 +61,8 @@ ls5$ndvi <- get_ndvi(ls5$sr_band3, ls5$sr_band4)
 ls5$savi <- get_savi(ls5$sr_band3, ls5$sr_band4)
 ls5$sr <- get_sr(ls5$sr_band3, ls5$sr_band4)
 ls5$evi <- get_evi(ls5$sr_band1, ls5$sr_band3, ls5$sr_band4)
-#ls5$satvi <- get_satvi(ls5$sr_band3, ls5$sr_band5, ls5$sr_band7)
 ls5$ndsvi <- get_ndsvi(ls5$sr_band3, ls5$sr_band5)
+ls5$satvi <- get_satvi(ls5$sr_band3, ls5$sr_band5, ls5$sr_band7))
 
 ls5 <- stack(ls5, ter_c)
 ls5 <- mask(ls5, esp_mask, maskvalue = 0)
@@ -70,8 +70,8 @@ ls5 <- mask(ls5, urb_mask, maskvalue = 1)
 
 names(ls5) <- c("sr_band1", "sr_band2", "sr_band3", "sr_band4", 
                 "sr_band5", "sr_band7", "wetness", "brightness", 
-                "greenness",  "ndvi", "savi", "sr", "evi",  #"satvi",
-                "ndsvi", "elevation", "flowdir", "folded_aspect",
+                "greenness",  "ndvi", "savi", "sr", "evi",
+                "ndsvi", "satvi", "elevation", "flowdir", "folded_aspect",
                 "roughness", "slope", "tpi", "tri")
 # names to match exactly with training data that goes into model. 
 # The order matters for these

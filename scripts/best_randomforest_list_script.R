@@ -26,6 +26,8 @@ hypergrid_original <- read.csv("data/hypergrids/hgOct_10_2018.csv") %>% arrange(
 hypergrid_combine <- read.csv("data/hypergrids/hg_a_Oct_9_2018.csv") %>% arrange(desc(balanced_accuracy))
 
 hypergrid_balanced <- read.csv("data/hypergrids/hgOct_12_2018.csv") %>% arrange(desc(balanced_accuracy))
+
+hypergrid_satvi <- read.csv("data/hypergrids/hgOct_16_2018.csv") %>% arrange(desc(balanced_accuracy))
 #w/elev and w/o elev both stored in same hypergrid now
 #hypergrid_2 <- read.csv("data/hypergrids/hg_rf_noelev.csv") %>% arrange(oob)
 
@@ -39,6 +41,9 @@ best_hyper_orig <- hypergrid_original[c(1, 4:7, 19, 25, 89, 249, 537, 621, 1194,
 best_hyper_comb <- hypergrid_combine[c(1, 7, 8, 33, 68, 387, 575, 630, 1178, 1295, 1557),] %>% arrange(desc(balanced_accuracy))
 
 best_hyper_balanced <- hypergrid_balanced[c(1:5, 7, 9, 11, 15, 17, 22, 25, 36:40),] %>% arrange(desc(balanced_accuracy))
+
+best_hyper_satvi <- hypergrid_satvi[c(1:5, 7, 10, 13, 16, 17, 19, 20, 41, 49, 51),] %>% arrange(desc(balanced_accuracy))
+
 ####model testing/selection history ####
 #(hyper_w_elev) -- two lowest oob errors(1,2); two lowest oob errors w/ higher shrub cover split (3, 6) -- this results in a more even dist. of error between classes
 #highest shrub cover split in 25 best oob error parameter sets (25)
@@ -61,7 +66,7 @@ best_hyper_balanced <- hypergrid_balanced[c(1:5, 7, 9, 11, 15, 17, 22, 25, 36:40
 
 #best10 <- rbind(best_hyper, best_hyper2)
 #### model list application ####
-best10 <- best_hyper_balanced
+best10 <- best_hyper_satvi
 
 
 
@@ -83,7 +88,8 @@ for(i in 1:nrow(best10)) {
                   elevation,
                   slope, folded_aspect, tpi = TPI, tri = TRI, roughness, flowdir, #data$cluster,
                   #total_shrubs)
-                  binary)
+                  binary) %>%
+    mutate(satvi = get_satvi(sr_band3, sr_band5,sr_band7))
   
   if(best10$elevation[i] == "no") {dplyr::select(gbd,-elevation)}
   
