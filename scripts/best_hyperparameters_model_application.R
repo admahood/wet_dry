@@ -62,7 +62,7 @@ ls5$savi <- get_savi(ls5$sr_band3, ls5$sr_band4)
 ls5$sr <- get_sr(ls5$sr_band3, ls5$sr_band4)
 ls5$evi <- get_evi(ls5$sr_band1, ls5$sr_band3, ls5$sr_band4)
 ls5$ndsvi <- get_ndsvi(ls5$sr_band3, ls5$sr_band5)
-ls5$satvi <- get_satvi(ls5$sr_band3, ls5$sr_band5, ls5$sr_band7))
+ls5$satvi <- get_satvi(ls5$sr_band3, ls5$sr_band5, ls5$sr_band7)
 
 ls5 <- stack(ls5, ter_c)
 ls5 <- mask(ls5, esp_mask, maskvalue = 0)
@@ -94,12 +94,15 @@ foreach(i = 1:length(model_list),
           
           system(paste("echo", "model applied"))
           
+          matrix <- c(1, 0, 2, 1)
+          rclss_matrix <- matrix(matrix, ncol = 2, byrow = T)
+          ls5_classed <- reclassify(ls5_classed, rclss_matrix)
           
           print(Sys.time()-t0) #checking elapsed time between creation of big stack and application of model
           
           writeRaster(ls5_classed, filename = filenamet, overwrite = T, progress = 'text')
           
-          system(paste0("aws s3 cp ", filenamet, " s3://earthlab-amahood/data/ls5_hyperparameter_test_results/", substr(filenamet, 14, 120)))
+          system(paste0("aws s3 cp ", filenamet, " s3://earthlab-amahood/data/model_agreement", substr(filenamet, 14, 120)))
           system(paste("echo", "done"))
           unlink(filenamet)
           

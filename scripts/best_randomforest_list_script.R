@@ -100,10 +100,11 @@ for(i in 1:nrow(best10)) {
                                   nodesize = best10$nodesize[[i]], 
   )
   print("models created")
+  
 }
 
 #create names for models based on presence of elevation variable and sc/mtry values
-model_names <- paste("balanced", ifelse(best10[1:nrow(best10),]$elevation == "yes", "elev", "noelev"), "sc",best10[1:nrow(best10),]$sc,"mtry", best10[1:nrow(best10),]$mtry, "nodes", best10[1:nrow(best10),]$nodesize, sep="_")
+model_names <- paste("satvi", ifelse(best10[1:nrow(best10),]$elevation == "yes", "elev", "noelev"), "sc",best10[1:nrow(best10),]$sc,"mtry", best10[1:nrow(best10),]$mtry, "nodes", best10[1:nrow(best10),]$nodesize, sep="_")
 names(model_list) <- model_names
 # # optimizing model- strait from data camp----------------------------------------------
 # # frst
