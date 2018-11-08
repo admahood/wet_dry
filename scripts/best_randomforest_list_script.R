@@ -68,12 +68,12 @@ best_hyper_satvi <- hypergrid_satvi[c(1:5, 7, 10, 13, 16, 17, 19, 20, 41, 49, 51
 #### model list application ####
 best10 <- best_hyper_satvi
 
-
+ensemble_models <- best10[ c(1, 8, 11),]
 
 
 model_list <- list()
 
-for(i in 1:nrow(best10)) {
+for(i in 1:nrow(ensemble_models)) {
   
   gbd <- st_read("data/plot_data/plots_with_landsat.gpkg", quiet=T) %>%
     filter(esp_mask == 1) %>%
@@ -104,7 +104,7 @@ for(i in 1:nrow(best10)) {
 }
 
 #create names for models based on presence of elevation variable and sc/mtry values
-model_names <- paste("satvi", ifelse(best10[1:nrow(best10),]$elevation == "yes", "elev", "noelev"), "sc",best10[1:nrow(best10),]$sc,"mtry", best10[1:nrow(best10),]$mtry, "nodes", best10[1:nrow(best10),]$nodesize, sep="_")
+model_names <- paste("satvi", ifelse(ensemble_models[1:nrow(ensemble_models),]$elevation == "yes", "elev", "noelev"), "sc",ensemble_models[1:nrow(ensemble_models),]$sc,"mtry", ensemble_models[1:nrow(ensemble_models),]$mtry, "nodes", ensemble_models[1:nrow(ensemble_models),]$nodesize, sep="_")
 names(model_list) <- model_names
 # # optimizing model- strait from data camp----------------------------------------------
 # # frst

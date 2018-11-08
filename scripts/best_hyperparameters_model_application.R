@@ -94,9 +94,9 @@ foreach(i = 1:length(model_list),
           
           system(paste("echo", "model applied"))
           
-          matrix <- c(1, 0, 2, 1)
-          rclss_matrix <- matrix(matrix, ncol = 2, byrow = T)
-          ls5_classed <- reclassify(ls5_classed, rclss_matrix)
+          # matrix <- c(1, 0, 2, 1)
+          # rclss_matrix <- matrix(matrix, ncol = 2, byrow = T)
+          # ls5_classed <- reclassify(ls5_classed, rclss_matrix)
           
           print(Sys.time()-t0) #checking elapsed time between creation of big stack and application of model
           
