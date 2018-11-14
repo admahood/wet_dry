@@ -11,7 +11,7 @@ rasterOptions(tmpdir=tmpd)
 
 s3_path <- "s3://earthlab-amahood/data/ls5_mucc"
 local_path <- "data/ls5_mucc"
-s3_terrain <- "s3://earthlab-amahood/data/terrain_gb"
+s3_terrain <- "s3://earthlab-amahood/data/terrain_mucc"
 local_terrain <- "data/terrain_2"
 
 s3_result <- "s3://earthlab-amahood/data/model_applied_scenes"
@@ -37,27 +37,31 @@ cores <- length(scene)
 registerDoParallel(cores)
 
 # whole lotta stuff that takes a long time doesn't need to be parallelized
+# ter <- stack(list.files(local_terrain, full.names =T))
+# ls5_e <- stack(scene_full[i])
+# ter_c <-raster::resample(ter, ls5_e)
+
+#create terrain raster stack
 ter <- stack(list.files(local_terrain, full.names =T))
-ls5_e <- raster(scene_full[1])
-ter_c <-raster::resample(ter, ls5_e)
-
-# create esp mask object and match projection/extent 
-
+ter_c <-raster::resample(ter, ls5_p)
+# create esp mask object and match projection/resolution 
+ls5_p <- stack(scene_full[i])
 esp_mask <- raster("data/esp_binary/clipped_binary.tif")
-esp_mask <- projectRaster(esp_mask, ls5, res = 30)
+esp_mask <- projectRaster(esp_mask, ls5_p, res = 30)
 
 #create urban_ag mask and match projection/extent
 urb_mask <- raster("data/urban_ag_mask/lf_msk_rclss1.tif")
-urb_mask <- projectRaster(urb_mask, ls5, res = 30)
+urb_mask <- projectRaster(urb_mask, ls5_p, res = 30)
 
 #only parallelize this part
-foreach(i = 1:length(scene_full), 
+foreach(i = scene_full, 
         .packages = 'raster') %dopar% {         
-          file <- as.character(scene[i])
+          file <- as.character(i)
           t0 <- Sys.time()
           
-          ls5 <- stack(scene_full[i])
+          ls5 <- stack(i)
           names(ls5)<- c("sr_band1", "sr_band2","sr_band3", "sr_band4","sr_band5", "sr_band7")
+          
           
           
           # now, make sure all the names of this stack match the names that go into the model and we're golden
@@ -87,6 +91,7 @@ foreach(i = 1:length(scene_full),
           
           print(Sys.time()-t0)
           gc() # for saving memory
+          
           for(j in 1:length(model_list)) {
           filenamet <- paste0("data/results/", as.character(names(model_list[j])), 
                               sub(pattern = ".tif", 
@@ -105,9 +110,9 @@ foreach(i = 1:length(scene_full),
           print(Sys.time()-t0) #checking elapsed time between creation of big stack and application of model
           
           writeRaster(ls5_classed, filename = filenamet, overwrite = T, progress = 'text')
-          
-          system(paste0("aws s3 cp ", filenamet, " s3://earthlab-amahood/data/mucc_model_results_allyears", substr(filenamet, 14, 150)))
-          system(paste("echo", "done"))
+          system(paste("echo", "file created"))
+          system(paste0("aws s3 cp ", filenamet, " s3://earthlab-amahood/data/mucc_model_results_allyears/", substr(filenamet, 14, 150)))
+          system(paste("echo", "aws sync done"))
           unlink(filenamet)
           }
           #it appears the task 2 failed error is coming from the deletion of temp files. I commented it out for now - Dylan
