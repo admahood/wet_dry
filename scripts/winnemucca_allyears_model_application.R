@@ -12,7 +12,7 @@ rasterOptions(tmpdir=tmpd)
 s3_path <- "s3://earthlab-amahood/data/ls5_mucc"
 local_path <- "data/ls5_mucc"
 s3_terrain <- "s3://earthlab-amahood/data/terrain_mucc"
-local_terrain <- "data/terrain_2"
+local_terrain <- "data/terrain2"
 
 s3_result <- "s3://earthlab-amahood/data/model_applied_scenes"
 
@@ -36,14 +36,17 @@ cores <- length(scene)
 
 registerDoParallel(cores)
 
+
+ter_p <- stack(list.files(local_terrain, full.names =T)) #create terrain object to grab projection from 
+
+
 # whole lotta stuff that takes a long time doesn't need to be parallelized
-# ter <- stack(list.files(local_terrain, full.names =T))
 # ls5_e <- stack(scene_full[i])
 # ter_c <-raster::resample(ter, ls5_e)
 
 #create terrain raster stack
-ter <- stack(list.files(local_terrain, full.names =T))
-ter_c <-raster::resample(ter, ls5_p)
+#ter <- stack(list.files(local_terrain, full.names =T))
+#ter_c <-raster::resample(ter, ls5_p)
 # create esp mask object and match projection/resolution 
 ls5_p <- stack(scene_full[i])
 esp_mask <- raster("data/esp_binary/clipped_binary.tif")
@@ -62,6 +65,40 @@ foreach(i = scene_full,
           ls5 <- stack(i)
           names(ls5)<- c("sr_band1", "sr_band2","sr_band3", "sr_band4","sr_band5", "sr_band7")
           
+          
+          ne <- projectExtent(ls5, crs=crs(ter_p))
+          res(ne) <- 30
+          
+          ter_files <- list.files("data/terrain", full.names = T) 
+          ter_names <- list.files("data/terrain", full.names = F)
+          dir.create(paste0("data/terrain_reproj", i))
+          
+          for(l in 1:length(ter_files)) {
+            
+            dir.create(paste0("data/terrain_reproj", i))
+            
+            ter <- raster(ter_files[l])
+            print(ter_names[l])
+            
+            ter <- crop(ter, ne)
+            print(paste(ter_names[l], "cropped"))
+            
+            ter <- projectRaster(ter, crs = crs(ls5), res = 30, filename = paste0("data/terrain_reproj", i, "/", "reproj_", ter_names[l]))
+            print(paste(ter_names[l], "projected"))
+            
+            ter <- resample(ter, ls5, filename = paste0("data/terrain_reproj", i, "/", "reproj_", ter_names[l]), overwrite = T)
+            print(paste(ter_names[l], "resampled"))
+            
+            print(paste(ter_names[l], "done"))
+          }
+          
+          ter_c <- stack(list.files(paste0("data/terrain_reproj", i), full.names = T))
+          
+          
+          # ter 
+          # ter <- crop(ne)
+          # ter_c <- projectRaster(ter, crs = crs(ls5), res = 30)
+          # ter_c <- resample(ter, ls5)
           
           
           # now, make sure all the names of this stack match the names that go into the model and we're golden
@@ -93,30 +130,29 @@ foreach(i = scene_full,
           gc() # for saving memory
           
           for(j in 1:length(model_list)) {
-          filenamet <- paste0("data/results/", as.character(names(model_list[j])), 
-                              sub(pattern = ".tif", 
-                                  replacement = "model_results.tif", 
-                                  x = file, fixed = T)) 
-          # frst <- model_list[[i]]
-          # now put a line to apply the model and write THAT as the raster and send it to s3 (and then delete the file) 
-          ls5_classed <- raster::predict(ls5, model_list[[j]], inf.rm = T, na.rm = T)
-          
-          system(paste("echo", "model applied", as.character(j)))
-          
-          # matrix <- c(1, 0, 2, 1)
-          # rclss_matrix <- matrix(matrix, ncol = 2, byrow = T)
-          # ls5_classed <- reclassify(ls5_classed, rclss_matrix)
-          
-          print(Sys.time()-t0) #checking elapsed time between creation of big stack and application of model
-          
-          writeRaster(ls5_classed, filename = filenamet, overwrite = T, progress = 'text')
-          system(paste("echo", "file created"))
-          system(paste0("aws s3 cp ", filenamet, " s3://earthlab-amahood/data/mucc_model_results_allyears/", substr(filenamet, 14, 150)))
-          system(paste("echo", "aws sync done"))
-          unlink(filenamet)
+            filenamet <- paste0("data/results/", as.character(names(model_list[j])), 
+                                sub(pattern = ".tif", 
+                                    replacement = "model_results.tif", 
+                                    x = file, fixed = T)) 
+            # frst <- model_list[[i]]
+            # now put a line to apply the model and write THAT as the raster and send it to s3 (and then delete the file) 
+            ls5_classed <- raster::predict(ls5, model_list[[j]], inf.rm = T, na.rm = T)
+            
+            system(paste("echo", "model applied", as.character(j)))
+            
+            # matrix <- c(1, 0, 2, 1)
+            # rclss_matrix <- matrix(matrix, ncol = 2, byrow = T)
+            # ls5_classed <- reclassify(ls5_classed, rclss_matrix)
+            
+            print(Sys.time()-t0) #checking elapsed time between creation of big stack and application of model
+            
+            writeRaster(ls5_classed, filename = filenamet, overwrite = T, progress = 'text')
+            system(paste("echo", "file created"))
+            system(paste0("aws s3 cp ", filenamet, " s3://earthlab-amahood/data/mucc_model_results_allyears/", substr(filenamet, 14, 150)))
+            system(paste("echo", "aws sync done"))
+            unlink(filenamet)
+            
           }
           #it appears the task 2 failed error is coming from the deletion of temp files. I commented it out for now - Dylan
           #system("rm data/tmp/*") # so we're not filling up the hard drive (had to move this to the end because the model needs the stuff stored in temp directory - D)
         }
-
-
