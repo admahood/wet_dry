@@ -11,8 +11,8 @@ rasterOptions(tmpdir=tmpd)
 
 s3_path <- "s3://earthlab-amahood/data/ls5_mucc"
 local_path <- "data/ls5_mucc"
-s3_terrain <- "s3://earthlab-amahood/data/terrain_mucc"
-local_terrain <- "data/terrain2"
+s3_terrain <- "s3://earthlab-amahood/data/terrain_2"
+local_terrain <- "data/terrain_reproj_full"
 
 s3_result <- "s3://earthlab-amahood/data/model_applied_scenes"
 
@@ -32,12 +32,12 @@ system("aws s3 sync s3://earthlab-amahood/data/landfire_urban_ag_water_mask/ dat
 scene <- list.files("data/ls5_mucc")
 scene_full <- list.files("data/ls5_mucc", full.names = T)
 
-cores <- length(scene)
+cores <- length(scene) / 2
 
 registerDoParallel(cores)
 
 
-ter_p <- stack(list.files(local_terrain, full.names =T)) #create terrain object to grab projection from 
+ter<- stack(list.files(local_terrain, full.names =T)) #create terrain object to grab projection from 
 
 
 # whole lotta stuff that takes a long time doesn't need to be parallelized
@@ -48,7 +48,7 @@ ter_p <- stack(list.files(local_terrain, full.names =T)) #create terrain object 
 #ter <- stack(list.files(local_terrain, full.names =T))
 #ter_c <-raster::resample(ter, ls5_p)
 # create esp mask object and match projection/resolution 
-ls5_p <- stack(scene_full[i])
+ls5_p <- stack(scene_full[1])
 esp_mask <- raster("data/esp_binary/clipped_binary.tif")
 esp_mask <- projectRaster(esp_mask, ls5_p, res = 30)
 
@@ -59,41 +59,42 @@ urb_mask <- projectRaster(urb_mask, ls5_p, res = 30)
 #only parallelize this part
 foreach(i = scene_full, 
         .packages = 'raster') %dopar% {         
-          file <- as.character(i)
+          file = substr(i, 15, 36)
           t0 <- Sys.time()
+          ter<- stack(list.files(local_terrain, full.names =T))
           
           ls5 <- stack(i)
           names(ls5)<- c("sr_band1", "sr_band2","sr_band3", "sr_band4","sr_band5", "sr_band7")
           
+          ter_c <- raster::resample(ter, ls5)
+          system(paste("echo", "terrain resampled"))
+          # ne <- projectExtent(ls5, crs=crs(ter_p))
+          # res(ne) <- 30
+          # 
+          # ter_files <- list.files("data/terrain", full.names = T) 
+          # ter_names <- list.files("data/terrain", full.names = F)
+          # dir.create(paste0("data/terrain_reproj", substr(i, 19, 22)))
           
-          ne <- projectExtent(ls5, crs=crs(ter_p))
-          res(ne) <- 30
-          
-          ter_files <- list.files("data/terrain", full.names = T) 
-          ter_names <- list.files("data/terrain", full.names = F)
-          dir.create(paste0("data/terrain_reproj", i))
-          
-          for(l in 1:length(ter_files)) {
-            
-            dir.create(paste0("data/terrain_reproj", i))
-            
-            ter <- raster(ter_files[l])
-            print(ter_names[l])
-            
-            ter <- crop(ter, ne)
-            print(paste(ter_names[l], "cropped"))
-            
-            ter <- projectRaster(ter, crs = crs(ls5), res = 30, filename = paste0("data/terrain_reproj", i, "/", "reproj_", ter_names[l]))
-            print(paste(ter_names[l], "projected"))
-            
-            ter <- resample(ter, ls5, filename = paste0("data/terrain_reproj", i, "/", "reproj_", ter_names[l]), overwrite = T)
-            print(paste(ter_names[l], "resampled"))
-            
-            print(paste(ter_names[l], "done"))
-          }
-          
-          ter_c <- stack(list.files(paste0("data/terrain_reproj", i), full.names = T))
-          
+          # for(l in 1:length(ter_files)) {   #this loop uses up to 45GB of ram per core, will need to improve efficiency when scaling up. -Dylan
+          #   
+          #   
+          #   ter <- raster(ter_files[l])
+          #   print(ter_names[l])
+          #   
+          #   ter <- crop(ter, ne)
+          #   print(paste(ter_names[l], "cropped"))
+          #   
+          #   ter <- projectRaster(ter, crs = crs(ls5), res = 30, filename = paste0("data/terrain_reproj", substr(i, 19, 22), "/", "reproj_", ter_names[l]))
+          #   print(paste(ter_names[l], "projected"))
+          #   
+          #   ter <- resample(ter, ls5, filename = paste0("data/terrain_reproj", substr(i, 19, 22), "/", "reproj_", ter_names[l]), overwrite = T)
+          #   print(paste(ter_names[l], "resampled"))
+          #   
+          #   print(paste(ter_names[l], "done"))
+          # }
+          # 
+          # ter_c <- stack(list.files(paste0("data/terrain_reproj", substr(i, 19, 22)), full.names = T))
+          # 
           
           # ter 
           # ter <- crop(ne)
@@ -119,7 +120,7 @@ foreach(i = scene_full,
           names(ls5) <- c("sr_band1", "sr_band2", "sr_band3", "sr_band4", 
                           "sr_band5", "sr_band7", "wetness", "brightness", 
                           "greenness",  "ndvi", "savi", "sr", "evi",
-                          "ndsvi", "satvi", "elevation", "flowdir", "folded_aspect",
+                          "ndsvi", "satvi", "flowdir", "folded_aspect", "elevation",
                           "roughness", "slope", "tpi", "tri")
           # names to match exactly with training data that goes into model. 
           # The order matters for these
@@ -130,10 +131,9 @@ foreach(i = scene_full,
           gc() # for saving memory
           
           for(j in 1:length(model_list)) {
-            filenamet <- paste0("data/results/", as.character(names(model_list[j])), 
-                                sub(pattern = ".tif", 
-                                    replacement = "model_results.tif", 
-                                    x = file, fixed = T)) 
+            
+            filenamet <- paste0("data/results/", names(model_list[j]), "_", 
+                                file) 
             # frst <- model_list[[i]]
             # now put a line to apply the model and write THAT as the raster and send it to s3 (and then delete the file) 
             ls5_classed <- raster::predict(ls5, model_list[[j]], inf.rm = T, na.rm = T)
@@ -146,7 +146,7 @@ foreach(i = scene_full,
             
             print(Sys.time()-t0) #checking elapsed time between creation of big stack and application of model
             
-            writeRaster(ls5_classed, filename = filenamet, overwrite = T, progress = 'text')
+            writeRaster(ls5_classed, filename = filenamet, format = "GTiff", overwrite = T)
             system(paste("echo", "file created"))
             system(paste0("aws s3 cp ", filenamet, " s3://earthlab-amahood/data/mucc_model_results_allyears/", substr(filenamet, 14, 150)))
             system(paste("echo", "aws sync done"))
