@@ -1,4 +1,4 @@
-# setup ---------------------------
+# setup ------------------------------------------------------------------------
 libs <- c("caTools", "randomForest", "ROCR", "party", "caret", 
           "tidyverse", "rgdal","sf", "Metrics", "gbm", "foreach", "doParallel")
 
@@ -17,7 +17,9 @@ date <- paste(strsplit(date()," ")[[1]][c(2,3,5)],collapse="_")
 set.seed(11)
 
 corz <- detectCores()-1
-# Load and manipulate Data ---------------------------------------------
+
+# Load and manipulate Data -----------------------------------------------------
+
 system("aws s3 cp s3://earthlab-amahood/data/plots_with_landsat.gpkg data/plot_data/plots_with_landsat.gpkg")
 system("aws s3 cp s3://earthlab-amahood/data/vegbank_plots_with_landsat.gpkg data/plot_data/vegbank_plots_with_landsat.gpkg")
 
@@ -32,9 +34,31 @@ gbd <- st_read("data/plot_data/plots_with_landsat.gpkg", quiet=T) %>%
                 elevation,
                 slope, folded_aspect, tpi=TPI, tri=TRI, roughness, flowdir) %>%
   mutate(satvi = get_satvi(sr_band3, sr_band5,sr_band7)) %>%
-  st_set_geometry(NULL)
+  st_set_geometry(NULL)%>%
+  mutate(split = 1,
+         split = sample.split(split, SplitRatio=0.7))
 
-  
+gtrain <- filter(gbd,split ==TRUE) %>% dplyr::select(-split)
+write.csv(gtrain, paste0("gtrain_",date,".csv"))
+system(paste0("aws s3 cp gtrain_",
+              date,
+              ".csv s3://earthlab-amahood/data/data_splits/gtrain_",
+              date,".csv"))
+
+
+gdevtest <- filter(gbd,split ==FALSE) %>%
+  mutate(split = sample.split(split, SplitRatio=0.5))
+
+gdev <- filter(gdevtest, split==TRUE) %>% dplyr::select(-split)
+write.csv(gdev, paste0("gdev_",date,".csv"))
+system(paste0("aws s3 cp gdev_",date,
+              ".csv s3://earthlab-amahood/data/data_splits/gdev_",date,".csv"))
+
+gtest <- filter(gdevtest, split==FALSE) %>% dplyr::select(-split)
+write.csv(gtest, paste0("gtest_",date,".csv"))
+system(paste0("aws s3 cp gtest_",date,
+              ".csv s3://earthlab-amahood/data/data_splits/gtest_",date,".csv"))
+
 
 vbd <- st_read("data/plot_data/vegbank_plots_with_landsat.gpkg", quiet=T) %>%
   mutate(ndsvi = get_ndsvi(sr_band3, sr_band5)) %>%
@@ -48,38 +72,60 @@ vbd <- st_read("data/plot_data/vegbank_plots_with_landsat.gpkg", quiet=T) %>%
   mutate(satvi = get_satvi(sr_band3, sr_band5,sr_band7)) %>%
   st_set_geometry(NULL) %>%
   mutate(split = 1,
-         split = sample.split(split, SplitRatio=0.5))
+         split = sample.split(split, SplitRatio=0.7))
+
+vtrain <- filter(vbd,split ==TRUE) %>% dplyr::select(-split)
+write.csv(vtrain, paste0("vtrain_",date,".csv"))
+system(paste0("aws s3 cp vtrain_",
+              date,
+              ".csv s3://earthlab-amahood/data/data_splits/vtrain_",
+              date,".csv"))
 
 
-dev <- filter(vbd, split==TRUE) %>% dplyr::select(-split)
-write.csv(dev, paste0("dev",date,".csv"))
-system(paste0("aws s3 cp dev",date,".csv s3://earthlab-amahood/data/dev",date,".csv"))
+vdevtest <- filter(vbd,split ==FALSE) %>%
+  mutate(split = sample.split(split, SplitRatio=0.5))
 
-test <- filter(vbd, split==FALSE) %>% dplyr::select(-split)
-write.csv(test, paste0("test",date,".csv"))
-system(paste0("aws s3 cp test",date,".csv s3://earthlab-amahood/data/test",date,".csv"))
+vdev <- filter(vdevtest, split==TRUE) %>% dplyr::select(-split)
+write.csv(vdev, paste0("vdev_",date,".csv"))
+system(paste0("aws s3 cp vdev_",date,
+              ".csv s3://earthlab-amahood/data/data_splits/vdev_",date,".csv"))
 
-# tuning with hypermatrix-------------------------------------------------------------------
+vtest <- filter(vdevtest, split==FALSE) %>% dplyr::select(-split)
+write.csv(vtest, paste0("vtest_",date,".csv"))
+system(paste0("aws s3 cp vtest_",date,
+              ".csv s3://earthlab-amahood/data/data_splits/vtest_",date,".csv"))
+
+# tuning with hypermatrix-------------------------------------------------------
 mtry <- seq(1,10,1) # 22 = # cols in the yet to be created training set
 sc <- seq(3,25,1)
 nodesize <- seq(1,4,1)
 elevation <- c("yes","no")
+dataset <- c("g", "v")
 
 # Create a data frame containing all combinations 
 hyper_grid <- expand.grid(mtry = mtry, 
                           nodesize = nodesize, 
                           sc=sc,
-                          elevation = elevation) ; nrow(hyper_grid)
+                          elevation = elevation,
+                          dataset = dataset) ; nrow(hyper_grid)
 
 registerDoParallel(corz)
 
 hr <- foreach (i = 1:nrow(hyper_grid), .combine = rbind) %dopar% {
   
-  train <- mutate(gbd,
-                binary = as.factor(
-                  ifelse(
-                    total_shrubs < hyper_grid$sc[i], "Grass", "Shrub"))) %>%
-    dplyr::select(-total_shrubs)
+  if(hyper_grid$dataset[i] == "g"){
+    train <- mutate(gtrain,
+                  binary = as.factor(
+                    ifelse(
+                      total_shrubs < hyper_grid$sc[i], "Grass", "Shrub"))) %>%
+      dplyr::select(-total_shrubs)}else{
+        
+        train <- mutate(vtrain,
+                        binary = as.factor(
+                          ifelse(
+                            total_shrubs < hyper_grid$sc[i], "Grass", "Shrub"))) %>%
+          dplyr::select(-total_shrubs)
+      }
   
   if(nrow(train[train$binary == "Grass",])<nrow(train[train$binary == "Shrub",])){
     gps <- train[train$binary == "Grass",]
@@ -101,12 +147,19 @@ hr <- foreach (i = 1:nrow(hyper_grid), .combine = rbind) %dopar% {
                               nodesize = hyper_grid$nodesize[i],
                               mtry = hyper_grid$mtry[i],
                               ntree = 3000)
-  #validate with vegbank
-  dev1  <- mutate(dev,
-                binary = as.factor(
-                  ifelse(
-                    total_shrubs < hyper_grid$sc[i], "Grass", "Shrub")))%>%
-    dplyr::select(-total_shrubs)
+  #validate 
+  if(hyper_grid$dataset[i] == "g"){
+    dev1  <- mutate(gdev,
+                  binary = as.factor(
+                    ifelse(
+                      total_shrubs < hyper_grid$sc[i], "Grass", "Shrub")))%>%
+      dplyr::select(-total_shrubs)}else{
+        dev1  <- mutate(vdev,
+                        binary = as.factor(
+                          ifelse(
+                            total_shrubs < hyper_grid$sc[i], "Grass", "Shrub")))%>%
+          dplyr::select(-total_shrubs)
+      }
   
   if(nrow(dev1[dev1$binary == "Grass",])<nrow(dev1[dev1$binary == "Shrub",])){
     gps <- dev1[dev1$binary == "Grass",]
@@ -156,7 +209,8 @@ hr <- foreach (i = 1:nrow(hyper_grid), .combine = rbind) %dopar% {
     prevalence = as.numeric(cm$byClass[8]),
     detection_rate = as.numeric(cm$byClass[9]),
     detection_prevalence = as.numeric(cm$byClass[10]),
-    balanced_accuracy = as.numeric(cm$byClass[11])
+    balanced_accuracy = as.numeric(cm$byClass[11]),
+    dataset = hyper_grid$dataset[i]
   )
   gc()
   system(paste("echo", round(as.numeric(cm$byClass[11]),2), paste(round(i/nrow(hyper_grid)*100,2),"%")))
