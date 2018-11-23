@@ -261,7 +261,7 @@ registerDoParallel(corz)
 
 hr <- foreach (i = 1:nrow(hyper_grid), .combine = rbind) %dopar% {
   
-  train <- mutate(gbd,
+  train <- mutate(gtrain,
                   binary = as.factor(
                     ifelse(
                       total_shrubs < hyper_grid$sc[i], "Grass", "Shrub"))) %>%
