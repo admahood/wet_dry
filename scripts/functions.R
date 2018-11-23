@@ -117,6 +117,10 @@ get_ndsvi <- function(band3, band5) {
 get_folded_aspect <- function(aspect) {
   abs(180 - abs(aspect - 225))
 }
+
+get_folded_aspect_ns <- function(aspect) {
+  180 - abs(aspect-180)
+}
 #LANDSAT 8 VEG INDICES -------
 get_ndvi8 <- function(band4, band5){
   return((band5 - band4)/ (band5 + band4))}
