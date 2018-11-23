@@ -26,17 +26,20 @@ system("aws s3 cp s3://earthlab-amahood/data/vegbank_plots_with_landsat.gpkg dat
 gbd <- st_read("data/plot_data/plots_with_landsat.gpkg", quiet=T) %>%
   filter(esp_mask == 1) %>%
   mutate(total_shrubs = NonInvShru + SagebrushC,
-         ndsvi = get_ndsvi(sr_band3, sr_band5)) %>%
+         ndsvi = get_ndsvi(sr_band3, sr_band5),
+         folded_aspect_ns = get_folded_aspect_ns(aspect)) %>%
   dplyr::select(sr_band1, sr_band2, sr_band3, sr_band4, sr_band5, sr_band7,
                 ndvi=NDVI, evi=EVI, savi=SAVI,sr=SR, ndsvi,
                 greenness, brightness, wetness,
                 total_shrubs,
                 elevation,
+                folded_aspect_ns,
                 slope, folded_aspect, tpi=TPI, tri=TRI, roughness, flowdir) %>%
   mutate(satvi = get_satvi(sr_band3, sr_band5,sr_band7)) %>%
   st_set_geometry(NULL)%>%
   mutate(split = 1,
-         split = sample.split(split, SplitRatio=0.7))
+         split = sample.split(split, SplitRatio=0.7)) 
+  
 
 gtrain <- filter(gbd,split ==TRUE) %>% dplyr::select(-split)
 write.csv(gtrain, paste0("gtrain_",date,".csv"))
@@ -61,13 +64,15 @@ system(paste0("aws s3 cp gtest_",date,
 
 
 vbd <- st_read("data/plot_data/vegbank_plots_with_landsat.gpkg", quiet=T) %>%
-  mutate(ndsvi = get_ndsvi(sr_band3, sr_band5)) %>%
+  mutate(ndsvi = get_ndsvi(sr_band3, sr_band5),
+         folded_aspect_ns = get_folded_aspect_ns(aspect)) %>%
   rename(total_shrubs = shrubcover, esp_mask = binary) %>%
   dplyr::select(sr_band1, sr_band2, sr_band3, sr_band4, sr_band5, sr_band7,
                 ndvi, evi, savi,sr, ndsvi,
                 greenness, brightness, wetness,
                 total_shrubs,
                 elevation,
+                folded_aspect_ns,
                 slope, folded_aspect, tpi, tri, roughness, flowdir)  %>%
   mutate(satvi = get_satvi(sr_band3, sr_band5,sr_band7)) %>%
   st_set_geometry(NULL) %>%
@@ -96,10 +101,11 @@ system(paste0("aws s3 cp vtest_",date,
               ".csv s3://earthlab-amahood/data/data_splits/vtest_",date,".csv"))
 
 # tuning with hypermatrix-------------------------------------------------------
-mtry <- seq(1,10,1) # 22 = # cols in the yet to be created training set
+mtry <- seq(1,15,1) # 22 = # cols in the yet to be created training set
 sc <- seq(3,25,1)
 nodesize <- seq(1,4,1)
 elevation <- c("yes","no")
+folded_aspect <- c("ns","ne_sw")
 dataset <- c("g", "v")
 
 # Create a data frame containing all combinations 
@@ -107,6 +113,7 @@ hyper_grid <- expand.grid(mtry = mtry,
                           nodesize = nodesize, 
                           sc=sc,
                           elevation = elevation,
+                          folded_aspect = folded_aspect,
                           dataset = dataset) ; nrow(hyper_grid)
 
 registerDoParallel(corz)
@@ -140,7 +147,10 @@ hr <- foreach (i = 1:nrow(hyper_grid), .combine = rbind) %dopar% {
   }
     
   if(hyper_grid$elevation[i] == "no"){dplyr::select(train,-elevation)}
-  
+  if(hyper_grid$folded_aspect[i] == "ns"){dplyr::select(train, -folded_aspect)
+  }else{
+      dplyr::select(train, -folded_aspect_ns)
+    }
   # Train a Random Forest model
   m <- randomForest(formula = binary ~ ., 
                               data = train,
@@ -210,10 +220,14 @@ hr <- foreach (i = 1:nrow(hyper_grid), .combine = rbind) %dopar% {
     detection_rate = as.numeric(cm$byClass[9]),
     detection_prevalence = as.numeric(cm$byClass[10]),
     balanced_accuracy = as.numeric(cm$byClass[11]),
+    folded_aspect_type = hyper_grid$folded_aspect[i],
     dataset = hyper_grid$dataset[i]
   )
   gc()
-  system(paste("echo", round(as.numeric(cm$byClass[11]),2), paste(round(i/nrow(hyper_grid)*100,2),"%")))
+  system(paste("echo", 
+               hyper_grid$folded_aspect[i],
+               round(as.numeric(cm$byClass[11]),2), 
+               paste(round(i/nrow(hyper_grid)*100,2),"%")))
   return(w)
 }
 
