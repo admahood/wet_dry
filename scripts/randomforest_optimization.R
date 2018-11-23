@@ -234,6 +234,8 @@ hr <- foreach (i = 1:nrow(hyper_grid), .combine = rbind) %dopar% {
 write.csv(hr, paste0("data/hg",date,".csv"))
 system(paste0("aws s3 cp data/hg",date,".csv s3://earthlab-amahood/data/hypergrids_vb/hg", date,".csv"))
 
+# below here is messing around, above is things that are used ------------------
+
 # fitting the optimum model ----------------------------------------------------
 read.csv("data/hg_w_elev_rf.csv")%>%
   arrange(oob) %>%
