@@ -23,6 +23,8 @@ corz <- detectCores()-1
 system("aws s3 cp s3://earthlab-amahood/data/plots_with_landsat.gpkg data/plot_data/plots_with_landsat.gpkg")
 system("aws s3 cp s3://earthlab-amahood/data/vegbank_plots_with_landsat.gpkg data/plot_data/vegbank_plots_with_landsat.gpkg")
 
+# blm-aim data 
+
 gbd <- st_read("data/plot_data/plots_with_landsat.gpkg", quiet=T) %>%
   filter(esp_mask == 1) %>%
   mutate(total_shrubs = NonInvShru + SagebrushC,
@@ -62,6 +64,7 @@ write.csv(gtest, paste0("gtest_",date,".csv"))
 system(paste0("aws s3 cp gtest_",date,
               ".csv s3://earthlab-amahood/data/data_splits/gtest_",date,".csv"))
 
+#vegbank data
 
 vbd <- st_read("data/plot_data/vegbank_plots_with_landsat.gpkg", quiet=T) %>%
   mutate(ndsvi = get_ndsvi(sr_band3, sr_band5),
@@ -86,7 +89,6 @@ system(paste0("aws s3 cp vtrain_",
               ".csv s3://earthlab-amahood/data/data_splits/vtrain_",
               date,".csv"))
 
-
 vdevtest <- filter(vbd,split ==FALSE) %>%
   mutate(split = sample.split(split, SplitRatio=0.5))
 
@@ -100,7 +102,7 @@ write.csv(vtest, paste0("vtest_",date,".csv"))
 system(paste0("aws s3 cp vtest_",date,
               ".csv s3://earthlab-amahood/data/data_splits/vtest_",date,".csv"))
 
-# tuning with hypermatrix-------------------------------------------------------
+# creating the hypermatrix -----------------------------------------------------
 mtry <- seq(1,15,1) # 22 = # cols in the yet to be created training set
 sc <- seq(3,25,1)
 nodesize <- seq(1,4,1)
@@ -108,13 +110,14 @@ elevation <- c("yes","no")
 folded_aspect <- c("ns","ne_sw")
 dataset <- c("g", "v")
 
-# Create a data frame containing all combinations 
 hyper_grid <- expand.grid(mtry = mtry, 
                           nodesize = nodesize, 
                           sc=sc,
                           elevation = elevation,
                           folded_aspect = folded_aspect,
                           dataset = dataset) ; nrow(hyper_grid)
+
+# running the hypermatrix in parallel ------------------------------------------
 
 registerDoParallel(corz)
 
