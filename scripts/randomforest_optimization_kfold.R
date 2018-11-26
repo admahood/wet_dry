@@ -143,7 +143,8 @@ hr <- foreach (i = 1:nrow(hyper_grid), .combine = rbind) %dopar% {
                "accuracy:",
                round(m$results$Accuracy,2), 
                "progress:",
-               paste(round(i/nrow(hyper_grid)*100,2),"%")))
+               paste(round(i/nrow(hyper_grid)*100,2),"%"),
+               Sys.time()))
   return(w)
 }
 
