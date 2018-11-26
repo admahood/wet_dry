@@ -72,7 +72,7 @@ hyper_grid <- expand.grid(mtry = mtry,
 # running the hypermatrix in parallel ------------------------------------------
 
 registerDoParallel(corz)
-
+t0 <- Sys.time()
 hr <- foreach (i = 1:nrow(hyper_grid), .combine = rbind) %dopar% {
   
 
@@ -144,7 +144,8 @@ hr <- foreach (i = 1:nrow(hyper_grid), .combine = rbind) %dopar% {
                round(m$results$Accuracy,2), 
                "progress:",
                paste(round(i/nrow(hyper_grid)*100,2),"%"),
-               Sys.time()))
+               "projected finish",
+               (Sys.time() - t0)/i * nrow(gtrain) +Sys.time()))
   return(w)
 }
 
