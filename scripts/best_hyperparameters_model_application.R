@@ -10,7 +10,7 @@ dir.create(tmpd)
 rasterOptions(tmpdir=tmpd)
 
 s3_path <- "s3://earthlab-amahood/data/ls5_mucc_2011"
-local_path <- "data/ls5_mucc"
+local_path <- "data/ls5_mucc1"
 s3_terrain <- "s3://earthlab-amahood/data/terrain_mucc"
 local_terrain <- "data/terrain_2"
 
@@ -27,10 +27,10 @@ system("aws s3 sync s3://earthlab-amahood/data/landfire_urban_ag_water_mask/ dat
 ##to avoid redundant classified images
 
 #cropping and stacking and applying the model loop --------------------------
-scene <- list.files("data/ls5_mucc")
-scene_full <- list.files("data/ls5_mucc", full.names = T)
+scene <- list.files("data/ls5_mucc1")
+scene_full <- list.files("data/ls5_mucc1", full.names = T)
 
-cores <- length(model_list)
+cores <- length(model_list)  
 
 registerDoParallel(cores)
 
@@ -102,7 +102,7 @@ foreach(i = 1:length(model_list),
           
           writeRaster(ls5_classed, filename = filenamet, overwrite = T, progress = 'text')
           
-          system(paste0("aws s3 cp ", filenamet, " s3://earthlab-amahood/data/model_agreement", substr(filenamet, 14, 120)))
+          system(paste0("aws s3 cp ", filenamet, " s3://earthlab-amahood/data/ls5_hyperparameter_test_results/", substr(filenamet, 14, 120)))
           system(paste("echo", "done"))
           unlink(filenamet)
           

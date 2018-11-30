@@ -1,5 +1,5 @@
 # Step 1: Load packages ---------------------------
-libs <- c("randomForest", "dplyr","sf")
+libs <- c("randomForest", "dplyr","sf", "caTools")
 # lapply(libs, install.packages, character.only = TRUE, verbose = FALSE)
 lapply(libs, library, character.only = TRUE, verbose = FALSE)
 
@@ -28,6 +28,12 @@ hypergrid_combine <- read.csv("data/hypergrids/hg_a_Oct_9_2018.csv") %>% arrange
 hypergrid_balanced <- read.csv("data/hypergrids/hgOct_12_2018.csv") %>% arrange(desc(balanced_accuracy))
 
 hypergrid_satvi <- read.csv("data/hypergrids/hgOct_16_2018.csv") %>% arrange(desc(balanced_accuracy))
+
+hypergrid_kfold  <- read.csv("data/hypergrids/hg_kfold_Nov_26_2018.csv") %>% arrange(desc(accuracy))
+
+hypergrid_blmvsvb <- read.csv("data/hypergrids/hgNov_23_2018.csv") %>% arrange(desc(accuracy))
+
+filtered_hg <- filter(hypergrid_blmvsvb, hypergrid_blmvsvb$mtry < 10) %>% arrange(desc(accuracy))
 #w/elev and w/o elev both stored in same hypergrid now
 #hypergrid_2 <- read.csv("data/hypergrids/hg_rf_noelev.csv") %>% arrange(oob)
 
@@ -44,6 +50,11 @@ best_hyper_balanced <- hypergrid_balanced[c(1:5, 7, 9, 11, 15, 17, 22, 25, 36:40
 
 best_hyper_satvi <- hypergrid_satvi[c(1:5, 7, 10, 13, 16, 17, 19, 20, 41, 49, 51),] %>% arrange(desc(balanced_accuracy))
 
+best_hyper_kfold <- hypergrid_kfold[c(1, 2, 10, 17, 11, 21, 30, 49),] %>% arrange(desc(accuracy))
+
+best_hyper_blmvsvb <- hypergrid_blmvsvb[c(1, 2, 3, 5, 6, 9), ] %>% arrange(desc(accuracy))
+
+best_hyper_filtered <- filtered_hg[c(1:4, 11, 18),] %>% arrange(desc(accuracy))
 ####model testing/selection history ####
 #(hyper_w_elev) -- two lowest oob errors(1,2); two lowest oob errors w/ higher shrub cover split (3, 6) -- this results in a more even dist. of error between classes
 #highest shrub cover split in 25 best oob error parameter sets (25)
@@ -66,14 +77,14 @@ best_hyper_satvi <- hypergrid_satvi[c(1:5, 7, 10, 13, 16, 17, 19, 20, 41, 49, 51
 
 #best10 <- rbind(best_hyper, best_hyper2)
 #### model list application ####
-best10 <- best_hyper_satvi
+best10 <- best_hyper_blmvsvb
 
 ensemble_models <- best10[ c(1, 8, 11),]
 
 
 model_list <- list()
 
-for(i in 1:nrow(ensemble_models)) {
+for(i in 1:nrow(best10)) {
   
   gbd <- st_read("data/plot_data/plots_with_landsat.gpkg", quiet=T) %>%
     filter(esp_mask == 1) %>%
@@ -104,7 +115,7 @@ for(i in 1:nrow(ensemble_models)) {
 }
 
 #create names for models based on presence of elevation variable and sc/mtry values
-model_names <- paste("satvi", ifelse(ensemble_models[1:nrow(ensemble_models),]$elevation == "yes", "elev", "noelev"), "sc",ensemble_models[1:nrow(ensemble_models),]$sc,"mtry", ensemble_models[1:nrow(ensemble_models),]$mtry, "nodes", ensemble_models[1:nrow(ensemble_models),]$nodesize, sep="_")
+model_names <- paste("nov23_train", ifelse(best10[1:nrow(best10),]$elevation == "yes", "elev", "noelev"), "sc", best10[1:nrow(best10),]$sc,"mtry", best10[1:nrow(best10),]$mtry, "nodes", best10[1:nrow(best10),]$nodesize, sep="_")
 names(model_list) <- model_names
 # # optimizing model- strait from data camp----------------------------------------------
 # # frst
@@ -232,7 +243,55 @@ names(model_list) <- model_names
 
 ### the optimal mtry value is 9 
 
+gbd <- st_read("data/plot_data/plots_with_landsat.gpkg", quiet=T) %>%
+  filter(esp_mask == 1) %>%
+  mutate(total_shrubs = NonInvShru + SagebrushC,
+         ndsvi = get_ndsvi(sr_band3, sr_band5)
+         ) %>%
+  dplyr::select(sr_band1, sr_band2, sr_band3, sr_band4, sr_band5, sr_band7,
+                ndvi=NDVI, evi=EVI, savi=SAVI,sr=SR, ndsvi,
+                greenness, brightness, wetness,
+                total_shrubs,
+                elevation,
+                slope, folded_aspect, tpi=TPI, tri=TRI, roughness, flowdir) %>%
+  mutate(satvi = get_satvi(sr_band3, sr_band5,sr_band7)) %>%
+  st_set_geometry(NULL)%>%
+  mutate(split = 1,
+         split = sample.split(split, SplitRatio=0.7))  
+  
+
+gtrain <- filter(gbd,split ==TRUE) %>% dplyr::select(-split) 
 
 
+
+for(i in 1:nrow(best10)) {
+  
+  train <- gtrain %>% 
+    mutate(binary = as.factor(ifelse(total_shrubs < best10$sc[i], "Grass", "Shrub"))) %>%
+    dplyr::select(-total_shrubs)
+  
+  if(best10$elevation[i] == "no") {dplyr::select(train,-elevation)}
+  
+  if(nrow(train[train$binary == "Grass",])<nrow(train[train$binary == "Shrub",])){
+    gps <- train[train$binary == "Grass",]
+    sps <- train[train$binary == "Shrub",]
+    nsps <- sample_n(sps, nrow(gps))
+    train <- rbind(gps,nsps)
+  }else{
+    gps <- train[train$binary == "Grass",]
+    sps <- train[train$binary == "Shrub",]
+    ngps <- sample_n(gps, nrow(sps))
+    train <- rbind(sps,ngps)
+  }
+  
+  model_list[[i]] <- randomForest(binary ~ . ,
+                                  data = train, 
+                                  ntree = 2000, 
+                                  mtry = best10$mtry[[i]], 
+                                  nodesize = best10$nodesize[[i]] 
+  )
+  print("models created")
+  
+}
 
 
