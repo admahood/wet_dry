@@ -79,7 +79,7 @@ best_hyper_filtered <- filtered_hg[c(4, 7, 12, 28, 34, 43, 44, 51, 112, 175, 180
 
 #best10 <- rbind(best_hyper, best_hyper2)
 #### model list application ####
-best10 <- best_hyper_blmvsvb
+best10 <- best_hyper_filtered
 
 ensemble_models <- best10[ c(1, 8, 11),]
 
@@ -117,7 +117,7 @@ for(i in 1:nrow(best10)) {
 }
 
 #create names for models based on presence of elevation variable and sc/mtry values
-model_names <- paste("nov23_train", ifelse(best10[1:nrow(best10),]$elevation == "yes", "elev", "noelev"), "sc", best10[1:nrow(best10),]$sc,"mtry", best10[1:nrow(best10),]$mtry, "nodes", best10[1:nrow(best10),]$nodesize, sep="_")
+model_names <- paste("nov23hg_Nov30run", ifelse(best10[1:nrow(best10),]$elevation == "yes", "elev", "noelev"), "sc", best10[1:nrow(best10),]$sc,"mtry", best10[1:nrow(best10),]$mtry, "nodes", best10[1:nrow(best10),]$nodesize, sep="_")
 names(model_list) <- model_names
 # # optimizing model- strait from data camp----------------------------------------------
 # # frst
@@ -264,7 +264,7 @@ gbd <- st_read("data/plot_data/plots_with_landsat.gpkg", quiet=T) %>%
 
 gtrain <- filter(gbd,split ==TRUE) %>% dplyr::select(-split) 
 
-
+model_list <- list()
 
 for(i in 1:nrow(best10)) {
   
