@@ -1,6 +1,8 @@
 # setup --------------------------------------------------------------------------------------
 library(sf)
 library(raster)
+library(foreach)
+library(doParallel)
 # syncing files ------------------------------------------------------------------------------
 system("aws s3 sync s3://earthlab-amahood/data/terrain_gb data/terrain")
 system("aws s3 sync s3://earthlab-amahood/data/ecoregions /home/rstudio/wet_dry/data/ecoregions")
@@ -30,18 +32,20 @@ scenes_gb <- scenes %>%
 
 path_row <- as.character(paste0(scenes_gb$PATH,scenes_gb$ROW)) 
 
+corz <- round(detectCores()*2/3)
+
 for(i in 1:length(path_row)){
   P <- substr(path_row[i],1,2)
   R <- substr(path_row[i],3,4)
   scene <- dplyr::filter(scenes, PATH == P, ROW == R) %>%
     st_buffer(dist = 20000)
   
-  for(j in 1:length(ter_files)){
-    dir.create("scrap")
+  foreach(j = 1:length(ter_files))%dopar%{
+    dir.create("scrap", showWarnings = F)
     p <- "scrap/"
     f <- paste0("p",P,"_r",R,"_",ter_files[j])
     r <- raster(file.path(ter_path,ter_files[j])) %>%
-      crop(scene, filename = paste0(p,f))
+      crop(scene, filename = paste0(p,f), overwrite =T)
     
     system(paste0("aws s3 cp ",
                   p,f,
