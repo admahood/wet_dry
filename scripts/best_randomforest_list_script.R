@@ -33,7 +33,9 @@ hypergrid_kfold  <- read.csv("data/hypergrids/hg_kfold_Nov_26_2018.csv") %>% arr
 
 hypergrid_blmvsvb <- read.csv("data/hypergrids/hgNov_23_2018.csv") %>% arrange(desc(accuracy))
 
-filtered_hg <- filter(hypergrid_blmvsvb, hypergrid_blmvsvb$mtry < 10) %>% arrange(desc(accuracy))
+filtered_hg <- filter(hypergrid_blmvsvb, hypergrid_blmvsvb$mtry < 10) %>% 
+  filter(dataset == "g") %>%
+  arrange(desc(accuracy)) #%>% filter(sc == 14)
 #w/elev and w/o elev both stored in same hypergrid now
 #hypergrid_2 <- read.csv("data/hypergrids/hg_rf_noelev.csv") %>% arrange(oob)
 
@@ -54,7 +56,7 @@ best_hyper_kfold <- hypergrid_kfold[c(1, 2, 10, 17, 11, 21, 30, 49),] %>% arrang
 
 best_hyper_blmvsvb <- hypergrid_blmvsvb[c(1, 2, 3, 5, 6, 9), ] %>% arrange(desc(accuracy))
 
-best_hyper_filtered <- filtered_hg[c(1:4, 11, 18),] %>% arrange(desc(accuracy))
+best_hyper_filtered <- filtered_hg[c(4, 7, 12, 28, 34, 43, 44, 51, 112, 175, 180),] %>% arrange(desc(accuracy)) 
 ####model testing/selection history ####
 #(hyper_w_elev) -- two lowest oob errors(1,2); two lowest oob errors w/ higher shrub cover split (3, 6) -- this results in a more even dist. of error between classes
 #highest shrub cover split in 25 best oob error parameter sets (25)
