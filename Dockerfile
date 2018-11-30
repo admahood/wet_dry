@@ -7,16 +7,19 @@ RUN apt-get update \
 
 RUN install2.r --error \ 
   assertthat \ 
+  caret \
+  caTools \
   doParallel \ 
   foreach \
   gdalUtils \
   ggthemes \ 
-  httr \ 
+  httr \
+  party \
+  picante \
   randomForest \
   rasterVis \ 
   RCurl \ 
+  ROCR \
   snowfall \ 
   tidyverse \ 
   viridis
-
-
