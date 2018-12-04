@@ -79,10 +79,10 @@ best_hyper_filtered <- filtered_hg[c(4, 7, 12, 28, 34, 43, 44, 51, 112, 175, 180
 
 #best10 <- rbind(best_hyper, best_hyper2)
 #### model list application ####
-best10 <- best_hyper_blmvsvb
+best10 <- best_hyper_satvi
 
 ensemble_models <- best10[ c(1, 8, 11),]
-
+best10 <- ensemble_models
 
 model_list <- list()
 
@@ -110,14 +110,14 @@ for(i in 1:nrow(best10)) {
                                   data = gbd, 
                                   ntree = 2000, 
                                   mtry = best10$mtry[[i]], 
-                                  nodesize = best10$nodesize[[i]], 
+                                  nodesize = best10$nodesize[[i]] 
   )
   print("models created")
   
 }
 
 #create names for models based on presence of elevation variable and sc/mtry values
-model_names <- paste("nov23_train", ifelse(best10[1:nrow(best10),]$elevation == "yes", "elev", "noelev"), "sc", best10[1:nrow(best10),]$sc,"mtry", best10[1:nrow(best10),]$mtry, "nodes", best10[1:nrow(best10),]$nodesize, sep="_")
+model_names <- paste("Dec3_vb_validated", ifelse(best10[1:nrow(best10),]$elevation == "yes", "elev", "noelev"), "sc", best10[1:nrow(best10),]$sc,"mtry", best10[1:nrow(best10),]$mtry, "nodes", best10[1:nrow(best10),]$nodesize, sep="_")
 names(model_list) <- model_names
 # # optimizing model- strait from data camp----------------------------------------------
 # # frst
@@ -244,12 +244,12 @@ names(model_list) <- model_names
 # print(best.m)
 
 ### the optimal mtry value is 9 
-
+#### creating models with training data split - 11/30 ####
 gbd <- st_read("data/plot_data/plots_with_landsat.gpkg", quiet=T) %>%
   filter(esp_mask == 1) %>%
   mutate(total_shrubs = NonInvShru + SagebrushC,
          ndsvi = get_ndsvi(sr_band3, sr_band5)
-         ) %>%
+  ) %>%
   dplyr::select(sr_band1, sr_band2, sr_band3, sr_band4, sr_band5, sr_band7,
                 ndvi=NDVI, evi=EVI, savi=SAVI,sr=SR, ndsvi,
                 greenness, brightness, wetness,
@@ -260,11 +260,11 @@ gbd <- st_read("data/plot_data/plots_with_landsat.gpkg", quiet=T) %>%
   st_set_geometry(NULL)%>%
   mutate(split = 1,
          split = sample.split(split, SplitRatio=0.7))  
-  
+
 
 gtrain <- filter(gbd,split ==TRUE) %>% dplyr::select(-split) 
 
-
+model_list <- list()
 
 for(i in 1:nrow(best10)) {
   
@@ -295,5 +295,4 @@ for(i in 1:nrow(best10)) {
   print("models created")
   
 }
-
 

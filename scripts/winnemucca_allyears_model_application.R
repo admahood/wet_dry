@@ -167,7 +167,7 @@ foreach(i = scene_full,
           names(ls5)<- c("sr_band1", "sr_band2","sr_band3", "sr_band4","sr_band5", "sr_band7")
           
           ter_c <- raster::resample(ter, ls5)
-          system(paste("echo", "terrain resampled"))
+          system(paste("echo", "terrain resampled", i))
           # ne <- projectExtent(ls5, crs=crs(ter_p))
           # res(ne) <- 30
           # 
@@ -214,6 +214,16 @@ foreach(i = scene_full,
           ls5$satvi <- get_satvi(ls5$sr_band3, ls5$sr_band5, ls5$sr_band7)
           system(paste("echo", "veg indices and tassel cap created", i))
           ls5 <- stack(ls5, ter_c)
+          
+          esp_mask <- raster("data/esp_binary/clipped_binary.tif")
+          esp_mask <- projectRaster(esp_mask, ls5, res = 30)
+          system(paste("echo", "esp mask reprojected", i))
+          
+          #create urban_ag mask and match projection/extent
+          urb_mask <- raster("data/urban_ag_mask/lf_msk_rclss1.tif")
+          urb_mask <- projectRaster(urb_mask, ls5, res = 30)
+          system(paste("echo", "esp mask reprojected", i))
+          
           ls5 <- mask(ls5, esp_mask, maskvalue = 0)
           system(paste("echo", "esp masking done", i))
           
@@ -234,28 +244,28 @@ foreach(i = scene_full,
           gc() # for saving memory
           
           
-            
-            filenamet <- paste0("data/results/", names(model_list[1]), "_", 
-                                file)
-            system(paste("echo", "filename created", i))
-            # frst <- model_list[[i]]
-            # now put a line to apply the model and write THAT as the raster and send it to s3 (and then delete the file) 
-            ls5_classed <- raster::predict(ls5, model_list[[1]], inf.rm = T, na.rm = T)
-            
-            system(paste("echo", "model applied")
-            
-            # matrix <- c(1, 0, 2, 1)
-            # rclss_matrix <- matrix(matrix, ncol = 2, byrow = T)
-            # ls5_classed <- reclassify(ls5_classed, rclss_matrix)
-            
-            print(Sys.time()-t0) #checking elapsed time between creation of big stack and application of model
-            
-            writeRaster(ls5_classed, filename = filenamet, format = "GTiff", overwrite = T)
-            system(paste("echo", "file saved to disk"))
-            system(paste0("aws s3 cp ", filenamet, " s3://earthlab-amahood/data/mucc_model_results_allyears/", substr(filenamet, 14, 150)))
-            system(paste("echo", "aws sync done"))
-            unlink(filenamet)
-            
+          
+          filenamet <- paste0("data/results/", as.character(names(model_list[1])), "_", 
+                              file)
+          system(paste("echo", "filename created", i))
+          # frst <- model_list[[i]]
+          # now put a line to apply the model and write THAT as the raster and send it to s3 (and then delete the file) 
+          ls5_classed <- raster::predict(ls5, model_list[[1]], inf.rm = T, na.rm = T)
+          
+          system(paste("echo", "model applied"))
+          
+          # matrix <- c(1, 0, 2, 1)
+          # rclss_matrix <- matrix(matrix, ncol = 2, byrow = T)
+          # ls5_classed <- reclassify(ls5_classed, rclss_matrix)
+          
+          print(Sys.time()-t0) #checking elapsed time between creation of big stack and application of model
+          
+          writeRaster(ls5_classed, filename = filenamet, format = "GTiff", overwrite = T)
+          system(paste("echo", "file saved to disk"))
+          system(paste0("aws s3 cp ", filenamet, " s3://earthlab-amahood/data/mucc_model_results_allyears/", substr(filenamet, 14, 150)))
+          system(paste("echo", "aws sync done"))
+          unlink(filenamet)
+          
           
           #it appears the task 2 failed error is coming from the deletion of temp files. I commented it out for now - Dylan
           #system("rm data/tmp/*") # so we're not filling up the hard drive (had to move this to the end because the model needs the stuff stored in temp directory - D)
