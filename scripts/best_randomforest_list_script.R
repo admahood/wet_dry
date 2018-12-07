@@ -56,6 +56,7 @@ best_hyper_kfold <- hypergrid_kfold[c(1, 2, 10, 17, 11, 21, 30, 49),] %>% arrang
 
 best_hyper_blmvsvb <- hypergrid_blmvsvb[c(1, 2, 3, 5, 6, 9), ] %>% arrange(desc(accuracy))
 
+best_hyper_aspecttype <- hypergrid_blmvsvb[c(24, 25),] %>% arrange(desc(accuracy))
 best_hyper_filtered <- filtered_hg[c(4, 7, 12, 28, 34, 43, 44, 51, 112, 175, 180),] %>% arrange(desc(accuracy)) 
 ####model testing/selection history ####
 #(hyper_w_elev) -- two lowest oob errors(1,2); two lowest oob errors w/ higher shrub cover split (3, 6) -- this results in a more even dist. of error between classes
@@ -79,7 +80,7 @@ best_hyper_filtered <- filtered_hg[c(4, 7, 12, 28, 34, 43, 44, 51, 112, 175, 180
 
 #best10 <- rbind(best_hyper, best_hyper2)
 #### model list application ####
-best10 <- best_hyper_satvi
+best10 <- best_hyper_aspecttype
 
 ensemble_models <- best10[ c(1, 8, 11),]
 best10 <- ensemble_models
@@ -117,7 +118,7 @@ for(i in 1:nrow(best10)) {
 }
 
 #create names for models based on presence of elevation variable and sc/mtry values
-model_names <- paste("Dec3_vb_validated", ifelse(best10[1:nrow(best10),]$elevation == "yes", "elev", "noelev"), "sc", best10[1:nrow(best10),]$sc,"mtry", best10[1:nrow(best10),]$mtry, "nodes", best10[1:nrow(best10),]$nodesize, sep="_")
+model_names <- paste("Dec6_aspect_test_", ifelse(best10[1:nrow(best10),]$elevation == "yes", "elev", "noelev"), "sc", best10[1:nrow(best10),]$sc,"mtry", best10[1:nrow(best10),]$mtry, "nodes", best10[1:nrow(best10),]$nodesize, sep="_")
 names(model_list) <- model_names
 # # optimizing model- strait from data camp----------------------------------------------
 # # frst
@@ -245,34 +246,22 @@ names(model_list) <- model_names
 
 ### the optimal mtry value is 9 
 #### creating models with training data split - 11/30 ####
-gbd <- st_read("data/plot_data/plots_with_landsat.gpkg", quiet=T) %>%
-  filter(esp_mask == 1) %>%
-  mutate(total_shrubs = NonInvShru + SagebrushC,
-         ndsvi = get_ndsvi(sr_band3, sr_band5)
-  ) %>%
-  dplyr::select(sr_band1, sr_band2, sr_band3, sr_band4, sr_band5, sr_band7,
-                ndvi=NDVI, evi=EVI, savi=SAVI,sr=SR, ndsvi,
-                greenness, brightness, wetness,
-                total_shrubs,
-                elevation,
-                slope, folded_aspect, tpi=TPI, tri=TRI, roughness, flowdir) %>%
-  mutate(satvi = get_satvi(sr_band3, sr_band5,sr_band7)) %>%
-  st_set_geometry(NULL)%>%
-  mutate(split = 1,
-         split = sample.split(split, SplitRatio=0.7))  
+system("aws s3 sync s3://earthlab-amahood/data/data_splits data/data_splits")
 
-
-gtrain <- filter(gbd,split ==TRUE) %>% dplyr::select(-split) 
+gbd_train <- as.tbl(read.csv("data/data_splits/gtrain_Nov_23_2018.csv")) %>% select(-X) #change to desired training dataset depending on hypergrid
 
 model_list <- list()
 
 for(i in 1:nrow(best10)) {
   
-  train <- gtrain %>% 
+  train <- gbd_train %>% 
     mutate(binary = as.factor(ifelse(total_shrubs < best10$sc[i], "Grass", "Shrub"))) %>%
     dplyr::select(-total_shrubs)
   
   if(best10$elevation[i] == "no") {dplyr::select(train,-elevation)}
+  
+  if(best10$folded_aspect_type[i] == "ns") {dplyr::select(train, -folded_aspect)
+    }else{dplyr::select(train, -folded_aspect_ns)}
   
   if(nrow(train[train$binary == "Grass",])<nrow(train[train$binary == "Shrub",])){
     gps <- train[train$binary == "Grass",]
@@ -296,3 +285,5 @@ for(i in 1:nrow(best10)) {
   
 }
 
+model_names <- paste("Dec6_aspect_test_", ifelse(best10[1:nrow(best10),]$elevation == "yes", "elev", "noelev"), "sc", best10[1:nrow(best10),]$sc,"mtry", best10[1:nrow(best10),]$mtry, "nodes", best10[1:nrow(best10),]$nodesize, sep="_")
+names(model_list) <- model_names
