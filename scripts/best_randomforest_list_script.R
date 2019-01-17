@@ -52,6 +52,10 @@ best_hyper_balanced <- hypergrid_balanced[c(1:5, 7, 9, 11, 15, 17, 22, 25, 36:40
 
 best_hyper_satvi <- hypergrid_satvi[c(1:5, 7, 10, 13, 16, 17, 19, 20, 41, 49, 51),] %>% arrange(desc(balanced_accuracy))
 
+#^^ vb_validated models to be used in all years ensemble
+#are also derived from this hypergrid. as of 1/17, the models are: best_hyper_satvi[8, 11, 12]
+
+
 best_hyper_kfold <- hypergrid_kfold[c(1, 2, 10, 17, 11, 21, 30, 49),] %>% arrange(desc(accuracy))
 
 best_hyper_blmvsvb <- hypergrid_blmvsvb[c(1, 2, 3, 5, 6, 9), ] %>% arrange(desc(accuracy))
@@ -80,9 +84,9 @@ best_hyper_filtered <- filtered_hg[c(4, 7, 12, 28, 34, 43, 44, 51, 112, 175, 180
 
 #best10 <- rbind(best_hyper, best_hyper2)
 #### model list application ####
-best10 <- best_hyper_aspecttype
+best10 <- best_hyper_satvi
 
-ensemble_models <- best10[ c(1, 8, 11),]
+ensemble_models <- best10[ c(12, 8, 11),]
 best10 <- ensemble_models
 
 model_list <- list()
@@ -118,7 +122,7 @@ for(i in 1:nrow(best10)) {
 }
 
 #create names for models based on presence of elevation variable and sc/mtry values
-model_names <- paste("Dec6_aspect_test_", ifelse(best10[1:nrow(best10),]$elevation == "yes", "elev", "noelev"), "sc", best10[1:nrow(best10),]$sc,"mtry", best10[1:nrow(best10),]$mtry, "nodes", best10[1:nrow(best10),]$nodesize, sep="_")
+model_names <- paste("Jan17_vb_val_", ifelse(best10[1:nrow(best10),]$elevation == "yes", "elev", "noelev"), "sc", best10[1:nrow(best10),]$sc,"mtry", best10[1:nrow(best10),]$mtry, "nodes", best10[1:nrow(best10),]$nodesize, sep="_")
 names(model_list) <- model_names
 # # optimizing model- strait from data camp----------------------------------------------
 # # frst
