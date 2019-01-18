@@ -17,7 +17,7 @@ system("aws s3 sync s3://earthlab-amahood/data/hypergrids_vb data/hypergrids")
 #   mean_error = NA,
 #   sd_error = NA
 # )
-
+system("aws s3 sync s3://earthlab-amahood/data/data_splits data/data_splits")
 
 
 hypergrid_original <- read.csv("data/hypergrids/hgOct_10_2018.csv") %>% arrange(desc(balanced_accuracy))
@@ -52,10 +52,15 @@ best_hyper_balanced <- hypergrid_balanced[c(1:5, 7, 9, 11, 15, 17, 22, 25, 36:40
 
 best_hyper_satvi <- hypergrid_satvi[c(1:5, 7, 10, 13, 16, 17, 19, 20, 41, 49, 51),] %>% arrange(desc(balanced_accuracy))
 
+#^^ vb_validated models to be used in all years ensemble
+#are also derived from this hypergrid. as of 1/17, the models are: best_hyper_satvi[8, 11, 12]
+
+
 best_hyper_kfold <- hypergrid_kfold[c(1, 2, 10, 17, 11, 21, 30, 49),] %>% arrange(desc(accuracy))
 
 best_hyper_blmvsvb <- hypergrid_blmvsvb[c(1, 2, 3, 5, 6, 9), ] %>% arrange(desc(accuracy))
 
+best_hyper_aspecttype <- hypergrid_blmvsvb[c(24, 25),] %>% arrange(desc(accuracy))
 best_hyper_filtered <- filtered_hg[c(4, 7, 12, 28, 34, 43, 44, 51, 112, 175, 180),] %>% arrange(desc(accuracy)) 
 ####model testing/selection history ####
 #(hyper_w_elev) -- two lowest oob errors(1,2); two lowest oob errors w/ higher shrub cover split (3, 6) -- this results in a more even dist. of error between classes
@@ -79,45 +84,55 @@ best_hyper_filtered <- filtered_hg[c(4, 7, 12, 28, 34, 43, 44, 51, 112, 175, 180
 
 #best10 <- rbind(best_hyper, best_hyper2)
 #### model list application ####
-best10 <- best_hyper_filtered
 
-ensemble_models <- best10[ c(1, 8, 11),]
+
+
+
+
+best10 <- best_hyper_satvi
+
+
+ensemble_models <- best10[ c(12, 8, 11),]
 
 
 model_list <- list()
 
-for(i in 1:nrow(best10)) {
-  
-  gbd <- st_read("data/plot_data/plots_with_landsat.gpkg", quiet=T) %>%
-    filter(esp_mask == 1) %>%
-    mutate(total_shrubs = NonInvShru + SagebrushC) %>%
-    st_set_geometry(NULL) %>%
-    mutate(binary = as.factor(ifelse(total_shrubs < best10$sc[i], "Grass", "Shrub")),
-           ndsvi=get_ndsvi(sr_band3, sr_band5)) %>%
+for(i in 1:nrow(ensemble_models)) {
+  gtrain <- read.csv("data/data_splits/gtrain_Nov_26_2018.csv") %>%
+    #filter(esp_mask == 1) %>%
+    #mutate(total_shrubs = NonInvShru + SagebrushC) %>%
+    #st_set_geometry(NULL) %>%
+    mutate(binary = as.factor(ifelse(total_shrubs < ensemble_models$sc[i], "Grass", "Shrub"))
+           #, ndsvi=get_ndsvi(sr_band3, sr_band5)
+           ) %>%
     #dplyr::select(-X1, -total_shrubs, -ds) 
     dplyr::select(sr_band1, sr_band2, sr_band3, sr_band4, sr_band5, sr_band7,
-                  ndvi = NDVI, evi = EVI, savi = SAVI, sr = SR, ndsvi = NDSVI, #data$SATVI,
+                  ndvi, evi, savi, sr, ndsvi, #data$SATVI,
                   greenness, brightness, wetness,
                   elevation,
-                  slope, folded_aspect, tpi = TPI, tri = TRI, roughness, flowdir, #data$cluster,
+                  slope, folded_aspect, tpi, tri, roughness, flowdir, #data$cluster,
                   #total_shrubs)
-                  binary) %>%
-    mutate(satvi = get_satvi(sr_band3, sr_band5,sr_band7))
+                  binary) 
+    #mutate(satvi = get_satvi(sr_band3, sr_band5,sr_band7))
   
-  if(best10$elevation[i] == "no") {dplyr::select(gbd,-elevation)}
+  if(ensemble_models$elevation[i] == "no") {dplyr::select(gtrain,-elevation)}
   
   model_list[[i]] <- randomForest(binary ~ . ,
-                                  data = gbd, 
+                                  data = gtrain, 
                                   ntree = 2000, 
-                                  mtry = best10$mtry[[i]], 
-                                  nodesize = best10$nodesize[[i]], 
+                                  mtry = ensemble_models$mtry[[i]], 
+                                  nodesize = ensemble_models$nodesize[[i]] 
   )
   print("models created")
   
 }
 
 #create names for models based on presence of elevation variable and sc/mtry values
-model_names <- paste("nov23hg_Nov30run", ifelse(best10[1:nrow(best10),]$elevation == "yes", "elev", "noelev"), "sc", best10[1:nrow(best10),]$sc,"mtry", best10[1:nrow(best10),]$mtry, "nodes", best10[1:nrow(best10),]$nodesize, sep="_")
+
+#model_names <- paste("nov23hg_Nov30run", ifelse(best10[1:nrow(best10),]$elevation == "yes", "elev", "noelev"), "sc", best10[1:nrow(best10),]$sc,"mtry", best10[1:nrow(best10),]$mtry, "nodes", best10[1:nrow(best10),]$nodesize, sep="_")
+
+model_names <- paste("Jan17_vb_val", ifelse(ensemble_models[1:nrow(ensemble_models),]$elevation == "yes", "elev", "noelev"), "sc", ensemble_models[1:nrow(ensemble_models),]$sc,"mtry", ensemble_models[1:nrow(ensemble_models),]$mtry, "nodes", ensemble_models[1:nrow(ensemble_models),]$nodesize, sep="_")
+
 names(model_list) <- model_names
 # # optimizing model- strait from data camp----------------------------------------------
 # # frst
@@ -244,7 +259,10 @@ names(model_list) <- model_names
 # print(best.m)
 
 ### the optimal mtry value is 9 
+#### creating models with training data split - 11/30 ####
+system("aws s3 sync s3://earthlab-amahood/data/data_splits data/data_splits")
 
+<<<<<<< HEAD
 gbd <- st_read("data/plot_data/plots_with_landsat.gpkg", quiet=T) %>%
   filter(esp_mask == 1) %>%
   mutate(total_shrubs = NonInvShru + SagebrushC,
@@ -263,16 +281,22 @@ gbd <- st_read("data/plot_data/plots_with_landsat.gpkg", quiet=T) %>%
   
 
 gtrain <- filter(gbd,split ==TRUE) %>% dplyr::select(-split) 
+=======
+gbd_train <- as.tbl(read.csv("data/data_splits/gtrain_Nov_23_2018.csv")) %>% select(-X) #change to desired training dataset depending on hypergrid
+>>>>>>> f7c11f21bd375552c56645b51f6d5f163de6f0c6
 
 model_list <- list()
 
 for(i in 1:nrow(best10)) {
   
-  train <- gtrain %>% 
+  train <- gbd_train %>% 
     mutate(binary = as.factor(ifelse(total_shrubs < best10$sc[i], "Grass", "Shrub"))) %>%
     dplyr::select(-total_shrubs)
   
   if(best10$elevation[i] == "no") {dplyr::select(train,-elevation)}
+  
+  if(best10$folded_aspect_type[i] == "ns") {dplyr::select(train, -folded_aspect)
+    }else{dplyr::select(train, -folded_aspect_ns)}
   
   if(nrow(train[train$binary == "Grass",])<nrow(train[train$binary == "Shrub",])){
     gps <- train[train$binary == "Grass",]
@@ -296,4 +320,5 @@ for(i in 1:nrow(best10)) {
   
 }
 
-
+model_names <- paste("Dec6_aspect_test_", ifelse(best10[1:nrow(best10),]$elevation == "yes", "elev", "noelev"), "sc", best10[1:nrow(best10),]$sc,"mtry", best10[1:nrow(best10),]$mtry, "nodes", best10[1:nrow(best10),]$nodesize, sep="_")
+names(model_list) <- model_names
