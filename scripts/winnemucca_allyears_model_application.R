@@ -247,12 +247,12 @@ foreach(i = scene_full,
           
           
           
-          filenamet <- paste0("data/results/", as.character(names(model_list[1])), "_", 
+          filenamet <- paste0("data/results/", as.character(names(model_list[3])), "_", 
                               file)
           system(paste("echo", "filename created", i))
           # frst <- model_list[[i]]
           # now put a line to apply the model and write THAT as the raster and send it to s3 (and then delete the file) 
-          ls5_classed <- raster::predict(ls5, model_list[[1]], inf.rm = T, na.rm = T)
+          ls5_classed <- raster::predict(ls5, model_list[[3]], inf.rm = T, na.rm = T)
           
           system(paste("echo", "model applied"))
           
@@ -272,3 +272,4 @@ foreach(i = scene_full,
           #it appears the task 2 failed error is coming from the deletion of temp files. I commented it out for now - Dylan
           #system("rm data/tmp/*") # so we're not filling up the hard drive (had to move this to the end because the model needs the stuff stored in temp directory - D)
         }
+  

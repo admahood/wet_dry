@@ -131,7 +131,7 @@ for(i in 1:nrow(ensemble_models)) {
 
 #model_names <- paste("nov23hg_Nov30run", ifelse(best10[1:nrow(best10),]$elevation == "yes", "elev", "noelev"), "sc", best10[1:nrow(best10),]$sc,"mtry", best10[1:nrow(best10),]$mtry, "nodes", best10[1:nrow(best10),]$nodesize, sep="_")
 
-model_names <- paste("Jan17_vb_val", ifelse(ensemble_models[1:nrow(ensemble_models),]$elevation == "yes", "elev", "noelev"), "sc", ensemble_models[1:nrow(ensemble_models),]$sc,"mtry", ensemble_models[1:nrow(ensemble_models),]$mtry, "nodes", ensemble_models[1:nrow(ensemble_models),]$nodesize, sep="_")
+model_names <- paste("Jan18_vb_val", ifelse(ensemble_models[1:nrow(ensemble_models),]$elevation == "yes", "elev", "noelev"), "sc", ensemble_models[1:nrow(ensemble_models),]$sc,"mtry", ensemble_models[1:nrow(ensemble_models),]$mtry, "nodes", ensemble_models[1:nrow(ensemble_models),]$nodesize, sep="_")
 
 names(model_list) <- model_names
 # # optimizing model- strait from data camp----------------------------------------------
