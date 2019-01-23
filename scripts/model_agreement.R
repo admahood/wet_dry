@@ -2,6 +2,30 @@ date <- paste(strsplit(date()," ")[[1]][c(2,3,5)],collapse="_")
 
 system("aws s3 sync s3://earthlab-amahood/data/model_agreement data/model_agreement")
 
+system("aws s3 sync s3://earthlab-amahood/data/mucc_ensemble_results data/preensemble")
+
+
+model_results <- list.files("data/preensemble")
+
+over_grass_list <- list()
+over_shrub_list <- list()
+balance_list <- list()
+
+year_list <- list()
+
+
+years <- as.character(c(1984:2011))
+for(i in 1:length(years)) {
+  if(substr(model_results[j], 44, 47) == i) {
+    
+  }
+}
+
+
+
+
+if(model_results[i])
+
 
 
 over_grass <- raster("data/model_agreement/satvi_elev_sc_21_mtry_3_nodes_3_ls5_2010_042031_model_results.tif")
