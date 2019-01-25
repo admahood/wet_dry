@@ -4,6 +4,7 @@ libs <- c("randomForest", "dplyr","sf", "caTools", "raster", "tidyverse", "ggplo
 lapply(libs, library, character.only = TRUE, verbose = FALSE)
 
 #system("aws s3 sync s3://earthlab-amahood/data/mucc_model_results_allyears data/allyears_results")
+
 dir.create("data/allyears_results")
 system ("aws s3 sync s3://earthlab-amahood/data/mucc_ensemble_results data/allyears_results")
 all_years_files <- list.files("data/allyears_results", full = T)
