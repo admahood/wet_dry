@@ -1,4 +1,4 @@
-#Install packages
+#Install packages ----
 libs <- c("dplyr", "raster", "sp")
 
 iini <-function(x){
@@ -7,23 +7,24 @@ iini <-function(x){
 lapply(libs, iini)
 lapply(libs, library, character.only = TRUE, verbose = FALSE)
 
-#download data
+#download data ----
 system("aws s3 sync s3://earthlab-amahood/data/model_agreement data/model_agreement") #single year test data
 system("aws s3 sync s3://earthlab-amahood/data/mucc_ensemble_results data/preensemble") #all years/models path 42 scene 31 (winnemucca)
 
-#set values for sc and date
+#set values for sc and date ----
 date <- paste(strsplit(date()," ")[[1]][c(2,3,5)],collapse="_")
 sc_values = c("sc_9", "sc_14", "sc_21") #categories for separating pre-ensemble results into model type
 
-#grab paths for pre-ensemble model results
+#grab paths for pre-ensemble model results ----
 model_results <- list.files("data/preensemble", full.names = T)
 
-#create empty lists
+#create empty lists ----
 over_grass_list <- list()
 over_shrub_list <- list()
 balance_list <- list()
 
-#separate model results into lists of each model type
+#create/sort model results lists ----
+#separate model results into lists of each model type 
 for(i in 1:length(model_results)) { 
 if (substr(model_results[i], 36, 40) == sc_values[3]) {
   over_grass_list[i] = model_results[i]
@@ -41,7 +42,7 @@ over_shrub_list <- over_shrub_list[29:56]
 #combine lists for each model category
 sorted_list <- list(over_grass_list, over_shrub_list, balance_list)
 
-#loop for grabbing each year's model results, reclassifying, and combining into ensemble for s3
+# Final ensemble creation loop (1/25) - for grabbing each year's model results, reclassifying, and combining into ensemble for s3 ----
 for(i in 1:length(years)) {
   if (substr(as.character(sorted_list[[1]][i]), 61, 64) == years[i]) {
     over_g_raster <- raster(as.character(sorted_list[[1]][i]))
@@ -70,7 +71,7 @@ for(i in 1:length(years)) {
   system(paste0("aws s3 cp ", ensemble_filename, " s3://earthlab-amahood/data/mucc_ensemble_results_done/", substr(ensemble_filename, 22, 150)))
 }
 
-#### SCRAP CODE FROM WRITING ABOVE FOR LOOP (IN CASE IT DOESNT WORK)####
+#### SCRAP CODE FROM WRITING ABOVE FOR LOOP (IN CASE IT DOESNT WORK, DONT DELETE)####
 
 # for(i in 1:length(sorted_list)) {
 # for(j in 1:length(sorted_list[[i]])) {

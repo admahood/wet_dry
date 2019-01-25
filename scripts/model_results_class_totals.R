@@ -4,13 +4,13 @@ libs <- c("randomForest", "dplyr","sf", "caTools", "raster", "tidyverse", "ggplo
 lapply(libs, library, character.only = TRUE, verbose = FALSE)
 
 #system("aws s3 sync s3://earthlab-amahood/data/mucc_model_results_allyears data/allyears_results")
-
+#Step 2: load data ----
 dir.create("data/allyears_results")
 system ("aws s3 sync s3://earthlab-amahood/data/mucc_ensemble_results data/allyears_results")
 all_years_files <- list.files("data/allyears_results", full = T)
 
 
-
+#step 3: extract class totals ----
 results_list <- list()
 
 for(i in 1:length(all_years_files)) {
@@ -49,8 +49,8 @@ df <- bind_rows(
   , .id = "raster"
 )
 
-#scatter plot of cheat and sage totals with linear trend line
+#scatter plot of cheat and sage totals with linear trend line ----
 ggplot(data=df, aes(x=raster, y=n, group = Var1, colour = as.factor(Var1))) + geom_point() + geom_smooth(method = "lm")
 
-#begin work here (1/23) for getting table of combined counts for high and low certainty ensemble results
+#begin work here (1/23) for getting table of combined counts for high and low certainty ensemble results ----
 r2011b <- bind_rows(r2011[1, 2] + r2011[2,2], r2011[3,2] + r2011[4,2])
