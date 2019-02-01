@@ -11,10 +11,10 @@ lapply(libs, library, character.only = TRUE, verbose = FALSE)
 system("aws s3 sync s3://earthlab-amahood/data/model_agreement data/model_agreement") #single year test data
 system("aws s3 sync s3://earthlab-amahood/data/mucc_ensemble_results data/preensemble") #all years/models path 42 scene 31 (winnemucca)
 
-#set values for sc and date ----
-date <- paste(strsplit(date()," ")[[1]][c(2,3,5)],collapse="_")
+#set values for years, sc and date ----
+date <- paste(strsplit(date()," ")[[1]][c(2, 4)],collapse="_")
 sc_values = c("sc_9", "sc_14", "sc_21") #categories for separating pre-ensemble results into model type
-
+years <- c(1984:2011)
 #grab paths for pre-ensemble model results ----
 model_results <- list.files("data/preensemble", full.names = T)
 

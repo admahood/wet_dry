@@ -1,5 +1,5 @@
 # Step 1: Load packages ---------------------------
-libs <- c("randomForest", "dplyr","sf", "caTools", "raster", "tidyverse", "ggplot2")
+libs <- c("randomForest", "dplyr","sf", "caTools", "raster", "tidyverse", "ggplot2", "doParallel")
 # lapply(libs, install.packages, character.only = TRUE, verbose = FALSE)
 lapply(libs, library, character.only = TRUE, verbose = FALSE)
 
@@ -16,6 +16,7 @@ results_list <- list()
 for(i in 1:length(all_years_files)) {
  results_list[i]  <- raster(all_years_files[i])
 }
+
 
 df <- bind_rows( 
     r1984 = as_data_frame(table(values(results_list[[1]])))
@@ -53,7 +54,23 @@ df <- bind_rows(
 
 df <- df %>% dplyr::select(raster, class = Var1,  pixel_count = n)
 
-#trying to make a better organized pixel counts table
+
+#attempting to take masked pixels out of the total to get accurate percentages for classes ----
+esp_mask <- raster("data/esp_binary/clipped_binary.tif")
+esp_mask <- projectRaster(esp_mask, res = 30, crs = crs(results_list[[1]]))
+
+cores <- 6
+registerDoParallel(cores)
+
+masked_results_list <- list()
+foreach(i = results_list) %dopar% {
+  esp_mask <- projectRaster(esp_mask, i, res = 30)
+  masked <- mask(i, esp_mask, maskvalue = 0)
+  masked_results_list[i] <- masked
+}
+#trying to make a better organized pixel counts table ----
+
+
 df2 <- rbind( 
   r1984 = as.vector(table(values(results_list[[1]])))
   , r1985 = as.vector(table(values(results_list[[2]])))
@@ -87,14 +104,20 @@ df2 <- rbind(
 df2 <- as_data_frame(df2)
 names(df2) <- c("grass1", "grass2", "shrub2", "shrub1")
 
-
+na_value_list <- list()
 for(i in 1:length(results_list)) {
   na_value_list[i] <- as.vector(sum(values(is.na(results_list[[i]]))))
 }
 
 df2 <- mutate(df2, 
-       na_pixel_count = na_value_list
-)
+       na_pixel_count = as.numeric(na_value_list))
+esp_list <- list()
+for(i in 1:length(results_list)) {
+esp_clip <- projectRaster(esp_mask, results_list[[i]], res = 30),
+esp_list[i] <- as.vector(table((values(esp_clip)))
+}
+
+
 
 df2 <- df2 %>% mutate(year = c(1984:2011),
                       percent_grass_certain = as.numeric(grass1 / (grass1 + grass2 +shrub1 + shrub2 + na_pixel_count) * 100),
@@ -104,9 +127,11 @@ df2 <- df2 %>% mutate(year = c(1984:2011),
                       percent_shrub_total = as.numeric(percent_shrub_certain + percent_shrub_likely),
                       percent_grass_total = as.numeric(percent_grass_certain + percent_grass_likely),
                       total_pixels = as.numeric(grass1 + grass2 + shrub1 + shrub2 + na_pixel_count),
-                      percent_check = as.numeric(percent_grass_total + percent_shrub_total))
+                      percent_check = as.numeric(percent_grass_total + percent_shrub_total + percent_na),
+                      percent_na = as.numeric(na_pixel_count / (grass1 + grass2 + grass1 + shrub2 + na_pixel_count)))
+                      
 
-ggplot(data=df2, aes(y=df2$percent_shrub_total, x = df2$year)) + geom_point() + geom_smooth(method = "lm")
+ggplot(data=df2, aes(y=df2$percent_na, x = df2$year)) + geom_point() + geom_smooth(method = "lm")
 
 #scatter plot of cheat and sage totals with linear trend line ----
 ggplot(data=df, aes(x=raster, y=n, group = Var1, colour = as.factor(Var1))) + geom_point() + geom_smooth(method = "lm")
