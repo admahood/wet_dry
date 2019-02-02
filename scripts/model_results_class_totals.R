@@ -17,42 +17,42 @@ for(i in 1:length(all_years_files)) {
  results_list[i]  <- raster(all_years_files[i])
 }
 
-
-df <- bind_rows( 
-    r1984 = as_data_frame(table(values(results_list[[1]])))
-  , r1985 = as_data_frame(table(values(results_list[[2]])))
-  , r1986 = as_data_frame(table(values(results_list[[3]])))
-  , r1987 = as_data_frame(table(values(results_list[[4]])))
-  , r1988 = as_data_frame(table(values(results_list[[5]])))
-  , r1989 = as_data_frame(table(values(results_list[[6]])))
-  , r1990 = as_data_frame(table(values(results_list[[7]])))
-  , r1991 = as_data_frame(table(values(results_list[[8]])))
-  , r1992 = as_data_frame(table(values(results_list[[9]])))
-  , r1993 = as_data_frame(table(values(results_list[[10]])))
-  , r1994 = as_data_frame(table(values(results_list[[11]])))
-  , r1995 = as_data_frame(table(values(results_list[[12]])))
-  , r1996 = as_data_frame(table(values(results_list[[13]])))
-  , r1997 = as_data_frame(table(values(results_list[[14]])))
-  , r1998 = as_data_frame(table(values(results_list[[15]])))
-  , r1999 = as_data_frame(table(values(results_list[[16]])))
-  , r2000 = as_data_frame(table(values(results_list[[17]])))
-  , r2001 = as_data_frame(table(values(results_list[[18]])))
-  , r2002 = as_data_frame(table(values(results_list[[19]])))
-  , r2003 = as_data_frame(table(values(results_list[[20]])))
-  , r2004 = as_data_frame(table(values(results_list[[21]])))
-  , r2005 = as_data_frame(table(values(results_list[[22]])))
-  , r2006 = as_data_frame(table(values(results_list[[23]])))
-  , r2007 = as_data_frame(table(values(results_list[[24]])))
-  , r2008 = as_data_frame(table(values(results_list[[25]])))
-  , r2009 = as_data_frame(table(values(results_list[[26]])))
-  , r2010 = as_data_frame(table(values(results_list[[27]])))
-  , r2011 = as_data_frame(table(values(results_list[[28]])))
-  , .id = "raster"
-)
-
-
-
-df <- df %>% dplyr::select(raster, class = Var1,  pixel_count = n)
+# 
+# df <- bind_rows( 
+#     r1984 = as_data_frame(table(values(results_list[[1]])))
+#   , r1985 = as_data_frame(table(values(results_list[[2]])))
+#   , r1986 = as_data_frame(table(values(results_list[[3]])))
+#   , r1987 = as_data_frame(table(values(results_list[[4]])))
+#   , r1988 = as_data_frame(table(values(results_list[[5]])))
+#   , r1989 = as_data_frame(table(values(results_list[[6]])))
+#   , r1990 = as_data_frame(table(values(results_list[[7]])))
+#   , r1991 = as_data_frame(table(values(results_list[[8]])))
+#   , r1992 = as_data_frame(table(values(results_list[[9]])))
+#   , r1993 = as_data_frame(table(values(results_list[[10]])))
+#   , r1994 = as_data_frame(table(values(results_list[[11]])))
+#   , r1995 = as_data_frame(table(values(results_list[[12]])))
+#   , r1996 = as_data_frame(table(values(results_list[[13]])))
+#   , r1997 = as_data_frame(table(values(results_list[[14]])))
+#   , r1998 = as_data_frame(table(values(results_list[[15]])))
+#   , r1999 = as_data_frame(table(values(results_list[[16]])))
+#   , r2000 = as_data_frame(table(values(results_list[[17]])))
+#   , r2001 = as_data_frame(table(values(results_list[[18]])))
+#   , r2002 = as_data_frame(table(values(results_list[[19]])))
+#   , r2003 = as_data_frame(table(values(results_list[[20]])))
+#   , r2004 = as_data_frame(table(values(results_list[[21]])))
+#   , r2005 = as_data_frame(table(values(results_list[[22]])))
+#   , r2006 = as_data_frame(table(values(results_list[[23]])))
+#   , r2007 = as_data_frame(table(values(results_list[[24]])))
+#   , r2008 = as_data_frame(table(values(results_list[[25]])))
+#   , r2009 = as_data_frame(table(values(results_list[[26]])))
+#   , r2010 = as_data_frame(table(values(results_list[[27]])))
+#   , r2011 = as_data_frame(table(values(results_list[[28]])))
+#   , .id = "raster"
+# )
+# 
+# 
+# 
+# df <- df %>% dplyr::select(raster, class = Var1,  pixel_count = n)
 
 
 #attempting to take masked pixels out of the total to get accurate percentages for classes ----
@@ -111,27 +111,31 @@ for(i in 1:length(results_list)) {
 
 df2 <- mutate(df2, 
        na_pixel_count = as.numeric(na_value_list))
+
+esp_mask <- raster("data/esp_binary/clipped_binary.tif")
 esp_list <- list()
+
+
 for(i in 1:length(results_list)) {
-esp_clip <- projectRaster(esp_mask, results_list[[i]], res = 30),
-esp_list[i] <- as.vector(table((values(esp_clip)))
+  esp_clip <- projectRaster(esp_mask, results_list[[i]], res = 30, method = 'ngb')
+  esp_list[i] <- as.vector(table(values(esp_clip)))
 }
 
-
-
 df2 <- df2 %>% mutate(year = c(1984:2011),
-                      percent_grass_certain = as.numeric(grass1 / (grass1 + grass2 +shrub1 + shrub2 + na_pixel_count) * 100),
-                      percent_grass_likely = as.numeric(grass2 / (grass2 + grass1 +shrub1 + shrub2 + na_pixel_count) * 100),
-                      percent_shrub_certain = as.numeric(shrub1 / (shrub1 + grass2 +grass1 + shrub2 + na_pixel_count) * 100),
-                      percent_shrub_likely = as.numeric(shrub2 / (shrub2 + grass2 +shrub1 + grass1 + na_pixel_count) * 100),
+                      total_pixels = as.numeric(grass1 + grass2 + shrub1 + shrub2 + na_pixel_count),
+                      percent_grass_certain = as.numeric((grass1 / total_pixels) * 100),
+                      percent_grass_likely = as.numeric((grass2 / total_pixels) * 100),
+                      percent_shrub_certain = as.numeric((shrub1 / total_pixels) * 100),
+                      percent_shrub_likely = as.numeric((shrub2 / total_pixels) * 100),
                       percent_shrub_total = as.numeric(percent_shrub_certain + percent_shrub_likely),
                       percent_grass_total = as.numeric(percent_grass_certain + percent_grass_likely),
-                      total_pixels = as.numeric(grass1 + grass2 + shrub1 + shrub2 + na_pixel_count),
+                      percent_na = as.numeric((na_pixel_count / total_pixels) * 100),
                       percent_check = as.numeric(percent_grass_total + percent_shrub_total + percent_na),
-                      percent_na = as.numeric(na_pixel_count / (grass1 + grass2 + grass1 + shrub2 + na_pixel_count)))
+                      shrubvgrass = as.numeric(grass1 / shrub1)
+                      )
                       
 
-ggplot(data=df2, aes(y=df2$percent_na, x = df2$year)) + geom_point() + geom_smooth(method = "lm")
+ggplot(data=df2, aes(y=df2$percent_shrub_total, x = df2$year)) + geom_point() + geom_smooth(method = "lm")
 
 #scatter plot of cheat and sage totals with linear trend line ----
 ggplot(data=df, aes(x=raster, y=n, group = Var1, colour = as.factor(Var1))) + geom_point() + geom_smooth(method = "lm")
