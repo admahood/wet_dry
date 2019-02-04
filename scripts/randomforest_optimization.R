@@ -1,6 +1,11 @@
 # setup ------------------------------------------------------------------------
-libs <- c("caTools", "randomForest", "ROCR", "party", "caret", 
-          "tidyverse", "rgdal","sf", "Metrics", "gbm", "foreach", "doParallel")
+libs <- c("randomForest", "tidyverse","sf", "foreach", "doParallel",
+          "caTools", # for sample.split()
+          "caret", # for confusionMatrix
+          "ranger",
+          "spdep", #for the weights
+          "rfUtilities" # for multi.collinear()
+          )
 
 #lapply(libs, install.packages, character.only = TRUE, verbose = FALSE)
 
@@ -32,13 +37,53 @@ gbd <- st_read("data/plot_data/plots_with_landsat.gpkg", quiet=T) %>%
          folded_aspect_ns = get_folded_aspect_ns(aspect)) %>%
   dplyr::select(sr_band1, sr_band2, sr_band3, sr_band4, sr_band5, sr_band7,
                 ndvi=NDVI, evi=EVI, savi=SAVI,sr=SR, ndsvi,
-                greenness, brightness, wetness,
+                greenness, brightness, wetness, OBJECTID,Latitude,
                 total_shrubs,
                 elevation,
                 folded_aspect_ns,
-                slope, folded_aspect, tpi=TPI, tri=TRI, roughness, flowdir) %>%
-  mutate(satvi = get_satvi(sr_band3, sr_band5,sr_band7)) %>%
-  st_set_geometry(NULL)%>%
+                slope, tpi=TPI, tri=TRI, roughness, flowdir) %>%
+  mutate(satvi = get_satvi(sr_band3, sr_band5,sr_band7),
+         tndvi = (ndvi+1)*50,
+         dup = duplicated(Latitude)) %>%
+  filter(dup == F) %>%
+  dplyr::select(-dup, -Latitude, -OBJECTID)
+
+
+# creating weights
+
+# gbd$lat <- st_coordinates(gbd)[,2]
+
+# gbd_sp  <- as_Spatial(gbd) %>%
+#   sp::spTransform(albers)
+# dt.vgm <- gstat::variogram(total_shrubs~1, gbd_sp)
+# dt.fit <- gstat::fit.variogram(dt.vgm, model = gstat::vgm("Sph")) # fit model
+# plot(dt.vgm,dt.fit)
+
+
+
+# gstat::variogramST(total_shrubs~1, 
+#                    locations = gbd_sp@coords, 
+#                    tlags=1:4, 
+#                    data = gbd_sp@data$year)
+
+albers <- "+proj=aea +lat_1=29.5 +lat_2=45.5 +lat_0=37.5 +lon_0=-96 +x_0=0 +y_0=0 +ellps=GRS80 +datum=NAD83 +units=m +no_defs"
+coords_sf <- st_transform(gbd, albers) %>%
+  st_coordinates() 
+nb_sf <- spdep::knn2nb(spdep::knearneigh(coords_sf, k=4))
+dsts <- spdep::nbdists(nb_sf, coords_sf)
+
+gbd$weights <- NA
+for(i in 1:nrow(gbd)){
+  weightsum <- dsts[[i]] %>% sum()
+  weight <- ((weightsum/4))
+  gbd$weights[i]<- weight
+}
+
+maxw<-max(gbd$weights)
+gbd$weights <- gbd$weights/maxw
+
+
+gbd<-  st_set_geometry(gbd,NULL)%>%
   mutate(split = 1,
          split = sample.split(split, SplitRatio=0.7)) 
   
@@ -50,6 +95,7 @@ system(paste0("aws s3 cp gtrain_",
               ".csv s3://earthlab-amahood/data/data_splits/gtrain_",
               date,".csv"))
 
+#multi.collinear(gtrain)
 
 gdevtest <- filter(gbd,split ==FALSE) %>%
   mutate(split = sample.split(split, SplitRatio=0.5))
@@ -77,7 +123,13 @@ vbd <- st_read("data/plot_data/vegbank_plots_with_landsat.gpkg", quiet=T) %>%
                 elevation,
                 folded_aspect_ns,
                 slope, folded_aspect, tpi, tri, roughness, flowdir)  %>%
-  mutate(satvi = get_satvi(sr_band3, sr_band5,sr_band7)) %>%
+  mutate(satvi = get_satvi(sr_band3, sr_band5,sr_band7),
+         tndvi = (ndvi+1)*50)
+vbd$lat <- st_coordinates(vbd)[,2]
+
+vbd <- mutate(vbd, dup = duplicated(lat)) %>% 
+  filter(dup == F) %>%
+  dplyr::select(-dup) %>%
   st_set_geometry(NULL) %>%
   mutate(split = 1,
          split = sample.split(split, SplitRatio=0.7))
@@ -103,19 +155,12 @@ system(paste0("aws s3 cp vtest_",date,
               ".csv s3://earthlab-amahood/data/data_splits/vtest_",date,".csv"))
 
 # creating the hypermatrix -----------------------------------------------------
-mtry <- seq(1,15,1) # 22 = # cols in the yet to be created training set
-sc <- seq(3,25,1)
-nodesize <- seq(1,4,1)
-elevation <- c("yes","no")
-folded_aspect <- c("ns","ne_sw")
-dataset <- c("g", "v")
+mtry <- seq(1,8,1) # 22 = # cols in the yet to be created training set
+sc <- seq(4,25,1)
+# nodesize <- seq(1,4,1)
 
 hyper_grid <- expand.grid(mtry = mtry, 
-                          nodesize = nodesize, 
-                          sc=sc,
-                          elevation = elevation,
-                          folded_aspect = folded_aspect,
-                          dataset = dataset) ; nrow(hyper_grid)
+                          sc=sc) ; nrow(hyper_grid)
 
 # running the hypermatrix in parallel ------------------------------------------
 
@@ -123,19 +168,12 @@ registerDoParallel(corz)
 
 hr <- foreach (i = 1:nrow(hyper_grid), .combine = rbind) %dopar% {
   
-  if(hyper_grid$dataset[i] == "g"){
-    train <- mutate(gtrain,
+    train <- mutate(gbd,
                   binary = as.factor(
                     ifelse(
                       total_shrubs < hyper_grid$sc[i], "Grass", "Shrub"))) %>%
-      dplyr::select(-total_shrubs)}else{
-        
-        train <- mutate(vtrain,
-                        binary = as.factor(
-                          ifelse(
-                            total_shrubs < hyper_grid$sc[i], "Grass", "Shrub"))) %>%
-          dplyr::select(-total_shrubs)
-      }
+      dplyr::select(-total_shrubs) %>%
+      st_set_geometry(NULL)
   
   if(nrow(train[train$binary == "Grass",])<nrow(train[train$binary == "Shrub",])){
     gps <- train[train$binary == "Grass",]
@@ -149,30 +187,21 @@ hr <- foreach (i = 1:nrow(hyper_grid), .combine = rbind) %dopar% {
     train <- rbind(sps,ngps)
   }
     
-  if(hyper_grid$elevation[i] == "no"){dplyr::select(train,-elevation)}
-  if(hyper_grid$folded_aspect[i] == "ns"){dplyr::select(train, -folded_aspect)
-  }else{
-      dplyr::select(train, -folded_aspect_ns)
-    }
+
   # Train a Random Forest model
-  m <- randomForest(formula = binary ~ ., 
-                              data = train,
-                              nodesize = hyper_grid$nodesize[i],
+  m <- ranger(formula = binary ~ ., 
+                              data = dplyr::select(train,-weights),
                               mtry = hyper_grid$mtry[i],
-                              ntree = 3000)
+                              case.weights = train$weights,
+                              importance = "impurity",
+                              num.trees = 1000)
   #validate 
-  if(hyper_grid$dataset[i] == "g"){
-    dev1  <- mutate(gdev,
+    dev1  <- mutate(vbd,
                   binary = as.factor(
                     ifelse(
                       total_shrubs < hyper_grid$sc[i], "Grass", "Shrub")))%>%
-      dplyr::select(-total_shrubs)}else{
-        dev1  <- mutate(vdev,
-                        binary = as.factor(
-                          ifelse(
-                            total_shrubs < hyper_grid$sc[i], "Grass", "Shrub")))%>%
-          dplyr::select(-total_shrubs)
-      }
+      dplyr::select(-total_shrubs) %>%
+      st_set_geometry(NULL)
   
   if(nrow(dev1[dev1$binary == "Grass",])<nrow(dev1[dev1$binary == "Shrub",])){
     gps <- dev1[dev1$binary == "Grass",]
@@ -186,25 +215,25 @@ hr <- foreach (i = 1:nrow(hyper_grid), .combine = rbind) %dopar% {
     dev1 <- rbind(sps,ngps)
   }
   
-  if(hyper_grid$elevation[i] == "no"){dplyr::select(dev1,-elevation)}
-  
-  
   class_prediction <- predict(object = m,   # model object
-                              newdata = dev1,  # test dataset
-                              type = "class")
+                              data = dev1,  # test dataset
+                              type = "response")
   
-  cm <- confusionMatrix(data = class_prediction,       # predicted classes
+  cm <- confusionMatrix(data = class_prediction$predictions,       # predicted classes
                         reference = dev1$binary)  # actual classes
     # Store OOB error for the model                      
+  imps<- importance(m) %>% 
+    as.data.frame() %>% 
+    rownames_to_column("var") %>% 
+    arrange(desc(.)) %>%
+    dplyr::select("var")
+  
   w<- data.frame(
     mtry = hyper_grid$mtry[i], 
-    nodesize = hyper_grid$nodesize[i], 
     sc=hyper_grid$sc[i],
-    elevation = hyper_grid$elevation[i],
-    oob = m$err.rate[nrow(m$err.rate), "OOB"],
-    oob_grass = m$err.rate[nrow(m$err.rate), "Grass"],
-    oob_shrub = m$err.rate[nrow(m$err.rate), "Shrub"],
-    oob_balanced = m$err.rate[nrow(m$err.rate), "Grass"] +  m$err.rate[nrow(m$err.rate), "Shrub"],
+    sensitivity = as.numeric(cm$byClass[1]),
+    specificity = as.numeric(cm$byClass[2]),
+    oob = m$prediction.error,
     accuracy = as.numeric(cm$overall[1]),
     kappa = as.numeric(cm$overall[2]),
     ac_lower = as.numeric(cm$overall[3]),
@@ -212,8 +241,6 @@ hr <- foreach (i = 1:nrow(hyper_grid), .combine = rbind) %dopar% {
     ac_null = as.numeric(cm$overall[5]),
     accuracy_p = as.numeric(cm$overall[6]),
     mcnemar_p = as.numeric(cm$overall[7]),
-    sensitivity = as.numeric(cm$byClass[1]),
-    specificity = as.numeric(cm$byClass[2]),
     pos_pred_value = as.numeric(cm$byClass[3]),
     neg_pred_value = as.numeric(cm$byClass[4]),
     precision = as.numeric(cm$byClass[5]),
@@ -223,12 +250,20 @@ hr <- foreach (i = 1:nrow(hyper_grid), .combine = rbind) %dopar% {
     detection_rate = as.numeric(cm$byClass[9]),
     detection_prevalence = as.numeric(cm$byClass[10]),
     balanced_accuracy = as.numeric(cm$byClass[11]),
-    folded_aspect_type = hyper_grid$folded_aspect[i],
-    dataset = hyper_grid$dataset[i]
+    sample_size = m$num.samples,
+    var1=imps$var[1],
+    var2=imps$var[2],
+    var3=imps$var[3],
+    var4=imps$var[4],
+    var5=imps$var[5],
+    var6=imps$var[6],
+    var7=imps$var[7],
+    var8=imps$var[8]
+    
   )
   gc()
   system(paste("echo", 
-               hyper_grid$folded_aspect[i],
+               m$num.samples,
                round(as.numeric(cm$byClass[11]),2), 
                paste(round(i/nrow(hyper_grid)*100,2),"%")))
   return(w)
@@ -240,21 +275,32 @@ system(paste0("aws s3 cp data/hg",date,".csv s3://earthlab-amahood/data/hypergri
 # below here is messing around, above is things that are used ------------------
 
 # fitting the optimum model ----------------------------------------------------
-read.csv("data/hg_w_elev_rf.csv")%>%
-  arrange(oob) %>%
+read.csv(paste0("data/hg",date,".csv"))%>%
+  arrange(desc(accuracy)) %>%
+  dplyr::select(mtry,sc, sensitivity, specificity, kappa, accuracy) %>%
   as_tibble()
+
+table(c(
+table(hr[1:10,]$var1) %>%sort(decreasing = T) %>% names(),
+table(hr[1:10,]$var2) %>%sort(decreasing = T)%>% names(),
+table(hr[1:10,]$var3) %>%sort(decreasing = T)%>% names(),
+table(hr[1:10,]$var4) %>%sort(decreasing = T)%>% names(),
+table(hr[1:10,]$var5) %>%sort(decreasing = T)%>% names(),
+table(hr[1:10,]$var6) %>%sort(decreasing = T)%>% names(),
+table(hr[1:10,]$var7) %>%sort(decreasing = T)%>% names())
+)
 
 gbd <- mutate(gbd,
               binary = as.factor(
                 ifelse(
-                  total_shrubs < 12, "Grass", "Shrub")))
+                  total_shrubs < 18, "Grass", "Shrub")))
 
 variables <- dplyr::select(gbd,
                            sr_band1, sr_band2, sr_band3, sr_band4, sr_band5, sr_band7,
-                           ndvi = NDVI, evi = EVI, savi = SAVI,sr = SR, ndsvi, #data$SATVI,
+                           ndvi, evi, savi,sr , ndsvi, satvi,
                            greenness, brightness, wetness,
-                           elevation,
-                           slope, folded_aspect, tpi = TPI, tri = TRI, roughness, flowdir,
+                           elevation, tndvi, weights,
+                           slope, folded_aspect_ns, tpi, tri , roughness, flowdir,
                            binary)
 
 variables$split <- sample.split(variables$binary, SplitRatio = .8) #create new variable for splitting plot data into training and test datasets (70% training data)
@@ -262,23 +308,19 @@ variables$split <- sample.split(variables$binary, SplitRatio = .8) #create new v
 train <- filter(variables, split == TRUE) %>%    #create training dataset
   dplyr::select(-split)                            #remove split variable from training data
 test <- filter(variables, split == FALSE) %>%
-  dplyr::select(-split)
+  dplyr::select(-split,-weights)
 
-frst <- randomForest(formula = binary ~ .,
-                     data = train,
-                     mtry = 14,
-                     nodesize = 2,
-                     sampsize = 742,
-                     importance=TRUE,
-                     ntree = 2000)
-
-
-oob_err <- frst$err.rate[nrow(frst$err.rate),]
+frst <- ranger(formula = binary ~ .,
+                     data = dplyr::select(train, -weights),
+                     mtry = 1,
+                     importance="permutation",
+                     case.weights = train$weights,
+                     num.trees = 2000)
 
 class_prediction <- predict(object = frst,   # model object
-                            newdata = test,  # test dataset
-                            type = "class")
-cm <- confusionMatrix(data = class_prediction,       # predicted classes
+                            data = test,  # test dataset
+                            type = "response")
+cm <- confusionMatrix(data = class_prediction$predictions,       # predicted classes
                       reference = test$binary)  # actual classes
 print(cm)
 paste0("Test Accuracy: ", cm$overall[1])
