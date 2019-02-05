@@ -54,50 +54,76 @@ gbd <- st_read("data/plot_data/plots_with_landsat.gpkg", quiet=T) %>%
 
 # data exploration -------------------------------------------------------------
 
-resp <- dplyr::select(gbd, total_shrubs, SagebrushC,
-                      BareSoilCo,InvAnnGras, InvAnnFo_1,InvPlantCo,
-                      GapPct_25_,GapPct_51_, GapPct_101, GapPct_200, GapPct_251,
-                      TotalFolia) %>%
+resp <- dplyr::select(gbd, SagebrushC,
+                      TotalFolia,
+                      BareSoilCo,InvAnnGras, InvAnnFo_1,InvPlantCo) %>%
   st_set_geometry(NULL) 
 clm <- dplyr::select(gbd, sr_band1, sr_band2, sr_band3, sr_band4, sr_band5, sr_band7,
                      elevation,ndvi,evi,satvi,tndvi,sr,ndsvi,Latitude,
                      folded_aspect_ns, brightness, greenness, wetness,
                      slope, tpi, tri, roughness, flowdir) %>%
   st_set_geometry(NULL) %>%
-  mutate(index57 = (sr_band5 - sr_band7)/(sr_band5+sr_band7))
+  mutate(index57 = (sr_band5 - sr_band7)/(sr_band5+sr_band7),
+         green_ndvi = (sr_band4 - sr_band2)/(sr_band4+sr_band2),
+         moisture_index = (sr_band4 - sr_band5)/(sr_band4+sr_band5),
+         SLA_index = sr_band4/(sr_band3+sr_band7))
 res_df <- data.frame(resp = NA, pred1 = NA, pred2=NA,R2 = NA, p = NA, est = NA)
+nb_df <- data.frame(pred = NA, rsq=NA,aic=NA, p=NA, est=NA)
 counter <- 1
 #univariate
+d <- mutate(cbind(resp,clm), SagebrushC = SagebrushC/100)
+for (r in 1:ncol(dplyr::select(d,-SagebrushC))){
+  f <- formula(paste0("SagebrushC ~ ",  names(dplyr::select(d,-SagebrushC))[r]))
+  x <- summary(glm(f, d, family=quasibinomial(link="logit")))
+  nb_df[counter, 1] <- names(dplyr::select(d,-SagebrushC))[r]
+  nb_df[counter, 2] <- round(rsq::rsq(glm(f, d, family="binomial")),4)
+  nb_df[counter, 3] <- x$aic
+  nb_df[counter, 4] <- round(x$coefficients[2,4], 4)
+  nb_df[counter, 5] <- round(x$coefficients[2,1], 4)
+  counter = counter +1
+}
+arrange(nb_df,desc(rsq))[1:20,]
+
+rsp <- resp/100
+dd <- cbind(rsp,clm)
+
+
+clm<-cbind(clm,x)
+counter <- 1
 for(r in 1:ncol(resp)){
   for(d in 1:ncol((clm))){
-      f <- formula(paste0("sqrt(",names(resp)[r],")", "~",  names(clm)[d]))
-      x <- summary(lm(f, data = cbind(resp,clm)))
+      f <- formula(paste0(names(resp)[r], "~",  names(clm)[d]))
+      m <- glm(f, data = dd, family=quasibinomial(link="logit"))
+      x <- summary(m)
       res_df[counter, 1] <- names(resp)[r]
       res_df[counter, 2] <- names((clm))[d]
       res_df[counter, 3] <- NA
-      res_df[counter, 4] <- round(x$r.squared, 4)
+      res_df[counter, 4] <- round(rsq::rsq(m),4)
       res_df[counter, 5] <- round(x$coefficients[2,4], 4)
       res_df[counter, 6] <- round(x$coefficients[2,1], 4)
       counter = counter +1
     
   }
 }
+
 #bivariate
 for(r in 1:ncol(resp)){
   for(c in 1:ncol(clm)){
-      for(e in 1:ncol(clm)){
-      f <- formula(paste0("sqrt(",names(resp)[r], ") ~", names(clm)[c],
+    for(e in 1:ncol(clm)){
+      
+      f <- formula(paste0(names(resp)[r], "~", names(clm)[c],
                           "+", names((clm))[e]))
-      x <- summary(lm(f, data = cbind(resp,clm)))
+      m <- glm(f, data = dd, family=quasibinomial(link="logit"))
+      x <- summary(m)
       res_df[counter, 1] <- names(resp)[r]
       res_df[counter, 2] <- names(clm)[c]
       res_df[counter, 3] <- names((clm))[e]
-      res_df[counter, 4] <- round(x$r.squared, 4)
+      res_df[counter, 4] <- round(rsq::rsq(m),4)
       res_df[counter, 5] <- round(x$coefficients[2,4], 4)
       res_df[counter, 6] <- round(x$coefficients[2,1], 4)
       counter = counter +1
-      }
     }
+  }
 }
 # total veg cover (TotalFolia) and bare soil (BareSoilCo) are best, and elevation 
 # is not a good predictor. I found that bands 5 and 7 were always good, so I made
@@ -111,8 +137,46 @@ for(r in 1:ncol(resp)){
 # that's not good lol
 arrange(res_df[res_df$resp == "InvAnnGras",],desc(R2))[1:20,]
 arrange(res_df[res_df$resp == "InvAnnFo_1",],desc(R2))[1:20,]
+arrange(res_df[res_df$resp == "SagebrushC",],desc(R2))[1:20,]
+arrange(res_df[res_df$resp == "BareSoilCo",],desc(R2))[1:20,]
+
 arrange(res_df,desc(R2))[1:20,]
 
+m <- glm(SagebrushC~InvPlantCo + elevation +green_ndvi, dd, family=quasibinomial(link="logit"))
+summary(m); rsq::rsq(m) # still just .266
+ggplot(data=dd,aes(y=SagebrushC,x=green_ndvi))+
+  geom_point()+
+  geom_smooth(method = "glm", 
+              method.args = list(family=quasibinomial(link="logit")), 
+              se = TRUE) +
+  theme_bw()
+
+m <- glm(TotalFolia ~ index57+ sr_band2*green_ndvi, dd, family=quasibinomial(link="logit"))
+summary(m); rsq::rsq(m)
+ggplot(data=dd,aes(y=TotalFolia,x=index57))+
+         geom_point()+
+  geom_smooth(method = "glm", 
+              method.args = list(family=quasibinomial(link="logit")), 
+              se = TRUE) +
+  theme_bw()
+
+m <- glm(BareSoilCo ~ index57+ sr_band4*brightness, dd, family=quasibinomial(link="logit"))
+summary(m); rsq::rsq(m)
+ggplot(data=dd,aes(y=BareSoilCo,x=index57))+
+  geom_point()+
+  geom_smooth(method = "glm", 
+              method.args = list(family=quasibinomial(link="logit")), 
+              se = TRUE) +
+  theme_bw()
+
+x<-prcomp(resp)$x %>%as.data.frame
+
+dd1 <- cbind(dd, x)
+
+ggplot(dd1, aes(size=SagebrushC, color=TotalFolia, y=PC1, x=PC2))+
+  geom_point()
+ggplot(dd1, aes(size=InvAnnFo_1, color=BareSoilCo, y=PC1, x=PC2))+
+  geom_point()
 # creating weights
 
 # gbd$lat <- st_coordinates(gbd)[,2]
