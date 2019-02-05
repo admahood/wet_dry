@@ -39,6 +39,9 @@ gbd <- st_read("data/plot_data/plots_with_landsat.gpkg", quiet=T) %>%
                 ndvi=NDVI, evi=EVI, savi=SAVI,sr=SR, ndsvi,
                 greenness, brightness, wetness, OBJECTID,Latitude,
                 total_shrubs,
+                BareSoilCo,InvAnnGras, InvAnnFo_1,InvPlantCo,
+                GapPct_25_,GapPct_51_, GapPct_101, GapPct_200, GapPct_251,
+                TotalFolia, SagebrushC,
                 elevation,
                 folded_aspect_ns,
                 slope, tpi=TPI, tri=TRI, roughness, flowdir) %>%
@@ -46,8 +49,69 @@ gbd <- st_read("data/plot_data/plots_with_landsat.gpkg", quiet=T) %>%
          tndvi = (ndvi+1)*50,
          dup = duplicated(Latitude)) %>%
   filter(dup == F) %>%
-  dplyr::select(-dup, -Latitude, -OBJECTID)
+  dplyr::select(-dup, -OBJECTID)
 
+
+# data exploration -------------------------------------------------------------
+
+resp <- dplyr::select(gbd, total_shrubs, SagebrushC,
+                      BareSoilCo,InvAnnGras, InvAnnFo_1,InvPlantCo,
+                      GapPct_25_,GapPct_51_, GapPct_101, GapPct_200, GapPct_251,
+                      TotalFolia) %>%
+  st_set_geometry(NULL) 
+clm <- dplyr::select(gbd, sr_band1, sr_band2, sr_band3, sr_band4, sr_band5, sr_band7,
+                     elevation,ndvi,evi,satvi,tndvi,sr,ndsvi,Latitude,
+                     folded_aspect_ns, brightness, greenness, wetness,
+                     slope, tpi, tri, roughness, flowdir) %>%
+  st_set_geometry(NULL) %>%
+  mutate(index57 = (sr_band5 - sr_band7)/(sr_band5+sr_band7))
+res_df <- data.frame(resp = NA, pred1 = NA, pred2=NA,R2 = NA, p = NA, est = NA)
+counter <- 1
+#univariate
+for(r in 1:ncol(resp)){
+  for(d in 1:ncol((clm))){
+      f <- formula(paste0("sqrt(",names(resp)[r],")", "~",  names(clm)[d]))
+      x <- summary(lm(f, data = cbind(resp,clm)))
+      res_df[counter, 1] <- names(resp)[r]
+      res_df[counter, 2] <- names((clm))[d]
+      res_df[counter, 3] <- NA
+      res_df[counter, 4] <- round(x$r.squared, 4)
+      res_df[counter, 5] <- round(x$coefficients[2,4], 4)
+      res_df[counter, 6] <- round(x$coefficients[2,1], 4)
+      counter = counter +1
+    
+  }
+}
+#bivariate
+for(r in 1:ncol(resp)){
+  for(c in 1:ncol(clm)){
+      for(e in 1:ncol(clm)){
+      f <- formula(paste0("sqrt(",names(resp)[r], ") ~", names(clm)[c],
+                          "+", names((clm))[e]))
+      x <- summary(lm(f, data = cbind(resp,clm)))
+      res_df[counter, 1] <- names(resp)[r]
+      res_df[counter, 2] <- names(clm)[c]
+      res_df[counter, 3] <- names((clm))[e]
+      res_df[counter, 4] <- round(x$r.squared, 4)
+      res_df[counter, 5] <- round(x$coefficients[2,4], 4)
+      res_df[counter, 6] <- round(x$coefficients[2,1], 4)
+      counter = counter +1
+      }
+    }
+}
+# total veg cover (TotalFolia) and bare soil (BareSoilCo) are best, and elevation 
+# is not a good predictor. I found that bands 5 and 7 were always good, so I made
+# an NDVI-type index of them (index57) and that worked well
+# but invasive annual grass and invasive annual grasses and forbs combined also
+# does pretty good
+# Sagebrush cover was not easily predicted. Perhaps we can use this info to develop
+# a way to group sites based on these response variables that are better able 
+# to be predicted as our class labels.
+# also, i discovered that our total shrubs variable is sometimes over 100...
+# that's not good lol
+arrange(res_df[res_df$resp == "InvAnnGras",],desc(R2))[1:20,]
+arrange(res_df[res_df$resp == "InvAnnFo_1",],desc(R2))[1:20,]
+arrange(res_df,desc(R2))[1:20,]
 
 # creating weights
 
