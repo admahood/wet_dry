@@ -52,7 +52,7 @@ gbd <- st_read("data/plot_data/plots_with_landsat.gpkg", quiet=T) %>%
   dplyr::select(-dup, -OBJECTID)
 
 
-# data exploration -------------------------------------------------------------
+# splitting the data into response and predictor variables -------------------------------------------------------------
 
 resp <- dplyr::select(gbd, SagebrushC,
                       TotalFolia,
@@ -67,6 +67,9 @@ clm <- dplyr::select(gbd, sr_band1, sr_band2, sr_band3, sr_band4, sr_band5, sr_b
          green_ndvi = (sr_band4 - sr_band2)/(sr_band4+sr_band2),
          moisture_index = (sr_band4 - sr_band5)/(sr_band4+sr_band5),
          SLA_index = sr_band4/(sr_band3+sr_band7))
+
+# running loops of single and multivariate models to check out relationships---------
+# (easier than plotting) 
 res_df <- data.frame(resp = NA, pred1 = NA, pred2=NA,R2 = NA, p = NA, est = NA)
 nb_df <- data.frame(pred = NA, rsq=NA,aic=NA, p=NA, est=NA)
 counter <- 1
@@ -142,6 +145,8 @@ arrange(res_df[res_df$resp == "BareSoilCo",],desc(R2))[1:20,]
 
 arrange(res_df,desc(R2))[1:20,]
 
+# now plotting!! ---------------------------------------------------------------
+
 m <- glm(SagebrushC~InvPlantCo + elevation +green_ndvi, dd, family=quasibinomial(link="logit"))
 summary(m); rsq::rsq(m) # still just .266
 ggplot(data=dd,aes(y=SagebrushC,x=green_ndvi))+
@@ -177,6 +182,74 @@ ggplot(dd1, aes(size=SagebrushC, color=TotalFolia, y=PC1, x=PC2))+
   geom_point()
 ggplot(dd1, aes(size=InvAnnFo_1, color=BareSoilCo, y=PC1, x=PC2))+
   geom_point()
+
+# unsupervised clustering using random forest  ----------------------------------
+# any of the clustering methods will probably work and the veg clustering 
+# methods out of the vegan package might be better, but just checking this out.
+# looks like it works pretty good (see teh MDS plot)
+rf_us <- randomForest(resp, ntree=3000, proximity = TRUE)
+library(cluster)
+
+# note here that k is the number of clusters
+resp$cluster <- as.factor(pam(1-rf_us$proximity, k=2, diss = TRUE)$clustering)
+
+# looks like 2 works good in this case
+MDSplot(rf_us, resp$cluster)
+
+# now, we use whatever classification label
+ddd<- list()
+ddd[[1]] <- cbind(clm,dplyr::select(resp,cluster)) 
+rvars <- ncol(ddd[[1]])-2
+
+# randomForest(cluster~., ddd)
+
+control <- trainControl(method='repeatedcv',
+                        number=10, 
+                        repeats=3,
+                        search="grid")
+var_results <- data.frame(accuracy=NA, nvars = NA, dropped = NA)
+for (i in 1:rvars){ # this takes 10-30 minutes
+  tgrid <- expand.grid(
+    .mtry = 1:round(sqrt(ncol(ddd[[i]])-1)),
+    .splitrule = "gini",
+    .min.node.size = c(10, 20)
+  )
+  # next time this is ran, do rf[[i]] to be able to look at the models later
+  rf <- train(cluster~., 
+                      data=ddd[[i]], 
+                      method='ranger',
+                      metric='Accuracy', # or RMSE?
+                      tuneGrid=tgrid, 
+                      trControl=control,
+                      importance = "permutation")
+  
+  var_results[i, 1] <- max(rf$results$Accuracy)
+  var_results[i, 2] <- i
+  
+  
+  least_important <- caret::varImp(rf)$importance %>%
+    rownames_to_column("var") %>%
+    arrange(Overall)
+  vvv <- least_important[1,1]
+  ddd[[i+1]] <- dplyr::select(ddd[[i]],-vvv)
+  
+  var_results[i, 3] <- vvv
+  print(paste(i/rvars*100, "%"))
+}
+
+names(ddd[[16]]) -> nnn
+nnn <- nnn[1:(length(nnn)-1)] #dropping cluster
+ggplot(var_results, aes(x=nvars, y=accuracy)) + 
+  geom_line() +
+  xlab("# Variables dropped (out of 27)") +
+  geom_vline(xintercept = 16, lty=3) +
+  annotate("text",x=0, y=0.815, hjust=0, vjust=1,
+           label = paste("Remaining Variables (after dropping 16): \n",
+                         nnn[1],"\n",nnn[2],"\n",nnn[3],"\n",nnn[4], "\n",
+                         nnn[5], "\n",nnn[6], "\n",nnn[7],"\n",nnn[8], "\n",
+                         nnn[9], "\n", nnn[10],"\n",nnn[11],"\n",nnn[12])) + 
+    ggsave("var_dropping.pdf")
+
 # creating weights
 
 # gbd$lat <- st_coordinates(gbd)[,2]
