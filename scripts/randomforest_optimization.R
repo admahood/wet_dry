@@ -201,11 +201,24 @@ gbd_new <- rbind(grasses,shrubs) %>%
                 elevation,ndvi,evi,satvi,tndvi,sr,ndsvi,Latitude,
                 folded_aspect_ns, brightness, greenness, wetness,
                 slope, tpi, tri, roughness, flowdir) %>%
-  st_set_geometry(NULL) %>%
   mutate(index57 = (sr_band5 - sr_band7)/(sr_band5+sr_band7),
          green_ndvi = (sr_band4 - sr_band2)/(sr_band4+sr_band2),
          moisture_index = (sr_band4 - sr_band5)/(sr_band4+sr_band5),
          SLA_index = sr_band4/(sr_band3+sr_band7))
+
+albers <- "+proj=aea +lat_1=29.5 +lat_2=45.5 +lat_0=37.5 +lon_0=-96 +x_0=0 +y_0=0 +ellps=GRS80 +datum=NAD83 +units=m +no_defs"
+coords_sf <- st_transform(gbd_new, albers) %>%
+  st_coordinates() 
+nb_sf <- spdep::knn2nb(spdep::knearneigh(coords_sf, k=4))
+dsts <- spdep::nbdists(nb_sf, coords_sf)
+
+www <- vector()
+for(i in 1:nrow(gbd_new)){
+  weightsum <- dsts[[i]] %>% sum()
+  weight <- ((weightsum/4))
+  www[i]<- weight
+}
+
 
 
 rf_us <- randomForest(resp, ntree=3000, proximity = TRUE)
@@ -223,7 +236,8 @@ ggplot(resp, aes(y=SagebrushC, x=TotalFolia, color = cluster))+
 
 # now, we use whatever classification label
 ddd<- list()
-ddd[[1]] <- cbind(clm,dplyr::select(resp,cluster)) 
+#ddd[[1]] <- cbind(clm,dplyr::select(resp,cluster)) 
+ddd[[1]] <- gbd_new
 rvars <- ncol(ddd[[1]])-2
 
 # randomForest(cluster~., ddd)
@@ -234,18 +248,33 @@ control <- trainControl(method='repeatedcv',
                         search="grid")
 var_results <- data.frame(accuracy=NA, nvars = NA, dropped = NA)
 for (i in 1:rvars){ # this takes 10-30 minutes
+  
+  # albers <- "+proj=aea +lat_1=29.5 +lat_2=45.5 +lat_0=37.5 +lon_0=-96 +x_0=0 +y_0=0 +ellps=GRS80 +datum=NAD83 +units=m +no_defs"
+  # coords_sf <- st_transform(ddd[[i]], albers) %>%
+  #   st_coordinates() 
+  # nb_sf <- spdep::knn2nb(spdep::knearneigh(coords_sf, k=4))
+  # dsts <- spdep::nbdists(nb_sf, coords_sf)
+  # 
+  # ddd[[i]]$www <- NA
+  # for(j in 1:nrow(ddd[[i]])){
+  #   weightsum <- dsts[[j]] %>% sum()
+  #   weight <- ((weightsum/4))
+  #   ddd[[i]]$www[j]<- weight
+  # }
+
   tgrid <- expand.grid(
-    .mtry = 1:round(sqrt(ncol(ddd[[i]])-1)),
+    .mtry = 1:round(sqrt(ncol(ddd[[i]])-2)), #cluster and geom don't count
     .splitrule = "gini",
     .min.node.size = c(10, 20)
   )
   # next time this is ran, do rf[[i]] to be able to look at the models later
   rf <- train(cluster~., 
-                      data=ddd[[i]], 
+                      data=st_set_geometry(ddd[[i]], NULL), 
                       method='ranger',
-                      metric='Accuracy', # or RMSE?
+                      metric=c('Accuracy'), # or RMSE?
                       tuneGrid=tgrid, 
                       trControl=control,
+                      #case.weights = www, # not sure why this doesn't work
                       importance = "permutation")
   
   var_results[i, 1] <- max(rf$results$Accuracy)
@@ -262,18 +291,19 @@ for (i in 1:rvars){ # this takes 10-30 minutes
   print(paste(i/rvars*100, "%"))
 }
 
-names(ddd[[16]]) -> nnn
-nnn <- nnn[1:(length(nnn)-1)] #dropping cluster
+names(ddd[[23]]) -> nnn
+nnn <- nnn[2:length(nnn)-1] #dropping cluster and geom
 ggplot(var_results, aes(x=nvars, y=accuracy)) + 
   geom_line() +
   xlab("# Variables dropped (out of 27)") +
-  geom_vline(xintercept = 16, lty=3) +
-  annotate("text",x=0, y=0.815, hjust=0, vjust=1,
-           label = paste("Remaining Variables (after dropping 16): \n",
+  geom_vline(xintercept = 23, lty=3) +
+  annotate("text",x=0, y=0.86, hjust=0, vjust=1,
+           label = paste("Remaining Variables (after dropping 22): \n",
                          nnn[1],"\n",nnn[2],"\n",nnn[3],"\n",nnn[4], "\n",
-                         nnn[5], "\n",nnn[6], "\n",nnn[7],"\n",nnn[8], "\n",
-                         nnn[9], "\n", nnn[10],"\n",nnn[11],"\n",nnn[12])) + 
-    ggsave("var_dropping.pdf")
+                         nnn[5]#, "\n",nnn[6], "\n",nnn[7],"\n",nnn[8], "\n",
+                         #nnn[9], "\n", nnn[10],"\n",nnn[11],"\n",nnn[12])) + 
+           )) +
+    ggsave("var_dropping_2.pdf")
 
 # creating weights
 
