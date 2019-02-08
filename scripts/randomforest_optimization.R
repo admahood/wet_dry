@@ -56,7 +56,11 @@ gbd <- st_read("data/plot_data/plots_with_landsat.gpkg", quiet=T) %>%
 
 resp <- dplyr::select(gbd, SagebrushC,
                       TotalFolia,
-                      BareSoilCo,InvAnnGras, InvAnnFo_1,InvPlantCo) %>%
+                      BareSoilCo,
+                      #InvAnnGras, 
+                      #InvAnnFo_1,
+                      InvPlantCo
+                      ) %>%
   st_set_geometry(NULL) 
 clm <- dplyr::select(gbd, sr_band1, sr_band2, sr_band3, sr_band4, sr_band5, sr_band7,
                      elevation,ndvi,evi,satvi,tndvi,sr,ndsvi,Latitude,
@@ -91,7 +95,6 @@ rsp <- resp/100
 dd <- cbind(rsp,clm)
 
 
-clm<-cbind(clm,x)
 counter <- 1
 for(r in 1:ncol(resp)){
   for(d in 1:ncol((clm))){
@@ -175,9 +178,8 @@ ggplot(data=dd,aes(y=BareSoilCo,x=index57))+
   theme_bw()
 
 x<-prcomp(resp)$x %>%as.data.frame
-
+biplot(prcomp(resp))
 dd1 <- cbind(dd, x)
-
 ggplot(dd1, aes(size=SagebrushC, color=TotalFolia, y=PC1, x=PC2))+
   geom_point()
 ggplot(dd1, aes(size=InvAnnFo_1, color=BareSoilCo, y=PC1, x=PC2))+
@@ -187,14 +189,37 @@ ggplot(dd1, aes(size=InvAnnFo_1, color=BareSoilCo, y=PC1, x=PC2))+
 # any of the clustering methods will probably work and the veg clustering 
 # methods out of the vegan package might be better, but just checking this out.
 # looks like it works pretty good (see teh MDS plot)
+
+# why not just manually attempt to get rid of mixed pixels? --------------------
+shrubs<- dplyr::filter(gbd, SagebrushC > 0 & InvAnnGras < 2) %>%
+  mutate(cluster = "shrub")
+grasses <- dplyr::filter(gbd, SagebrushC < 2 & InvAnnGras >2)%>%
+  mutate(cluster="grass")
+
+gbd_new <- rbind(grasses,shrubs) %>%
+  dplyr::select(cluster, sr_band1, sr_band2, sr_band3, sr_band4, sr_band5, sr_band7,
+                elevation,ndvi,evi,satvi,tndvi,sr,ndsvi,Latitude,
+                folded_aspect_ns, brightness, greenness, wetness,
+                slope, tpi, tri, roughness, flowdir) %>%
+  st_set_geometry(NULL) %>%
+  mutate(index57 = (sr_band5 - sr_band7)/(sr_band5+sr_band7),
+         green_ndvi = (sr_band4 - sr_band2)/(sr_band4+sr_band2),
+         moisture_index = (sr_band4 - sr_band5)/(sr_band4+sr_band5),
+         SLA_index = sr_band4/(sr_band3+sr_band7))
+
+
 rf_us <- randomForest(resp, ntree=3000, proximity = TRUE)
 library(cluster)
+hclust(vegan::vegdist(resp, method="bray"), method="average") -> clust
 
 # note here that k is the number of clusters
 resp$cluster <- as.factor(pam(1-rf_us$proximity, k=2, diss = TRUE)$clustering)
 
 # looks like 2 works good in this case
 MDSplot(rf_us, resp$cluster)
+table(resp$cluster)
+ggplot(resp, aes(y=SagebrushC, x=TotalFolia, color = cluster))+
+  geom_point()
 
 # now, we use whatever classification label
 ddd<- list()
