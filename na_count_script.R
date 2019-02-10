@@ -23,7 +23,7 @@ system(paste0("aws s3 sync ", s3_path, " ", local_path))
 scene <- list.files("data/ls5_mucc")
 scene_full <- list.files("data/ls5_mucc", full.names = T)
 
-#parallel prep
+
 #create individual annual esp masks and write to disk
 for(i in 1:length(scene_full))  {
   ls5 <- stack(scene_full[i])
@@ -108,4 +108,15 @@ for(i in 1:length(esp_rclssed)) {
 esp_nacount_stack <- stack(esp_rclssed)
 rm(esp_rclssed)
 esp_nacount_raster <- sum(esp_nacount_stack)
+writeRaster(esp_nacount_raster, filename = paste0(esp_folder, "/detailed_allyears_esp_nacount.tif"))
+system(paste0("aws s3 sync", " ", esp_folder, " ", " s3://earthlab-amahood/data/annual_esp_masks_mucc/"))
+
+
+
+m <- c(0, 27, 0,  27.5, 28, 1)
+rclmat <- matrix(m, ncol=3, byrow=TRUE)
+
+esp_nacount_binary <- reclassify(esp_nacount_raster, rclmat)
+writeRaster(esp_nacount_binary, filename = paste0(esp_folder, "/binary_allyears_esp_nacount.tif"))
+system(paste0("aws s3 sync", " ", esp_folder, " ", " s3://earthlab-amahood/data/annual_esp_masks_mucc/"))
 
