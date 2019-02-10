@@ -106,7 +106,7 @@ get_satvi <- function(band3, band5, band7, L = 0.5) {
   x= (band5 - band3) / (band5 + band3 + L)
   y= x  * (1 + L) 
   z= y - (band7 / 2)
-  return(y)
+  return(z)
 }
 
 get_ndsvi <- function(band3, band5) {

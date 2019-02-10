@@ -81,6 +81,7 @@ foreach(i = scene_full,
           
           # names to match exactly with training data that goes into model. 
           # The order matters for these
+          # -- adam-- just name them correctly the first time in the script and delete this
           names(ls5) <- c("sr_band1", "sr_band2", "sr_band3", "sr_band4", 
                           "sr_band5", "sr_band7", "wetness", "brightness", 
                           "greenness",  "ndvi", "savi", "sr", "evi",
