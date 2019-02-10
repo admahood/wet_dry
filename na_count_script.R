@@ -120,3 +120,61 @@ esp_nacount_binary <- reclassify(esp_nacount_raster, rclmat)
 writeRaster(esp_nacount_binary, filename = paste0(esp_folder, "/binary_allyears_esp_nacount.tif"))
 system(paste0("aws s3 sync", " ", esp_folder, " ", " s3://earthlab-amahood/data/annual_esp_masks_mucc/"))
 
+
+
+# URB AG NA COUNT SCRIPT STARTS HERE -----
+
+urb_list <- list.files(paste0(urbag_folder), full.names = T)
+
+urb_rclssed <- list()
+for(i in 1:length(urb_list)) {
+  urb_rclssed[[i]] <- raster(urb_list[i])
+  urb_rclssed[[i]][urb_rclssed[[i]] > 0] <- 1
+}
+
+#find extent which covers all masks so we can stack them
+xmin <- as.vector(c())
+xmax <- as.vector(c())
+ymin <- as.vector(c())
+ymax <- as.vector(c())
+e <- c()
+
+for (i in 1:length(urb_rclssed)) {
+  xmin[i] <- extent(urb_rclssed[[i]])@xmin
+  xmax[i] <- extent(urb_rclssed[[i]])@xmax
+  ymin[i] <- extent(urb_rclssed[[i]])@ymin
+  ymax[i] <- extent(urb_rclssed[[i]])@ymax
+}
+
+xm <- min(xmin)
+xma <- max(xmax)
+ym <- min(ymin)
+yma <- max(ymax)
+
+e <- matrix(c(xm, ym, xma, yma), nrow = 2, ncol = 2)
+e <- extent(e)
+
+for(i in 1:length(urb_rclssed)) { 
+  urb_rclssed[[i]] <- extend(urb_rclssed[[i]], e, value = 0)
+  gc()
+}
+
+#create stack of urb masks for addition (any pixel that does not add to 28 was urb masked at some point in the model application)
+#because mask value = 0, pixels that were never masked should have a value of 1 for all 28 years, and thus upon adding up the stack we can tell which were NA
+
+urb_nacount_stack <- stack(urb_rclssed)
+rm(urb_rclssed)
+urb_nacount_raster <- sum(urb_nacount_stack)
+rm(urb_nacount_stack)
+writeRaster(urb_nacount_raster, filename = paste0(urbag_folder, "/detailed_allyears_urb_nacount.tif"))
+system(paste0("aws s3 sync", " ", urbag_folder, " ", " s3://earthlab-amahood/data/annual_urb_masks_mucc/"))
+
+
+
+m <- c(0, 27, 0,  27.5, 28, 1)
+rclmat <- matrix(m, ncol=3, byrow=TRUE)
+
+urb_nacount_binary <- reclassify(urb_nacount_raster, rclmat)
+writeRaster(urb_nacount_binary, filename = paste0(urbag_folder, "/binary_allyears_urb_nacount.tif"))
+system(paste0("aws s3 sync", " ", urbag_folder, " ", " s3://earthlab-amahood/data/annual_urb_masks_mucc/"))
+
