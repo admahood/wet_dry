@@ -66,15 +66,6 @@ for(i in 1:length(esp_list)) {
   esp_rclssed[[i]][esp_rclssed[[i]] > 0] <- 1
 }
 
-#doing the same as above for urb ag rasters
-urb_list <- list.files(paste0(urbag_folder), full.names = T)
-
-urb_rclssed <- list()
-for(i in 1:length(urb_list)) {
-  urb_rclssed[[i]] <- raster(urb_list[i])
-  urb_rclssed[[i]][urb_rclssed[[i]] > 0] <- 1
-}
-
 #find extent which covers all masks so we can stack them
 xmin <- as.vector(c())
 xmax <- as.vector(c())
