@@ -398,11 +398,11 @@ mod <- randomForest(formula=f,
 
 #2010
 naip <- raster("/home/a/data/naip/2010/m_4011703_ne_11_1_20100704.tif")
-naip1 <- raster("/home/a/data/naip/m_4111761_nw_11_1_20100704.tif")
+naip <- raster("/home/a/data/naip/2010/m_4111761_nw_11_1_20100704.tif")
 
 years = 1984:2011
 for(yy in years){
-  #dir.create("/home/a/data/ls_naip_preds/wmuc")
+  # dir.create("/home/a/data/ls_naip_preds/frank")
   l_file <- paste0("/home/a/data/landsat/p42r31/ls5_", yy, "_042031_.tif")
   ls5 <- raster::stack(l_file) %>%
     crop(naip)
@@ -417,7 +417,7 @@ for(yy in years){
   ls5_classed <- raster::predict(ls5, mod)
   
   writeRaster(ls5_classed, 
-              filename = paste0("/home/a/data/ls_naip_preds/wmuc/wmuc_",yy,".tif"), 
+              filename = paste0("/home/a/data/ls_naip_preds/frank/frank_",yy,".tif"), 
               format = "GTiff", overwrite = T) #save prediction raster
   print( yy)
 }
@@ -425,7 +425,7 @@ for(yy in years){
 #create animation ot the NDVI outputs
 library(gganimate)
 years = 1984:2011
-rastStack <- raster::stack(list.files("/home/a/data/ls_naip_preds/wmuc/", full.names = T))
+rastStack <- raster::stack(list.files("/home/a/data/ls_naip_preds/frank/", full.names = T))
 ts_df=list()
 for (i in 1:length(years)) {
   rr <- as.data.frame(rastStack[[i]], xy = TRUE)
@@ -448,10 +448,8 @@ anim<-ggplot(ts_df, aes(x=x,y=y,fill=Shrubs))+
   transition_time(year)
 
 aa<-gganimate::animate(anim, fps=1, nframes = length(years))
-anim_save(aa, filename="/home/a/data/gifs/wmuc.gif")
+anim_save(aa, filename="/home/a/data/gifs/frank.gif")
 
-res = file.copy('wmuc.gif', path_gif, overwrite=T)
-res = file.remove('wmuc.gif')
 
 ls5 <- raster::stack("/home/a/data/landsat/ls5_2010_042031_.tif") %>%
   crop(naip)
