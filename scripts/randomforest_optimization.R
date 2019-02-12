@@ -325,6 +325,7 @@ mods<-list()
 ddd[[1]] <- gbd_new
 rvars <- ncol(ddd[[1]])-2
 
+# also need to try this with vbd only
 
 control <- trainControl(method='repeatedcv',
                         number=10, 
@@ -380,9 +381,77 @@ ggplot(var_results, aes(x=nvars, y=accuracy)) +
     ggsave("var_dropping_feb_9_w_vegbank_no_elev.pdf")
 
 # apply the model --------------------------------------------------------------
+
+gbd_new$cluster <- as.factor(gbd_new$cluster)
+
+f<- formula("cluster~green_ndvi+evi+ndsvi+wetness+ndti")
+#f<- formula(paste("cluster~",paste(nnn, collapse="+")))
+
+mod <- randomForest(formula=f, 
+                    data=gbd_new,
+                    mtry = 1,
+                    nodesize=10,
+                    ntree = 3000
+                    # case.weights = www, # not sure why this doesn't work --works in ranger not in train
+);mod
+
+
 #2010
-naip <- raster("/home/a/data/naip/m_4011703_ne_11_1_20100704.tif")
+naip <- raster("/home/a/data/naip/2010/m_4011703_ne_11_1_20100704.tif")
 naip1 <- raster("/home/a/data/naip/m_4111761_nw_11_1_20100704.tif")
+
+years = 1984:2011
+for(yy in years){
+  #dir.create("/home/a/data/ls_naip_preds/wmuc")
+  l_file <- paste0("/home/a/data/landsat/p42r31/ls5_", yy, "_042031_.tif")
+  ls5 <- raster::stack(l_file) %>%
+    crop(naip)
+  names(ls5) <-c("sr_band1", "sr_band2","sr_band3", "sr_band4", "sr_band5", "sr_band7")
+  ls5$ndti <- (ls5$sr_band5 - ls5$sr_band7)/(ls5$sr_band5+ls5$sr_band7)
+  ls5$green_ndvi <- (ls5$sr_band4 - ls5$sr_band2)/(ls5$sr_band4+ls5$sr_band2)
+  ls5$evi <- get_evi(ls5$sr_band1, band3 = ls5$sr_band3, band4 =ls5$sr_band4)
+  ls5$wetness <- wet5(band1 = ls5$sr_band1,band2 = ls5$sr_band2, band3 =  ls5$sr_band3,
+                      band4 = ls5$sr_band4, band5 = ls5$sr_band5, band7 =  ls5$sr_band7)
+  ls5$ndsvi <- get_ndsvi(band3 = ls5$sr_band3,band5 = ls5$sr_band5)
+  
+  ls5_classed <- raster::predict(ls5, mod)
+  
+  writeRaster(ls5_classed, 
+              filename = paste0("/home/a/data/ls_naip_preds/wmuc/wmuc_",yy,".tif"), 
+              format = "GTiff", overwrite = T) #save prediction raster
+  print( yy)
+}
+
+#create animation ot the NDVI outputs
+library(gganimate)
+years = 1984:2011
+rastStack <- raster::stack(list.files("/home/a/data/ls_naip_preds/wmuc/", full.names = T))
+ts_df=list()
+for (i in 1:length(years)) {
+  rr <- as.data.frame(rastStack[[i]], xy = TRUE)
+  names(rr) <- c("x","y", "Shrubs")
+  rr$Shrubs = as.factor(rr$Shrubs)
+  rr$year=years[i]
+  ts_df[[i]]<-rr
+}
+ts_df<-do.call("rbind",ts_df)
+
+
+
+anim<-ggplot(ts_df, aes(x=x,y=y,fill=Shrubs))+
+  geom_raster() +
+  theme_void() +
+  scale_fill_manual(values=c("yellowgreen", "darkgreen"),labels="grass", "shrub") +
+  ggtitle(paste(years[i])) +
+  coord_fixed()+
+  labs(title = 'Year: {frame_time}') +
+  transition_time(year)
+
+aa<-gganimate::animate(anim, fps=1, nframes = length(years))
+anim_save(aa, filename="/home/a/data/gifs/wmuc.gif")
+
+res = file.copy('wmuc.gif', path_gif, overwrite=T)
+res = file.remove('wmuc.gif')
 
 ls5 <- raster::stack("/home/a/data/landsat/ls5_2010_042031_.tif") %>%
   crop(naip)
@@ -416,18 +485,7 @@ ls5$wetness <- wet5(band1 = ls5$sr_band1,band2 =  ls5$sr_band2, band3 =  ls5$sr_
                      band4 = ls5$sr_band4, band5 =  ls5$sr_band5, band7 =  ls5$sr_band7)
 #ls5$ndti <- (ls5$sr_band5 - ls5$sr_band7)/(ls5$sr_band5+ls5$sr_band7)
 #ls5$satvi <- get_satvi(band3 = ls5$sr_band3, band5=ls5$sr_band5, band7 = ls5$sr_band7)
-gbd_new$cluster <- as.factor(gbd_new$cluster)
 
-f<- formula("cluster~green_ndvi+folded_aspect_ns+ndti")
-#f<- formula(paste("cluster~",paste(nnn, collapse="+")))
-
-mod <- randomForest(formula=f, 
-                   data=gbd_new,
-                   mtry = 1,
-                   nodesize=10,
-                   ntree = 3000
-                  # case.weights = www, # not sure why this doesn't work --works in ranger not in train
-                   );mod
 
 ls5_classed <- raster::predict(ls5, mod)
 
