@@ -250,9 +250,12 @@ mod <- randomForest(formula=f,
 
 
 #2010
-naip <- raster("/home/a/data/naip/2010/m_4011703_ne_11_1_20100704.tif") #wmuc
-naip <- raster("/home/a/data/naip/2010/m_4111761_nw_11_1_20100704.tif") #frank
-naip <- raster("/home/a/data/naip/2006/n_4111823_sw_11_1_20060714.tif") #kings river
+naip<-list()
+naip[[1]] <- raster("/home/a/data/naip/2010/m_4011703_ne_11_1_20100704.tif") #wmuc
+naip[[2]] <- raster("/home/a/data/naip/2010/m_4111761_nw_11_1_20100704.tif") #frank
+naip[[3]] <- raster("/home/a/data/naip/2006/n_4111823_sw_11_1_20060714.tif") #kings river
+
+naip_names<-c("wmuc", "frank", "kings")
 
 # also, we'll throw in a mean/variance table just for fun
 #mean_var <- data.frame(scene_mean=NA, scene_variance = NA, variable = NA, year = NA)
@@ -288,6 +291,8 @@ foreach(yy = years)%dopar%{
 
 }
 
+
+
 library(gganimate)
 years = 1984:2011
 system("rm /home/a/data/ls_naip_preds/wmuc/*.xml")
@@ -314,6 +319,38 @@ anim<-ggplot(ts_df, aes(x=x,y=y,fill=Shrubs))+
 
 aa<-gganimate::animate(anim, fps=2, nframes = length(years))
 anim_save(aa, filename="/home/a/data/gifs/wmuc_wvb_welev.gif")
+
+
+
+# animations from the ensemble predictions -------------------------------------
+r_l <- list.files("/home/a/data/ensemble_predictions/", full.names = T)
+years=1984:2011
+for(np in 1:length(naip)){
+  ts_df=list()
+  for (i in 1:length(years)) {
+    rrr<- raster(r_l[i]) %>%
+      crop(naip[[np]])
+    rr <- as.data.frame(rrr, xy = TRUE)
+    names(rr) <- c("x","y", "Prediction")
+    nn <- r_l[i]
+    rr$year=as.numeric(substr(nn, 45, 48))
+    ts_df[[i]]<-rr
+  }
+  ts_df<-do.call("rbind",ts_df)
+  
+  anim<-ggplot(ts_df, aes(x=x,y=y,fill=Prediction))+
+    geom_raster() +
+    theme_void() +
+    scale_fill_viridis_c() +
+    ggtitle(paste(years[i])) +
+    coord_fixed()+
+    labs(title = 'Year: {frame_time}') +
+    transition_time(year)
+  
+  aa<-gganimate::animate(anim, fps=2, nframes = length(years))
+  anim_save(aa, filename=paste0("/home/a/data/gifs/",naip_names[np],"_ensemble_predictions.gif"))
+}
+
 
 # end of animate ------------------------------------------
 
