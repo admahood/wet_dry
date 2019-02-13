@@ -34,28 +34,7 @@ system("aws s3 cp s3://earthlab-amahood/data/vegbank_plots_with_landsat.gpkg dat
 
 
 
-# blm-aim data 
-
-gbd <- st_read("data/plot_data/plots_with_landsat.gpkg", quiet=T) %>%
-  filter(esp_mask == 1) %>%
-  mutate(total_shrubs = NonInvShru + SagebrushC,
-         ndsvi = get_ndsvi(sr_band3, sr_band5),
-         folded_aspect_ns = get_folded_aspect_ns(aspect)) %>%
-  dplyr::select(sr_band1, sr_band2, sr_band3, sr_band4, sr_band5, sr_band7,
-                ndvi=NDVI, evi=EVI, savi=SAVI,sr=SR, ndsvi,
-                greenness, brightness, wetness, OBJECTID,Latitude,
-                total_shrubs,
-                BareSoilCo,InvAnnGras, InvAnnFo_1,InvPlantCo,
-                GapPct_25_,GapPct_51_, GapPct_101, GapPct_200, GapPct_251,
-                TotalFolia, SagebrushC,
-                #elevation,
-                folded_aspect_ns,
-                slope, tpi=TPI, tri=TRI, roughness, flowdir) %>%
-  mutate(satvi = get_satvi(sr_band3, sr_band5,sr_band7),
-         tndvi = (ndvi+1)*50,
-         dup = duplicated(Latitude)) %>%
-  filter(dup == F) %>%
-  dplyr::select(-dup, -OBJECTID)
+#veg_bank data
 
 vbd <- read_csv("/home/a/data/vegetation/vegbank_bigger/plot_taxa.csv") %>%
   dplyr::select(observation_id, authorplantname_vb, cover) %>% # also there is stratum
@@ -74,17 +53,7 @@ vbd$sage <- rowSums(vbd[3:22])
 # less precise, so here we fiddle around and raise the shrub cover cutoff until
 # the number of shrub observations is almost equal to the number of grass observations
 
-vgrass <- dplyr::select(vbd, observation_id, brte, sage) %>%
-  dplyr::filter(sage ==0 & brte>4) %>%
-  mutate(cluster = "grass");vgrass
 
-vshrub <- dplyr::select(vbd, observation_id, brte, sage) %>%
-  dplyr::filter(sage > 27 & brte < 1) %>%
-  mutate(cluster = "shrub");vshrub
-  
-
-
-vbd_new <- rbind(vshrub, vgrass) 
 
 
 vbd_old <- st_read("data/plot_data/vegbank_plots_with_landsat.gpkg", quiet=T) %>%
@@ -98,24 +67,295 @@ vbd_old <- st_read("data/plot_data/vegbank_plots_with_landsat.gpkg", quiet=T) %>
                 total_shrubs,
                 elevation,
                 folded_aspect_ns,
-                slope, folded_aspect, tpi, tri, roughness, flowdir)  %>%
+                slope, folded_aspect, tri, roughness)  %>%
   mutate(satvi = get_satvi(sr_band3, sr_band5,sr_band7),
          tndvi = (ndvi+1)*50, #formerly index57
          ndti = (sr_band5 - sr_band7)/(sr_band5+sr_band7),
          green_ndvi = (sr_band4 - sr_band2)/(sr_band4+sr_band2),
-         moisture_index = (sr_band4 - sr_band5)/(sr_band4+sr_band5),
          SLA_index = sr_band4/(sr_band3+sr_band7),
          ndi7 = (sr_band4 - sr_band7)/(sr_band4+sr_band7))
 
-vbd_new_j <- left_join(vbd_new, vbd_old) %>% na.omit() %>%
+vbd_new_j <- left_join(vbd, vbd_old) %>% na.omit() 
+
+vgrass <- vbd_new_j %>%
+  dplyr::filter(sage ==0 & brte>10) %>%
+  mutate(cluster = "grass");dim(vgrass)
+
+vshrub <- vbd_new_j %>%
+  dplyr::filter(sage > 30 & brte ==0) %>%
+  mutate(cluster = "shrub") %>%
+  dplyr::filter(elevation < 2000);dim(vshrub) 
+# shrubs are higher in elevation on average, might be confounding things
+
+vbd_new <- rbind(vshrub, vgrass) %>%
   dplyr::select(cluster, sr_band1, sr_band2, sr_band3, sr_band4, sr_band5, sr_band7,
-                #elevation,
+                elevation,
                 ndvi,evi,
                 #satvi,
                 tndvi,sr,ndsvi,
                 folded_aspect_ns, brightness, greenness, wetness,
-                slope, tpi, tri, roughness, flowdir, tndvi, ndti, green_ndvi,
-                moisture_index, SLA_index, ndi7)
+                slope, tri, roughness, tndvi, ndti, green_ndvi,
+                SLA_index, ndi7)
+# blm-aim data 
+
+gbd <- st_read("data/plot_data/plots_with_landsat.gpkg", quiet=T) %>%
+  filter(esp_mask == 1) %>%
+  mutate(total_shrubs = NonInvShru + SagebrushC,
+         ndsvi = get_ndsvi(sr_band3, sr_band5),
+         folded_aspect_ns = get_folded_aspect_ns(aspect)) %>%
+  dplyr::select(sr_band1, sr_band2, sr_band3, sr_band4, sr_band5, sr_band7,
+                ndvi=NDVI, evi=EVI, savi=SAVI,sr=SR, ndsvi,
+                greenness, brightness, wetness, OBJECTID,Latitude,
+                total_shrubs,
+                BareSoilCo,InvAnnGras, InvAnnFo_1,InvPlantCo,
+                GapPct_25_,GapPct_51_, GapPct_101, GapPct_200, GapPct_251,
+                TotalFolia, SagebrushC,
+                elevation,
+                folded_aspect_ns,
+                slope, tri=TRI, roughness) %>%
+  mutate(satvi = get_satvi(sr_band3, sr_band5,sr_band7),
+         tndvi = (ndvi+1)*50,
+         dup = duplicated(Latitude)) %>%
+  filter(dup == F) %>%
+  dplyr::select(-dup, -OBJECTID)
+
+# why not just manually attempt to get rid of mixed pixels? --------------------
+shrubs<- dplyr::filter(gbd, SagebrushC > 0 & InvAnnGras < 2) %>%
+  mutate(cluster = "shrub")
+grasses <- dplyr::filter(gbd, SagebrushC <2 & InvAnnGras >2)%>%
+  mutate(cluster="grass")
+
+gbd_new <- rbind(grasses,shrubs) %>%
+  dplyr::select(cluster, sr_band1, sr_band2, sr_band3, sr_band4, sr_band5, sr_band7,
+                elevation,
+                ndvi,evi,tndvi,sr,ndsvi,
+                folded_aspect_ns, brightness, greenness, wetness,
+                slope, tri, roughness) %>%
+  mutate(ndti = (sr_band5 - sr_band7)/(sr_band5+sr_band7),
+         green_ndvi = (sr_band4 - sr_band2)/(sr_band4+sr_band2),
+         SLA_index = sr_band4/(sr_band3+sr_band7),
+         ndi7 = (sr_band4 - sr_band7)/(sr_band4+sr_band7)) %>%
+  st_set_geometry(NULL)%>%
+  rbind(vbd_new)
+
+# perhaps a line here to make the observations exactly equal...
+
+# observation weights not working for some reason in caret::train --------------
+
+albers <- "+proj=aea +lat_1=29.5 +lat_2=45.5 +lat_0=37.5 +lon_0=-96 +x_0=0 +y_0=0 +ellps=GRS80 +datum=NAD83 +units=m +no_defs"
+coords_sf <- st_transform(gbd_new, albers) %>%
+  st_coordinates()
+nb_sf <- spdep::knn2nb(spdep::knearneigh(coords_sf, k=4))
+dsts <- spdep::nbdists(nb_sf, coords_sf)
+
+www <- vector()
+for(i in 1:nrow(gbd_new)){
+  weightsum <- dsts[[i]] %>% sum()
+  weight <- ((weightsum/4))
+  www[i]<- weight
+}
+
+# to check if they're about even
+# gbd_new$cluster %>% table()
+
+# new model training with caret ------------------------------------------------
+# dropping variables and finding parsimony? with almost 3000 data points now,
+# this take a long time. just using the blm data might actually end up being
+# better since it's higher quality data, but good to look at both ways
+
+# ddd is the data frame as each variable gets dropped, mods is the models stored
+# in a list so we can use them after
+
+ddd<- list()
+mods<-list()
+#ddd[[1]] <- cbind(clm,dplyr::select(resp,cluster)) 
+ddd[[1]] <- gbd_new
+rvars <- ncol(ddd[[1]])-2
+
+# also need to try this with vbd only
+
+control <- trainControl(method='repeatedcv',
+                        number=10, 
+                        repeats=3,
+                        search="grid")
+var_results <- data.frame(accuracy=NA, nvars = NA, mean_acc=NA,sd_acc=NA, dropped = NA)
+for (i in 1:rvars){ # this takes 10-30 minutes
+  t0<-Sys.time()
+    tgrid <- expand.grid(
+    .mtry = 1:round(sqrt(ncol(ddd[[i]])-2)), #cluster and geom don't count
+    .splitrule = "gini",
+    .min.node.size = c(10, 20)
+  )
+  # next time this is ran, do rf[[i]] to be able to look at the models later
+  mods[[i]] <- train(cluster~., 
+                      data=ddd[[i]],#st_set_geometry(ddd[[i]], NULL), 
+                      method='ranger',
+                      metric=c('Accuracy'), # or RMSE?
+                      tuneGrid=tgrid, 
+                      trControl=control,
+                      #case.weights = www, # not sure why this doesn't work
+                      importance = "permutation")
+  
+  var_results[i, 1] <- max(mods[[i]]$results$Accuracy)
+  var_results[i, 2] <- i
+  var_results[i, 3] <- mean(mods[[i]]$results$Accuracy)
+  var_results[i, 4] <- sd(mods[[i]]$results$Accuracy)
+  
+  
+  least_important <- caret::varImp(mods[[i]])$importance %>%
+    rownames_to_column("var") %>%
+    arrange(Overall)
+  vvv <- least_important[1,1]
+  ddd[[i+1]] <- dplyr::select(ddd[[i]],-vvv)
+  
+  var_results[i, 5] <- vvv
+  print(paste("Progress:", round(i/rvars*100), "% |",
+              "Accuracy:",  round(max(mods[[i]]$results$Accuracy)*100),
+              "% | Dropped", vvv, Sys.time()-t0))
+}
+var_results
+best <- 18
+
+names(ddd[[best]]) -> nnn
+nnn <- nnn[-1]
+imp <- varImp(mods[[best]])
+ggplot(var_results, aes(x=nvars-1, y=accuracy)) + 
+  geom_line() +
+  geom_line(aes(y=mean_acc), col = "red", lwd=1) +
+  # geom_annotate("text", label = dropped) + #something like this
+  xlab("# Variables dropped") +
+  geom_vline(xintercept = best, lty=3) +
+  annotate("text",x=0, y=0.86, hjust=0, vjust=1,
+           label = paste("Remaining Variables: \n", 
+                         paste(nnn, collapse = "\n")
+                        ," \nmtry",mods[[best]]$bestTune[[1]],
+                         " \nmin.node.size", mods[[best]]$bestTune[[3]]
+                         )) +
+    ggsave("var_dropping_feb_11_w_vegbank_w_elev.pdf")
+
+# apply the model --------------------------------------------------------------
+
+gbd_new$cluster <- as.factor(gbd_new$cluster)
+
+f<- formula(paste("cluster~",paste(nnn, collapse="+")))
+#f<- formula(paste("cluster~",paste(nnn, collapse="+")))
+
+mod <- randomForest(formula=f, 
+                    data=gbd_new,
+                    mtry = mods[[best]]$bestTune[[1]],
+                    nodesize=mods[[best]]$bestTune[[3]],
+                    ntree = 3000
+                    # case.weights = www, # not sure why this doesn't work --works in ranger not in train
+);mod
+
+
+#2010
+naip <- raster("/home/a/data/naip/2010/m_4011703_ne_11_1_20100704.tif") #wmuc
+naip <- raster("/home/a/data/naip/2010/m_4111761_nw_11_1_20100704.tif") #frank
+naip <- raster("/home/a/data/naip/2006/n_4111823_sw_11_1_20060714.tif") #kings river
+
+# also, we'll throw in a mean/variance table just for fun
+#mean_var <- data.frame(scene_mean=NA, scene_variance = NA, variable = NA, year = NA)
+years = 1984:2011
+# cc = 1
+registerDoParallel(corz)
+system("rm /home/a/data/ls_naip_preds/wmuc/*")
+foreach(yy = years)%dopar%{
+  # dir.create("/home/a/data/ls_naip_preds/kings")
+  l_file <- paste0("/home/a/data/landsat/p42r31/ls5_", yy, "_042031_.tif")
+  ls5 <- raster::stack(l_file) %>%
+    crop(naip)
+  names(ls5) <-c("sr_band1", "sr_band2","sr_band3", "sr_band4", "sr_band5", "sr_band7")
+  ls5$elevation<- raster("/home/a/data/background/elevation/p42_r31_elevation.tif") %>%
+    raster::projectRaster(ls5)
+  ls5$tri <- terrain(ls5$elevation, opts="tri")
+  ls5$ndvi <- get_ndvi(band3 = ls5$sr_band3, band4 = ls5$sr_band4)
+  ls5$ndti <- (ls5$sr_band5 - ls5$sr_band7)/(ls5$sr_band5+ls5$sr_band7)
+  ls5$green_ndvi <- (ls5$sr_band4 - ls5$sr_band2)/(ls5$sr_band4+ls5$sr_band2)
+  ls5$evi <- get_evi(ls5$sr_band1, band3 = ls5$sr_band3, band4 =ls5$sr_band4)
+  ls5$wetness <- wet5(band1 = ls5$sr_band1,band2 = ls5$sr_band2, band3 =  ls5$sr_band3,
+                      band4 = ls5$sr_band4, band5 = ls5$sr_band5, band7 =  ls5$sr_band7)
+ # ls5$ndsvi <- get_ndsvi(band3 = ls5$sr_band3,band5 = ls5$sr_band5)
+  ls5$sr <- get_sr(band3 = ls5$sr_band3, band4 = ls5$sr_band4)
+  ls5$tndvi <- (ls5$ndvi+1)*50
+  
+  ls5_classed <- raster::predict(ls5, mod)
+  
+  writeRaster(ls5_classed, 
+              filename = paste0("/home/a/data/ls_naip_preds/wmuc/wmuc",yy,".tif"), 
+              format = "GTiff", overwrite = T) #save prediction raster
+  system(paste("echo",yy))
+
+}
+
+library(gganimate)
+years = 1984:2011
+system("rm /home/a/data/ls_naip_preds/wmuc/*.xml")
+rastStack <- raster::stack(list.files("/home/a/data/ls_naip_preds/wmuc/", full.names = T))
+ts_df=list()
+for (i in 1:length(years)) {
+  rr <- as.data.frame(rastStack[[i]], xy = TRUE)
+  names(rr) <- c("x","y", "Shrubs")
+  rr$Shrubs <- as.factor(rr$Shrubs)
+  nn <- names(rastStack[[i]])
+  rr$year=as.numeric(substr(nn, nchar(nn)-3, nchar(nn)))
+  ts_df[[i]]<-rr
+}
+ts_df<-do.call("rbind",ts_df)
+
+anim<-ggplot(ts_df, aes(x=x,y=y,fill=Shrubs))+
+  geom_raster() +
+  theme_void() +
+  scale_fill_manual(values=c("yellowgreen", "darkgreen"),labels="grass", "shrub") +
+  ggtitle(paste(years[i])) +
+  coord_fixed()+
+  labs(title = 'Year: {frame_time}') +
+  transition_time(year)
+
+aa<-gganimate::animate(anim, fps=2, nframes = length(years))
+anim_save(aa, filename="/home/a/data/gifs/wmuc_wvb_welev.gif")
+
+# end of animate ------------------------------------------
+
+ls5 <- raster::stack("/home/a/data/landsat/ls5_2010_042031_.tif") %>%
+  crop(naip)
+
+#2006
+naip <- raster("/home/a/data/naip/2006/n_4011703_ne_11_1_20060813.tif")
+naip1 <- raster("/home/a/data/naip/2006/n_4111761_nw_11_1_20060813.tif")
+
+ls5 <- raster::stack("/home/a/data/landsat/ls5_2006_042031_.tif") %>%
+  crop(naip1)
+
+
+names(ls5) <-c("sr_band1", "sr_band2","sr_band3", "sr_band4", "sr_band5", "sr_band7")
+ls5$elevation<- raster("/home/a/data/background/elevation/p42_r31_elevation.tif") %>%
+ raster::projectRaster(ls5)
+ls5$folded_aspect_ns <- get_folded_aspect_ns(raster::terrain(ls5$elevation, opt="aspect"))
+
+ls5$slope <- raster("/home/a/data/background/slope/p42_r31_slope.tif") %>%
+  raster::projectRaster(ls5)
+ls5$ndvi <- get_ndvi(band3 = ls5$sr_band3,band4=ls5$sr_band4)
+ls5$tndvi <-(ls5$ndvi+1)*50
+ls5$ndti <- (ls5$sr_band5 - ls5$sr_band7)/(ls5$sr_band5+ls5$sr_band7)
+ls5$sr <- get_sr(band3 = ls5$sr_band3, band4=ls5$sr_band4)
+ls5$green_ndvi <- (ls5$sr_band4 - ls5$sr_band2)/(ls5$sr_band4+ls5$sr_band2)
+#ls5$tri <- terrain(ls5$elevation, opt = "tri")
+ls5$evi <- get_evi(ls5$sr_band1, band3 = ls5$sr_band3, band4 =ls5$sr_band4)
+ls5$ndsvi <- get_ndsvi(band3 = ls5$sr_band3,band5 = ls5$sr_band5)
+ls5$greenness <- green5(band1 = ls5$sr_band1,band2 =  ls5$sr_band2, band3 =  ls5$sr_band3,
+                        band4 = ls5$sr_band4, band5 =  ls5$sr_band5, band7 =  ls5$sr_band7)
+ls5$wetness <- wet5(band1 = ls5$sr_band1,band2 =  ls5$sr_band2, band3 =  ls5$sr_band3,
+                     band4 = ls5$sr_band4, band5 =  ls5$sr_band5, band7 =  ls5$sr_band7)
+#ls5$ndti <- (ls5$sr_band5 - ls5$sr_band7)/(ls5$sr_band5+ls5$sr_band7)
+#ls5$satvi <- get_satvi(band3 = ls5$sr_band3, band5=ls5$sr_band5, band7 = ls5$sr_band7)
+
+
+ls5_classed <- raster::predict(ls5, mod)
+
+writeRaster(ls5_classed, 
+            filename = paste("eden_valley_2006_noelev_modified_wvb.tif",sep="_"), 
+            format = "GTiff", overwrite = T) #save prediction raster
 
 
 # splitting the data into response and predictor variables -------------------------------------------------------------
@@ -126,7 +366,7 @@ resp <- dplyr::select(gbd, SagebrushC,
                       #InvAnnGras, 
                       #InvAnnFo_1,
                       InvPlantCo
-                      ) %>%
+) %>%
   st_set_geometry(NULL) 
 clm <- dplyr::select(gbd, sr_band1, sr_band2, sr_band3, sr_band4, sr_band5, sr_band7,
                      elevation,ndvi,evi,satvi,tndvi,sr,ndsvi,Latitude,
@@ -164,16 +404,16 @@ dd <- cbind(rsp,clm)
 counter <- 1
 for(r in 1:ncol(resp)){
   for(d in 1:ncol((clm))){
-      f <- formula(paste0(names(resp)[r], "~",  names(clm)[d]))
-      m <- glm(f, data = dd, family=quasibinomial(link="logit"))
-      x <- summary(m)
-      res_df[counter, 1] <- names(resp)[r]
-      res_df[counter, 2] <- names((clm))[d]
-      res_df[counter, 3] <- NA
-      res_df[counter, 4] <- round(rsq::rsq(m),4)
-      res_df[counter, 5] <- round(x$coefficients[2,4], 4)
-      res_df[counter, 6] <- round(x$coefficients[2,1], 4)
-      counter = counter +1
+    f <- formula(paste0(names(resp)[r], "~",  names(clm)[d]))
+    m <- glm(f, data = dd, family=quasibinomial(link="logit"))
+    x <- summary(m)
+    res_df[counter, 1] <- names(resp)[r]
+    res_df[counter, 2] <- names((clm))[d]
+    res_df[counter, 3] <- NA
+    res_df[counter, 4] <- round(rsq::rsq(m),4)
+    res_df[counter, 5] <- round(x$coefficients[2,4], 4)
+    res_df[counter, 6] <- round(x$coefficients[2,1], 4)
+    counter = counter +1
     
   }
 }
@@ -228,7 +468,7 @@ ggplot(data=dd,aes(y=SagebrushC,x=green_ndvi))+
 m <- glm(TotalFolia ~ index57+ sr_band2*green_ndvi, dd, family=quasibinomial(link="logit"))
 summary(m); rsq::rsq(m)
 ggplot(data=dd,aes(y=TotalFolia,x=index57))+
-         geom_point()+
+  geom_point()+
   geom_smooth(method = "glm", 
               method.args = list(family=quasibinomial(link="logit")), 
               se = TRUE) +
@@ -251,6 +491,8 @@ ggplot(dd1, aes(size=SagebrushC, color=TotalFolia, y=PC1, x=PC2))+
 ggplot(dd1, aes(size=InvAnnFo_1, color=BareSoilCo, y=PC1, x=PC2))+
   geom_point()
 
+
+
 # unsupervised clustering using random forest  ----------------------------------
 # any of the clustering methods will probably work and the veg clustering 
 # methods out of the vegan package might be better, but just checking this out.
@@ -268,228 +510,6 @@ MDSplot(rf_us, resp$cluster)
 table(resp$cluster)
 ggplot(resp, aes(y=SagebrushC, x=TotalFolia, color = cluster))+
   geom_point()
-
-
-
-# why not just manually attempt to get rid of mixed pixels? --------------------
-shrubs<- dplyr::filter(gbd, SagebrushC > 0 & InvAnnGras < 2) %>%
-  mutate(cluster = "shrub")
-grasses <- dplyr::filter(gbd, SagebrushC < 2 & InvAnnGras >2)%>%
-  mutate(cluster="grass")
-
-gbd_new <- rbind(grasses,shrubs) %>%
-  dplyr::select(cluster, sr_band1, sr_band2, sr_band3, sr_band4, sr_band5, sr_band7,
-                #elevation,
-                ndvi,evi,tndvi,sr,ndsvi,
-                folded_aspect_ns, brightness, greenness, wetness,
-                slope, tpi, tri, roughness, flowdir) %>%
-  mutate(ndti = (sr_band5 - sr_band7)/(sr_band5+sr_band7),
-         green_ndvi = (sr_band4 - sr_band2)/(sr_band4+sr_band2),
-         moisture_index = (sr_band4 - sr_band5)/(sr_band4+sr_band5),
-         SLA_index = sr_band4/(sr_band3+sr_band7),
-         ndi7 = (sr_band4 - sr_band7)/(sr_band4+sr_band7)) %>%
-  st_set_geometry(NULL)%>%
-  rbind(vbd_new_j)
-
-# perhaps a line here to make the observations exactly equal...
-
-# observation weights not working for some reason in caret::train --------------
-
-albers <- "+proj=aea +lat_1=29.5 +lat_2=45.5 +lat_0=37.5 +lon_0=-96 +x_0=0 +y_0=0 +ellps=GRS80 +datum=NAD83 +units=m +no_defs"
-coords_sf <- st_transform(gbd_new, albers) %>%
-  st_coordinates()
-nb_sf <- spdep::knn2nb(spdep::knearneigh(coords_sf, k=4))
-dsts <- spdep::nbdists(nb_sf, coords_sf)
-
-www <- vector()
-for(i in 1:nrow(gbd_new)){
-  weightsum <- dsts[[i]] %>% sum()
-  weight <- ((weightsum/4))
-  www[i]<- weight
-}
-
-# to check if they're about even
-# gbd_new$cluster %>% table()
-
-# new model training with caret ------------------------------------------------
-# dropping variables and finding parsimony? with almost 3000 data points now,
-# this take a long time. just using the blm data might actually end up being
-# better since it's higher quality data, but good to look at both ways
-
-# ddd is the data frame as each variable gets dropped, mods is the models stored
-# in a list so we can use them after
-
-ddd<- list()
-mods<-list()
-#ddd[[1]] <- cbind(clm,dplyr::select(resp,cluster)) 
-ddd[[1]] <- gbd_new
-rvars <- ncol(ddd[[1]])-2
-
-# also need to try this with vbd only
-
-control <- trainControl(method='repeatedcv',
-                        number=10, 
-                        repeats=3,
-                        search="grid")
-var_results <- data.frame(accuracy=NA, nvars = NA, dropped = NA)
-for (i in 1:rvars){ # this takes 10-30 minutes
-
-
-  tgrid <- expand.grid(
-    .mtry = 1:round(sqrt(ncol(ddd[[i]])-2)), #cluster and geom don't count
-    .splitrule = "gini",
-    .min.node.size = c(10, 20)
-  )
-  # next time this is ran, do rf[[i]] to be able to look at the models later
-  mods[[i]] <- train(cluster~., 
-                      data=ddd[[i]],#st_set_geometry(ddd[[i]], NULL), 
-                      method='ranger',
-                      metric=c('Accuracy'), # or RMSE?
-                      tuneGrid=tgrid, 
-                      trControl=control,
-                      #case.weights = www, # not sure why this doesn't work
-                      importance = "permutation")
-  
-  var_results[i, 1] <- max(mods[[i]]$results$Accuracy)
-  var_results[i, 2] <- i
-  
-  
-  least_important <- caret::varImp(mods[[i]])$importance %>%
-    rownames_to_column("var") %>%
-    arrange(Overall)
-  vvv <- least_important[1,1]
-  ddd[[i+1]] <- dplyr::select(ddd[[i]],-vvv)
-  
-  var_results[i, 3] <- vvv
-  print(paste("Progress:", round(i/rvars*100), "% |", "Accuracy:",  round(max(mods[[i]]$results$Accuracy)*100)))
-}
-var_results
-names(ddd[[21]]) -> nnn
-nnn <- nnn[-1]
-imp <- varImp(mods[[22]])
-#nnn <- nnn[c(-1, -length(nnn))] #dropping cluster and geom
-ggplot(var_results, aes(x=nvars, y=accuracy)) + 
-  geom_line() +
-  xlab("# Variables dropped") +
-  geom_vline(xintercept = 21, lty=3) +
-  annotate("text",x=0, y=0.75, hjust=0, vjust=1,
-           label = paste("Remaining Variables: \n",
-                         nnn[1],"\n",nnn[2],"\n",nnn[3],"\n",nnn[4], "\n",
-                         nnn[5]#, "\n",nnn[6], "\n",nnn[7],"\n",nnn[8]#, "\n",
-                        # nnn[9], "\n", nnn[10]#,"\n",nnn[11],"\n",nnn[12])) + 
-           )) +
-    ggsave("var_dropping_feb_9_w_vegbank_no_elev.pdf")
-
-# apply the model --------------------------------------------------------------
-
-gbd_new$cluster <- as.factor(gbd_new$cluster)
-
-f<- formula("cluster~green_ndvi+evi+ndsvi+wetness+ndti")
-#f<- formula(paste("cluster~",paste(nnn, collapse="+")))
-
-mod <- randomForest(formula=f, 
-                    data=gbd_new,
-                    mtry = 1,
-                    nodesize=10,
-                    ntree = 3000
-                    # case.weights = www, # not sure why this doesn't work --works in ranger not in train
-);mod
-
-
-#2010
-naip <- raster("/home/a/data/naip/2010/m_4011703_ne_11_1_20100704.tif")
-naip <- raster("/home/a/data/naip/2010/m_4111761_nw_11_1_20100704.tif")
-
-years = 1984:2011
-for(yy in years){
-  # dir.create("/home/a/data/ls_naip_preds/frank")
-  l_file <- paste0("/home/a/data/landsat/p42r31/ls5_", yy, "_042031_.tif")
-  ls5 <- raster::stack(l_file) %>%
-    crop(naip)
-  names(ls5) <-c("sr_band1", "sr_band2","sr_band3", "sr_band4", "sr_band5", "sr_band7")
-  ls5$ndti <- (ls5$sr_band5 - ls5$sr_band7)/(ls5$sr_band5+ls5$sr_band7)
-  ls5$green_ndvi <- (ls5$sr_band4 - ls5$sr_band2)/(ls5$sr_band4+ls5$sr_band2)
-  ls5$evi <- get_evi(ls5$sr_band1, band3 = ls5$sr_band3, band4 =ls5$sr_band4)
-  ls5$wetness <- wet5(band1 = ls5$sr_band1,band2 = ls5$sr_band2, band3 =  ls5$sr_band3,
-                      band4 = ls5$sr_band4, band5 = ls5$sr_band5, band7 =  ls5$sr_band7)
-  ls5$ndsvi <- get_ndsvi(band3 = ls5$sr_band3,band5 = ls5$sr_band5)
-  
-  ls5_classed <- raster::predict(ls5, mod)
-  
-  writeRaster(ls5_classed, 
-              filename = paste0("/home/a/data/ls_naip_preds/frank/frank_",yy,".tif"), 
-              format = "GTiff", overwrite = T) #save prediction raster
-  print( yy)
-}
-
-#create animation ot the NDVI outputs
-library(gganimate)
-years = 1984:2011
-rastStack <- raster::stack(list.files("/home/a/data/ls_naip_preds/frank/", full.names = T))
-ts_df=list()
-for (i in 1:length(years)) {
-  rr <- as.data.frame(rastStack[[i]], xy = TRUE)
-  names(rr) <- c("x","y", "Shrubs")
-  rr$Shrubs = as.factor(rr$Shrubs)
-  rr$year=years[i]
-  ts_df[[i]]<-rr
-}
-ts_df<-do.call("rbind",ts_df)
-
-
-
-anim<-ggplot(ts_df, aes(x=x,y=y,fill=Shrubs))+
-  geom_raster() +
-  theme_void() +
-  scale_fill_manual(values=c("yellowgreen", "darkgreen"),labels="grass", "shrub") +
-  ggtitle(paste(years[i])) +
-  coord_fixed()+
-  labs(title = 'Year: {frame_time}') +
-  transition_time(year)
-
-aa<-gganimate::animate(anim, fps=1, nframes = length(years))
-anim_save(aa, filename="/home/a/data/gifs/frank.gif")
-
-
-ls5 <- raster::stack("/home/a/data/landsat/ls5_2010_042031_.tif") %>%
-  crop(naip)
-
-#2006
-naip <- raster("/home/a/data/naip/2006/n_4011703_ne_11_1_20060813.tif")
-naip1 <- raster("/home/a/data/naip/2006/n_4111761_nw_11_1_20060813.tif")
-
-ls5 <- raster::stack("/home/a/data/landsat/ls5_2006_042031_.tif") %>%
-  crop(naip1)
-
-
-names(ls5) <-c("sr_band1", "sr_band2","sr_band3", "sr_band4", "sr_band5", "sr_band7")
-ls5$elevation<- raster("/home/a/data/background/elevation/p42_r31_elevation.tif") %>%
- raster::projectRaster(ls5)
-ls5$folded_aspect_ns <- get_folded_aspect_ns(raster::terrain(ls5$elevation, opt="aspect"))
-
-ls5$slope <- raster("/home/a/data/background/slope/p42_r31_slope.tif") %>%
-  raster::projectRaster(ls5)
-ls5$ndvi <- get_ndvi(band3 = ls5$sr_band3,band4=ls5$sr_band4)
-ls5$tndvi <-(ls5$ndvi+1)*50
-ls5$ndti <- (ls5$sr_band5 - ls5$sr_band7)/(ls5$sr_band5+ls5$sr_band7)
-ls5$sr <- get_sr(band3 = ls5$sr_band3, band4=ls5$sr_band4)
-ls5$green_ndvi <- (ls5$sr_band4 - ls5$sr_band2)/(ls5$sr_band4+ls5$sr_band2)
-#ls5$tri <- terrain(ls5$elevation, opt = "tri")
-ls5$evi <- get_evi(ls5$sr_band1, band3 = ls5$sr_band3, band4 =ls5$sr_band4)
-ls5$ndsvi <- get_ndsvi(band3 = ls5$sr_band3,band5 = ls5$sr_band5)
-ls5$greenness <- green5(band1 = ls5$sr_band1,band2 =  ls5$sr_band2, band3 =  ls5$sr_band3,
-                        band4 = ls5$sr_band4, band5 =  ls5$sr_band5, band7 =  ls5$sr_band7)
-ls5$wetness <- wet5(band1 = ls5$sr_band1,band2 =  ls5$sr_band2, band3 =  ls5$sr_band3,
-                     band4 = ls5$sr_band4, band5 =  ls5$sr_band5, band7 =  ls5$sr_band7)
-#ls5$ndti <- (ls5$sr_band5 - ls5$sr_band7)/(ls5$sr_band5+ls5$sr_band7)
-#ls5$satvi <- get_satvi(band3 = ls5$sr_band3, band5=ls5$sr_band5, band7 = ls5$sr_band7)
-
-
-ls5_classed <- raster::predict(ls5, mod)
-
-writeRaster(ls5_classed, 
-            filename = paste("eden_valley_2006_noelev_modified_wvb.tif",sep="_"), 
-            format = "GTiff", overwrite = T) #save prediction raster
 
 
 
