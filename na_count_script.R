@@ -6,6 +6,7 @@ lapply(libs, library, character.only = TRUE, verbose = FALSE)
 esp_folder <- "data/esp_nacount"
 urbag_folder <- "data/urbag_nacount"
 
+dir.create("data")
 dir.create(esp_folder)
 dir.create(urbag_folder)
 
@@ -57,7 +58,14 @@ for(i in 1:length(scene_full))  {
 
 system(paste0("aws s3 sync", " ", urbag_folder, "/", " s3://earthlab-amahood/data/annual_urb_masks_mucc/"))
 
+
+#s3 sync if above steps have already been done 
+system(paste0("aws s3 sync", " ", "s3://earthlab-amahood/data/annual_esp_masks_mucc/ ", esp_folder, "/"))
+system(paste0("aws s3 sync", " ", "s3://earthlab-amahood/data/annual_urb_masks_mucc/ ", urbag_folder, "/"))
+
 #get rid of esp values between 0 and 1 from reprojection step. since mask value = 0, everything above 0 does not get masked, therefore to keep it binary i change all of these values to 1(nonmasked value)
+
+
 esp_list <- list.files(paste0(esp_folder), full.names = T)
 
 esp_rclssed <- list()

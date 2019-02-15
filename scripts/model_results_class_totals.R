@@ -59,15 +59,28 @@ for(i in 1:length(all_years_files)) {
 esp_mask <- raster("data/esp_binary/clipped_binary.tif")
 esp_mask <- projectRaster(esp_mask, res = 30, crs = crs(results_list[[1]]))
 
+
+
 cores <- 6
 registerDoParallel(cores)
 
 masked_results_list <- list()
-foreach(i = results_list) %dopar% {
-  esp_mask <- projectRaster(esp_mask, i, res = 30)
-  masked <- mask(i, esp_mask, maskvalue = 0)
-  masked_results_list[i] <- masked
+for(i in 1:length(results_list)) {
+  # esp_mask <- projectRaster(esp_mask, i, res = 30)
+  masked <- raster::extend(results_list[[i]], esp_na)
+  masked <- raster::crop(masked, esp_na)
+  masked_results_list[[i]] <- masked
 }
+
+for(i in 1:length(masked_results_list)) {
+  masked <- mask(masked_results_list[[i]], esp_na, maskvalue = 0)
+  masked_results_list[[i]] <- masked
+}
+# foreach(i = masked_results_list) %dopar% {
+#   # esp_mask <- projectRaster(esp_mask, i, res = 30)
+#   masked <- mask(i, esp_na, maskvalue = 0)
+#   masked_results_list[i] <- masked
+# }
 #trying to make a better organized pixel counts table ----
 
 
@@ -123,6 +136,7 @@ for(i in 1:length(results_list)) {
 
 df2 <- df2 %>% mutate(year = c(1984:2011),
                       total_pixels = as.numeric(grass1 + grass2 + shrub1 + shrub2 + na_pixel_count),
+                      total_study_area = as.numeric(grass1 + grass2 + shrub1 + shrub2),
                       percent_grass_certain = as.numeric((grass1 / total_pixels) * 100),
                       percent_grass_likely = as.numeric((grass2 / total_pixels) * 100),
                       percent_shrub_certain = as.numeric((shrub1 / total_pixels) * 100),
@@ -131,14 +145,16 @@ df2 <- df2 %>% mutate(year = c(1984:2011),
                       percent_grass_total = as.numeric(percent_grass_certain + percent_grass_likely),
                       percent_na = as.numeric((na_pixel_count / total_pixels) * 100),
                       percent_check = as.numeric(percent_grass_total + percent_shrub_total + percent_na),
-                      shrubvgrass = as.numeric(grass1 / shrub1)
+                      shrubvgrass = as.numeric(grass1  / shrub1)
                       )
                       
 
-ggplot(data=df2, aes(y=df2$percent_shrub_total, x = df2$year)) + geom_point() + geom_smooth(method = "lm")
+ggplot(data=df2, aes(y=df2$percent_grass_total, x = df2$year)) + geom_point() + geom_smooth(method = "lm") 
 
 #scatter plot of cheat and sage totals with linear trend line ----
-ggplot(data=df, aes(x=raster, y=n, group = Var1, colour = as.factor(Var1))) + geom_point() + geom_smooth(method = "lm")
+ggplot(data=df, aes(x=raster, y=n, group = Var1, colour = as.factor(Var1))) + geom_point() 
++ geom_smooth(method = "lm")
++ geom_line(x)
 
 #begin work here (1/23) for getting table of combined counts for high and low certainty ensemble results ----
 r2011b <- bind_rows(r2011[1, 2] + r2011[2,2], r2011[3,2] + r2011[4,2])
