@@ -4,10 +4,11 @@ library(foreach)
 library(doParallel)
 
 corz <- detectCores()-1
-root_path <- "/home/a/data/landsat/"
+root_path <- "data/landsat/"
 scene_path<- "p42r31"
 local_path<-paste0(root_path, scene_path)
 s3_path<- "s3://earthlab-amahood/data/ls5_mucc/"
+s3_upload_path <- "s3://earthlab-amahood/data/ls5_mucc_extent_matched"
 
 extent_path<-paste0(root_path,"extents")
 
@@ -41,11 +42,19 @@ for(i in 1:length(l_files)){ #each iteration takes about 2 minutes
   system(paste("echo",i, Sys.time()-t0))
 }
 
-raster::stack(l_files) # works!!
+test2 <- raster::stack(l_files) # works!!
 
 #now, create blank raster
 
 blank <- raster(l_files[1]) %>% 
   setValues(0) %>%
-  writeRaster(filename = paste0(extent_path,"/trimmed_extent_",scene_path),
-              dType="LOG1S")
+  writeRaster(filename = paste0(local_path,"/trimmed_extent_",scene_path),
+              dType="LOG1S") 
+
+
+#uploading extent fixed ls5 rasters and template raster to s3
+system(paste0("aws s3 cp ", local_path,"/trimmed_extent_",scene_path, ".gri", " ", s3_upload_path))
+
+for(i in 1:length(l_files)) { 
+  system(paste0("aws s3 cp ", l_files[i], " ", s3_upload_path))
+}
