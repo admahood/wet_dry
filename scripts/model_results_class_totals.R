@@ -1,14 +1,18 @@
 # Step 1: Load packages ---------------------------
 libs <- c("randomForest", "dplyr","sf", "caTools", "raster", "tidyverse", "ggplot2", "doParallel")
 # lapply(libs, install.packages, character.only = TRUE, verbose = FALSE)
+install.packages("randomForest")
 lapply(libs, library, character.only = TRUE, verbose = FALSE)
 
 #system("aws s3 sync s3://earthlab-amahood/data/mucc_model_results_allyears data/allyears_results")
 #Step 2: load data ----
+dir.create("data")
 dir.create("data/allyears_results")
 system ("aws s3 sync s3://earthlab-amahood/data/mucc_ensemble_results_done data/allyears_results")
 all_years_files <- list.files("data/allyears_results", full = T)
 
+system("aws s3 sync s3://earthlab-amahood/data/annual_esp_masks_mucc/ data/esp_masks/")
+system("aws s3 sync s3://earthlab-amahood/data/fire_perimeters/ data/fire_perims/")
 
 #step 3: extract class totals ----
 results_list <- list()
@@ -56,20 +60,33 @@ for(i in 1:length(all_years_files)) {
 
 
 #attempting to take masked pixels out of the total to get accurate percentages for classes ----
-esp_mask <- raster("data/esp_binary/clipped_binary.tif")
-esp_mask <- projectRaster(esp_mask, res = 30, crs = crs(results_list[[1]]))
+esp_na <- raster("data/esp_masks/binary_allyears_esp_nacount.tif")
+
+
 
 cores <- 6
 registerDoParallel(cores)
 
 masked_results_list <- list()
-foreach(i = results_list) %dopar% {
-  esp_mask <- projectRaster(esp_mask, i, res = 30)
-  masked <- mask(i, esp_mask, maskvalue = 0)
-  masked_results_list[i] <- masked
+for(i in 1:length(results_list)) {
+  # esp_mask <- projectRaster(esp_mask, i, res = 30)
+  masked <- raster::extend(results_list[[i]], esp_na)
+  masked <- raster::crop(masked, esp_na)
+  masked_results_list[[i]] <- masked
 }
-#trying to make a better organized pixel counts table ----
 
+for(i in 1:length(masked_results_list)) {
+  masked <- mask(masked_results_list[[i]], esp_na, maskvalue = 0)
+  masked_results_list[[i]] <- masked
+}
+
+# foreach(i = masked_results_list) %dopar% {
+#   # esp_mask <- projectRaster(esp_mask, i, res = 30)
+#   masked <- mask(i, esp_na, maskvalue = 0)
+#   masked_results_list[i] <- masked
+# }
+#trying to make a better organized pixel counts table ----
+results_list <- masked_results_list
 
 df2 <- rbind( 
   r1984 = as.vector(table(values(results_list[[1]])))
@@ -112,17 +129,11 @@ for(i in 1:length(results_list)) {
 df2 <- mutate(df2, 
        na_pixel_count = as.numeric(na_value_list))
 
-esp_mask <- raster("data/esp_binary/clipped_binary.tif")
-esp_list <- list()
 
-
-for(i in 1:length(results_list)) {
-  esp_clip <- projectRaster(esp_mask, results_list[[i]], res = 30, method = 'ngb')
-  esp_list[i] <- as.vector(table(values(esp_clip)))
-}
 
 df2 <- df2 %>% mutate(year = c(1984:2011),
                       total_pixels = as.numeric(grass1 + grass2 + shrub1 + shrub2 + na_pixel_count),
+                      total_study_area = as.numeric(grass1 + grass2 + shrub1 + shrub2),
                       percent_grass_certain = as.numeric((grass1 / total_pixels) * 100),
                       percent_grass_likely = as.numeric((grass2 / total_pixels) * 100),
                       percent_shrub_certain = as.numeric((shrub1 / total_pixels) * 100),
@@ -131,14 +142,64 @@ df2 <- df2 %>% mutate(year = c(1984:2011),
                       percent_grass_total = as.numeric(percent_grass_certain + percent_grass_likely),
                       percent_na = as.numeric((na_pixel_count / total_pixels) * 100),
                       percent_check = as.numeric(percent_grass_total + percent_shrub_total + percent_na),
-                      shrubvgrass = as.numeric(grass1 / shrub1)
+                      shrubvgrass = as.numeric(grass1  / shrub1),
+                      shrubgrassdiff = as.numeric(percent_shrub_total - percent_grass_total)
                       )
                       
 
-ggplot(data=df2, aes(y=df2$percent_shrub_total, x = df2$year)) + geom_point() + geom_smooth(method = "lm")
+ggplot(data=df2, aes(y=df2$shrubgrassdiff, x = df2$year)) + geom_point() + geom_smooth(method = "lm") 
+
+#filtering out years with >1 sd variability in either class
+df3 <- filter(df2, (percent_shrub_total - mean(percent_shrub_total)) < sd(percent_shrub_total)) %>%
+  filter((percent_grass_total - mean(percent_grass_total)) < sd(percent_grass_total))
 
 #scatter plot of cheat and sage totals with linear trend line ----
-ggplot(data=df, aes(x=raster, y=n, group = Var1, colour = as.factor(Var1))) + geom_point() + geom_smooth(method = "lm")
+ggplot(data=df, aes(x=raster, y=n, group = Var1, colour = as.factor(Var1))) + geom_point() 
++ geom_smooth(method = "lm")
++ geom_line(x)
 
 #begin work here (1/23) for getting table of combined counts for high and low certainty ensemble results ----
 r2011b <- bind_rows(r2011[1, 2] + r2011[2,2], r2011[3,2] + r2011[4,2])
+
+#working with fire perimeter data (2/21)
+fire_perims <- st_read("data/fire_perims/dissolve_mtbs_perims_1984-2015_DD_20170501.shp")
+fire_perims <- st_transform(fire_perims, as.character(crs(results_list[[1]])))
+scene_poly <- st_make_grid(results_list[[1]])
+fire_perims <- st_crop(fire_perims, scene_poly)
+
+years <- c(1984:2011)
+class_totals_oneyr <- list()
+class_totals_twoyr <- list()
+class_totals_threeyr <- list()
+class_totals_fouryr <- list()
+
+cores <- detectCores()
+registerDoParallel(cores)
+iterator <- c(1:28)
+
+foreach(i = iterator) %dopar% {
+  fire_perims2 <- fire_perims %>% filter(Year == years[i])
+  fire_names <- as.character(fire_perims2$Fire_Name)
+  class_totals_oneyr[[i]] <- raster::extract(results_list[[(i + 1)]], y = fire_perims2)
+  names(class_totals_oneyr[[i]]) <- fire_names
+  for(j in 1:length(fire_names)) {
+   
+    sum(class_totals_oneyr[[i]][j]$`IZEN 1`)
+  }
+}
+
+
+# class_totals_twoyr[i] <- raster::extract(results_list[[(i + 2)]], y = fire_perims2)
+# class_totals_threeyr[i] <- raster::extract(results_list[[(i + 3)]], y = fire_perims2)
+# class_totals_fouryr[i] <- raster::extract(results_list[[(i + 4)]], y = fire_perims2)
+
+
+fire_perims2 <- fire_perims %>% filter(Year == 2007) 
+fire_perims2 <- st_transform(fire_perims2, as.character(crs(results_list[[1]])))
+st_make_grid(results_list[[1]])
+fire_perims2 <- st_crop(fire_perims2, scene_poly)
+
+class_totals_burned_2007 <- raster::extract(results_list[[26]], y = fire_perims2)
+names(class_totals_burned_2007) <- fire_perims2$Fire_Name
+ggplot(df2, aes(year)) + geom_smooth(aes(y = percent_shrub_total, color = "green"), method = "lm", se = F) + geom_smooth(aes(y = percent_grass_total, color = "yellow"), method = "lm", se = F) + geom_point(aes(y=df2$percent_shrub_total, color = "green")) + geom_point(aes(y=df2$percent_grass_total, color = "yellow")) 
+
