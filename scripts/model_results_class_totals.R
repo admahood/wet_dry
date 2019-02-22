@@ -12,6 +12,7 @@ system ("aws s3 sync s3://earthlab-amahood/data/mucc_ensemble_results_done data/
 all_years_files <- list.files("data/allyears_results", full = T)
 
 system("aws s3 sync s3://earthlab-amahood/data/annual_esp_masks_mucc/ data/esp_masks/")
+system("aws s3 sync s3://earthlab-amahood/data/fire_perimeters/ data/fire_perims/")
 
 #step 3: extract class totals ----
 results_list <- list()
@@ -130,7 +131,7 @@ df2 <- mutate(df2,
 
 
 
-df2 <- df2 %>% mutate(#year = c(1984:2011),
+df2 <- df2 %>% mutate(year = c(1984:2011),
                       total_pixels = as.numeric(grass1 + grass2 + shrub1 + shrub2 + na_pixel_count),
                       total_study_area = as.numeric(grass1 + grass2 + shrub1 + shrub2),
                       percent_grass_certain = as.numeric((grass1 / total_pixels) * 100),
@@ -161,7 +162,37 @@ ggplot(data=df, aes(x=raster, y=n, group = Var1, colour = as.factor(Var1))) + ge
 r2011b <- bind_rows(r2011[1, 2] + r2011[2,2], r2011[3,2] + r2011[4,2])
 
 #working with fire perimeter data (2/21)
-fire_perims <- st_read("data/fire_perims/dissolvemtbs_perims_1984-2015_DD_20170501.shp")
+fire_perims <- st_read("data/fire_perims/dissolve_mtbs_perims_1984-2015_DD_20170501.shp")
+fire_perims <- st_transform(fire_perims, as.character(crs(results_list[[1]])))
+scene_poly <- st_make_grid(results_list[[1]])
+fire_perims <- st_crop(fire_perims, scene_poly)
+
+years <- c(1984:2011)
+class_totals_oneyr <- list()
+class_totals_twoyr <- list()
+class_totals_threeyr <- list()
+class_totals_fouryr <- list()
+
+cores <- detectCores()
+registerDoParallel(cores)
+iterator <- c(1:28)
+
+foreach(i = iterator) %dopar% {
+  fire_perims2 <- fire_perims %>% filter(Year == years[i])
+  fire_names <- as.character(fire_perims2$Fire_Name)
+  class_totals_oneyr[[i]] <- raster::extract(results_list[[(i + 1)]], y = fire_perims2)
+  names(class_totals_oneyr[[i]]) <- fire_names
+  for(j in 1:length(fire_names)) {
+   
+    sum(class_totals_oneyr[[i]][j]$`IZEN 1`)
+  }
+}
+
+
+# class_totals_twoyr[i] <- raster::extract(results_list[[(i + 2)]], y = fire_perims2)
+# class_totals_threeyr[i] <- raster::extract(results_list[[(i + 3)]], y = fire_perims2)
+# class_totals_fouryr[i] <- raster::extract(results_list[[(i + 4)]], y = fire_perims2)
+
 
 fire_perims2 <- fire_perims %>% filter(Year == 2007) 
 fire_perims2 <- st_transform(fire_perims2, as.character(crs(results_list[[1]])))
