@@ -32,6 +32,8 @@ corz <- detectCores()-1
 
 system("aws s3 cp s3://earthlab-amahood/data/plots_with_landsat.gpkg data/plot_data/plots_with_landsat.gpkg")
 system("aws s3 cp s3://earthlab-amahood/data/vegbank_plots_with_landsat.gpkg data/plot_data/vegbank_plots_with_landsat.gpkg")
+#recently generated favoring mid-summer over less cloudy
+system("aws s3 cp s3://earthlab-amahood/data/plots_with_landsat_feb19.gpkg data/plot_data/plots_with_landsat.gpkg")
 
 
 
@@ -101,27 +103,45 @@ vbd_new <- rbind(vshrub, vgrass) %>%
 
 gbd <- st_read("data/plot_data/plots_with_landsat.gpkg", quiet=T) %>%
   filter(esp_mask == 1) %>%
-  mutate(total_shrubs = NonInvShru + SagebrushC,
-         ndsvi = get_ndsvi(sr_band3, sr_band5),
+  mutate(ndsvi = get_ndsvi(sr_band3, sr_band5),
+         m_ndsvi = get_ndsvi(mean_sr_band3, mean_sr_band5),
+         rel_ndsvi = ndsvi-m_ndsvi,
          folded_aspect_ns = get_folded_aspect_ns(aspect)) %>%
   dplyr::select(sr_band1, sr_band2, sr_band3, sr_band4, sr_band5, sr_band7,
-                ndvi=NDVI, evi=EVI, savi=SAVI,sr=SR, ndsvi,
+                mean_sr_band1, mean_sr_band2, mean_sr_band3, mean_sr_band4, 
+                mean_sr_band5, mean_sr_band7,
+                ndvi, evi, savi,sr, ndsvi,
                 greenness, brightness, wetness, OBJECTID,Latitude,
-                total_shrubs,
                 BareSoilCo,InvAnnGras, InvAnnFo_1,InvPlantCo,
-                GapPct_25_,GapPct_51_, GapPct_101, GapPct_200, GapPct_251,
                 TotalFolia, SagebrushC,
                 elevation,
                 folded_aspect_ns,
-                slope, tri=TRI, roughness) %>%
-  mutate(satvi = get_satvi(sr_band3, sr_band5,sr_band7),
+                slope, tri, roughness) %>%
+  mutate(m_ndvi = get_ndvi(mean_sr_band3, mean_sr_band4), 
+         rel_ndvi = ndvi - m_ndvi,
+         m_evi = get_evi(mean_sr_band1, mean_sr_band3, mean_sr_band4), 
+         rel_evi = evi-m_evi,
+         m_savi = get_savi(mean_sr_band3, mean_sr_band4),
+         rel_savi = savi-m_savi,
+         m_sr = get_sr(mean_sr_band3, mean_sr_band4), 
+         rel_sr = sr - m_sr,
          tndvi = (ndvi+1)*50,
+         m_tndvi = (m_ndvi+1)*50,
+         rel_tndvi = tndvi - m_tndvi,
          dup = duplicated(Latitude))%>%
   mutate(ndti = (sr_band5 - sr_band7)/(sr_band5+sr_band7),
          green_ndvi = (sr_band4 - sr_band2)/(sr_band4+sr_band2),
          SLA_index = sr_band4/(sr_band3+sr_band7),
-         ndi7 = (sr_band4 - sr_band7)/(sr_band4+sr_band7))  %>%
-  filter(dup == F) %>%
+         ndi7 = (sr_band4 - sr_band7)/(sr_band4+sr_band7),
+         m_ndti = (mean_sr_band5 - mean_sr_band7)/(mean_sr_band5+mean_sr_band7),
+         m_green_ndvi = (mean_sr_band4 - mean_sr_band2)/(mean_sr_band4+mean_sr_band2),
+         m_SLA_index = mean_sr_band4/(mean_sr_band3+mean_sr_band7),
+         m_ndi7 = (mean_sr_band4 - mean_sr_band7)/(mean_sr_band4+mean_sr_band7),
+         rel_ndti = ndti - m_ndti,
+         rel_green_ndvi = green_ndvi - m_green_ndvi,
+         rel_SLA_index = SLA_index-m_SLA_index,
+         rel_ndi7 = ndi7 -m_ndi7)  %>%
+  #filter(dup == F) %>%
   dplyr::select(-dup, -OBJECTID)
 
 # why not just manually attempt to get rid of mixed pixels? --------------------
