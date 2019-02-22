@@ -96,9 +96,10 @@ for(i in 1:length(years)){
         names(band) <- tif_names[k]
         gbplots_subset <- raster::extract(band, gbplots_subset, sp=TRUE)
         
-        if(startsWith(tif_names[k],"sr")){
+        if(startsWith(tif_names[k],"sr_band")){
           gbplots_subset$newcol <- mean(getValues(band), na.rm=T)
-          names(gbplots_subset)[length(names(gbplots_subset))-1] <- paste0("mean_", tif_names[k])
+          
+          names(gbplots_subset)[length(names(gbplots_subset))] <- paste0("mean_", tif_names[k])
         }
       }
       gbplots_subset <- st_transform(st_as_sf(gbplots_subset),crs = st_crs(plot_data))
