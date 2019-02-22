@@ -194,6 +194,6 @@ shrub_binary <- raster("data/landfire_esp_rcl/shrub_binary.tif")
 df$esp_mask <- raster::extract(binary_clip, df)
 
 # writing the file and pushing to s3 -----------------------------------------------
-st_write(df, "data/plots_with_landsat.gpkg")
+st_write(df, "data/plots_with_landsat.gpkg", delete_dsn = T)
 system("aws s3 cp data/plots_with_landsat.gpkg s3://earthlab-amahood/data/plots_with_landsat_feb19.gpkg")
 
