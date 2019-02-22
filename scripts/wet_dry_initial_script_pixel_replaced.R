@@ -156,6 +156,8 @@ gb_dem <- raster("data/terrain_2/lf_dem_reproj_full.tif")
 ter_s3 <- 's3://earthlab-amahood/data/terrain_2'
 ter_local <- '/home/rstudio/wet_dry/data/terrain_2'
 
+library(foreach)
+library(doParallel)
 system(paste("aws s3 sync",
              ter_s3,
              ter_local))
@@ -191,7 +193,7 @@ writeRaster(folded_aspect, "data/terrain_2/folded_aspect.tif")
 system("aws s3 cp data/terrain_2/folded_aspect.tif s3://earthlab-amahood/data/terrain_2/folded_aspect.tif")
 
 #extract terrain raster values
-df$elevation <- raster::extract(gb_dem, df)
+df$elevation <- raster::extract(raster("data/terrain_2/lf_dem_reproj.tif"), df)
 df$slope <- raster::extract(raster("data/terrain_2/slope.tif"), df)
 df$aspect <- raster::extract(raster("data/terrain_2/aspect.tif"), df)
 df$TPI <- raster::extract(raster("data/terrain_2/TPI.tif"), df)
