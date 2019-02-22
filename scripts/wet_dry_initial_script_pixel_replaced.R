@@ -210,7 +210,6 @@ df$NDVI <- get_ndvi(df$sr_band3,df$sr_band4)
 df$EVI <- get_evi(df$sr_band1, df$sr_band3, df$sr_band4)
 df$SAVI <- get_savi(df$sr_band3,df$sr_band4)
 df$SR = get_sr(df$sr_band3,df$sr_band4)
-#df$SATVI <- get_satvi(df$sr_band3, df$sr_band5, df$sr_band7) ------#FIX THIS FORMULA
 df$NDSVI <- get_ndsvi(df$sr_band3, df$sr_band5)
 df$greenness <- green7(df$sr_band1,df$sr_band2,df$sr_band3,df$sr_band4,df$sr_band5,df$sr_band7)
 df$brightness <- bright7(df$sr_band1,df$sr_band2,df$sr_band3,df$sr_band4,df$sr_band5,df$sr_band7)
