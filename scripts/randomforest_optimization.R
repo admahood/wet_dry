@@ -3,6 +3,7 @@ libs <- c("randomForest", "tidyverse","sf", "foreach", "doParallel",
           "caTools", # for sample.split()
           "caret", # for confusionMatrix
           "ranger",
+          "gganimate",
           "raster",
           #"meteo", #for tiling
           "spdep", #for the weights
@@ -115,7 +116,11 @@ gbd <- st_read("data/plot_data/plots_with_landsat.gpkg", quiet=T) %>%
                 slope, tri=TRI, roughness) %>%
   mutate(satvi = get_satvi(sr_band3, sr_band5,sr_band7),
          tndvi = (ndvi+1)*50,
-         dup = duplicated(Latitude)) %>%
+         dup = duplicated(Latitude))%>%
+  mutate(ndti = (sr_band5 - sr_band7)/(sr_band5+sr_band7),
+         green_ndvi = (sr_band4 - sr_band2)/(sr_band4+sr_band2),
+         SLA_index = sr_band4/(sr_band3+sr_band7),
+         ndi7 = (sr_band4 - sr_band7)/(sr_band4+sr_band7))  %>%
   filter(dup == F) %>%
   dplyr::select(-dup, -OBJECTID)
 
@@ -131,10 +136,6 @@ gbd_new <- rbind(grasses,shrubs) %>%
                 ndvi,evi,tndvi,sr,ndsvi,
                 folded_aspect_ns, brightness, greenness, wetness,
                 slope, tri, roughness) %>%
-  mutate(ndti = (sr_band5 - sr_band7)/(sr_band5+sr_band7),
-         green_ndvi = (sr_band4 - sr_band2)/(sr_band4+sr_band2),
-         SLA_index = sr_band4/(sr_band3+sr_band7),
-         ndi7 = (sr_band4 - sr_band7)/(sr_band4+sr_band7)) %>%
   st_set_geometry(NULL)%>%
   rbind(vbd_new)
 
@@ -351,6 +352,125 @@ for(np in 1:length(naip)){
   anim_save(aa, filename=paste0("/home/a/data/gifs/",naip_names[np],"_ensemble_predictions.gif"))
 }
 
+# animations of individual variables -------------------------------------------
+naip<-list()
+naip[[1]] <- raster("/home/a/data/naip/2010/m_4011703_ne_11_1_20100704.tif") #wmuc
+naip[[2]] <- raster("/home/a/data/naip/2010/m_4111761_nw_11_1_20100704.tif") #frank
+naip[[3]] <- raster("/home/a/data/naip/2006/n_4111823_sw_11_1_20060714.tif") #kings river
+
+naip_names <- c("wmuc", "frank", "kings")
+years = 1991:2011
+
+zscore <- function(x) return((x - mean(getValues(x),na.rm=TRUE))/sd(getValues(x),na.rm=TRUE))
+mean_diff<-function(x) return(x - mean(getValues(x),na.rm=TRUE))
+
+ts_df <- list()
+mods<-list()
+counter <- 1
+for(np in 1:length(naip)){
+  for (yy in years) {
+    l_file <- paste0("/home/a/data/landsat/p42r31/ls5_", yy, "_042031_.tif")
+    ls5 <- raster::stack(l_file) %>%
+      crop(naip[[np]])
+    names(ls5) <-c("sr_band1", "sr_band2","sr_band3", "sr_band4", "sr_band5", "sr_band7")
+ 
+    # ls5$slope <- raster("/home/a/data/background/slope/p42_r31_slope.tif")%>%
+    #   projectRaster(naip[[np]])
+    # ls5$elevation <- raster("/home/a/data/background/elevation/p42_r31_elevation.tif") %>%
+    #   projectRaster(naip[[np]])
+    ls5$ndvi <-get_ndvi(band3 = ls5$sr_band3, band4 = ls5$sr_band4)
+    ls5$ndti <- (ls5$sr_band5 - ls5$sr_band7)/(ls5$sr_band5+ls5$sr_band7)
+    ls5$green_ndvi <- (ls5$sr_band4 - ls5$sr_band2)/(ls5$sr_band4+ls5$sr_band2)
+    ls5$evi <- get_evi(ls5$sr_band1, band3 = ls5$sr_band3, band4 =ls5$sr_band4) 
+    ls5$wetness <- wet5(band1 = ls5$sr_band1,band2 = ls5$sr_band2, band3 =  ls5$sr_band3,
+                         band4 = ls5$sr_band4, band5 = ls5$sr_band5, band7 =  ls5$sr_band7) 
+    ls5$ndsvi <- get_ndsvi(band3 = ls5$sr_band3,band5 = ls5$sr_band5) 
+    ls5$sr <- get_sr(band3 = ls5$sr_band3, band4 = ls5$sr_band4) 
+    ls5$tndvi <- (ls5$ndvi+1)*50
+    ls5$greenness <- green5(band1 = ls5$sr_band1,band2 =  ls5$sr_band2, band3 =  ls5$sr_band3,
+                            band4 = ls5$sr_band4, band5 =  ls5$sr_band5, band7 =  ls5$sr_band7)
+    ls5$brightness <- bright5(band1 = ls5$sr_band1,band2 =  ls5$sr_band2, band3 =  ls5$sr_band3,
+                            band4 = ls5$sr_band4, band5 =  ls5$sr_band5, band7 =  ls5$sr_band7)
+    #m_bs <- glm(BareSoilCo ~ ndti+ sr_band4*brightness, dd, family=quasibinomial(link="logit"))
+    #m_tf <- glm(TotalFolia ~ ndti+ sr_band2*green_ndvi, dd, family=quasibinomial(link="logit"))
+    m_sb <- glm(SagebrushC ~ ndvi+brightness+green_ndvi, dd, family=quasibinomial(link="logit"));summary(m_sb);rsq::rsq(m_sb)
+    
+    probs <- function(pred) exp(pred)/(1+exp(pred))
+    # mods$bare <- predict(ls5, m_bs)
+    # mods$total_foliar<- predict(ls5, m_tf)
+    # for(ii in 1:length(names(ls5))){
+    #   ls5[[ii]]<-mean_diff(mods[[ii]])
+    # }
+    
+    mods$sage <- predict(ls5, m_sb)
+    
+     for(ii in 1:length(names(mods))){
+      mods[[ii]]<-probs(mods[[ii]])
+     }
+    m <- c(0, 0.15, 1,  0.15, 1, 2)
+    rclmat <- matrix(m, ncol=3, byrow=TRUE)
+    mods$sage_class <- reclassify(mods$sage, rclmat)
+
+    for(bb in 1:length(names(mods))){
+      rrr<- mods[[bb]] 
+      rr <- as.data.frame(rrr, xy = TRUE)
+      names(rr) <- c("x","y", "Value")
+      rr$year=yy
+      rr$Variable = names(mods)[bb]
+      rr$scene <- naip_names[np]
+      rr$x <- rr$x - min(rr$x)
+      rr$y <- rr$y - min(rr$y)
+      ts_df[[counter]]<-rr
+      counter<-counter+1
+    }
+  }
+}
+ts_df<-do.call("rbind",ts_df)
+
+# corz <- detectCores()-1
+# registerDoParallel(corz) 
+
+scene_means <- ts_df %>%
+  filter(Variable == "sage") %>%
+  group_by(year) %>%
+  summarise(scene_mean=mean(Value,na.rm=T))  %>%
+  ungroup()
+
+
+sage_class <- ts_df %>%
+  as_tibble()%>%
+  filter(Variable == "sage") %>%
+  left_join(scene_means) %>%
+  mutate(adj_value = Value - scene_mean)
+
+
+anim<-ggplot(sage_class, aes(x=x,y=y,fill=adj_value))+
+  geom_raster() +
+  theme_void() +    
+  facet_wrap(~scene, scales="free") +
+  scale_fill_viridis_c(name = "class") +
+  labs(title = 'Year: {frame_time}') +
+  transition_time(year)
+
+aa<-gganimate::animate(anim, fps=2, nframes = length(years), width=1000, height=400)
+anim_save(aa, filename=paste0("/home/a/data/gifs/sage_cover_scene_adjusted.gif"))
+
+# this uses a lot of ram - like 8gb per thing
+for(vv in unique(ts_df$Variable)){
+  print(vv)
+  anim<-ggplot(ts_df[ts_df$Variable == vv,], aes(x=x,y=y,fill=Value))+
+    geom_raster() +
+    theme_void() +    
+    facet_wrap(~scene, scales="free") +
+    scale_fill_viridis_c(name = vv) +
+    ggtitle(paste(yy)) +
+    labs(title = 'Year: {frame_time}') +
+    transition_time(year)
+    
+  aa<-gganimate::animate(anim, fps=2, nframes = length(years), width=1000, height=400)
+  anim_save(aa, filename=paste0("/home/a/data/gifs/quasipoisson_",vv,".gif"))
+}
+
 
 # end of animate ------------------------------------------
 
@@ -408,7 +528,7 @@ resp <- dplyr::select(gbd, SagebrushC,
 clm <- dplyr::select(gbd, sr_band1, sr_band2, sr_band3, sr_band4, sr_band5, sr_band7,
                      elevation,ndvi,evi,satvi,tndvi,sr,ndsvi,Latitude,
                      folded_aspect_ns, brightness, greenness, wetness,
-                     slope, tpi, tri, roughness, flowdir) %>%
+                     slope,  tri, roughness) %>%
   st_set_geometry(NULL) %>%
   mutate(index57 = (sr_band5 - sr_band7)/(sr_band5+sr_band7),
          green_ndvi = (sr_band4 - sr_band2)/(sr_band4+sr_band2),
@@ -492,8 +612,9 @@ arrange(res_df[res_df$resp == "BareSoilCo",],desc(R2))[1:20,]
 arrange(res_df,desc(R2))[1:20,]
 
 # now plotting!! ---------------------------------------------------------------
+dd<- dplyr::rename(dd,ndti=index57)
 
-m <- glm(SagebrushC~InvPlantCo + elevation +green_ndvi, dd, family=quasibinomial(link="logit"))
+m <- glm(SagebrushC~InvPlantCo + elevation +green_ndvi, gbd, family=quasibinomial(link="logit"))
 summary(m); rsq::rsq(m) # still just .266
 ggplot(data=dd,aes(y=SagebrushC,x=green_ndvi))+
   geom_point()+
@@ -502,7 +623,7 @@ ggplot(data=dd,aes(y=SagebrushC,x=green_ndvi))+
               se = TRUE) +
   theme_bw()
 
-m <- glm(TotalFolia ~ index57+ sr_band2*green_ndvi, dd, family=quasibinomial(link="logit"))
+m_tf <- glm(TotalFolia ~ ndti+ sr_band2*green_ndvi, dd, family=quasibinomial(link="logit"))
 summary(m); rsq::rsq(m)
 ggplot(data=dd,aes(y=TotalFolia,x=index57))+
   geom_point()+
@@ -511,7 +632,7 @@ ggplot(data=dd,aes(y=TotalFolia,x=index57))+
               se = TRUE) +
   theme_bw()
 
-m <- glm(BareSoilCo ~ index57+ sr_band4*brightness, dd, family=quasibinomial(link="logit"))
+m_bs <- glm(BareSoilCo ~ ndti+ sr_band4*brightness, dd, family=quasibinomial(link="logit"))
 summary(m); rsq::rsq(m)
 ggplot(data=dd,aes(y=BareSoilCo,x=index57))+
   geom_point()+
