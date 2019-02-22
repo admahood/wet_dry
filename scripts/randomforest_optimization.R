@@ -125,6 +125,12 @@ gbd <- st_read("data/plot_data/plots_with_landsat.gpkg", quiet=T) %>%
          rel_savi = savi-m_savi,
          m_sr = get_sr(mean_sr_band3, mean_sr_band4), 
          rel_sr = sr - m_sr,
+         m_greenness = green7(mean_sr_band1, mean_sr_band2, mean_sr_band3, mean_sr_band4,mean_sr_band5, mean_sr_band7),
+         m_brightness = bright7(mean_sr_band1, mean_sr_band2, mean_sr_band3, mean_sr_band4,mean_sr_band5, mean_sr_band7),
+         m_wetness = wet7(mean_sr_band1, mean_sr_band2, mean_sr_band3, mean_sr_band4,mean_sr_band5, mean_sr_band7),
+         rel_greenness = greenness - m_greenness,
+         rel_wetness = wetness - m_wetness,
+         rel_brightness = brightness - m_brightness,
          tndvi = (ndvi+1)*50,
          m_tndvi = (m_ndvi+1)*50,
          rel_tndvi = tndvi - m_tndvi,
@@ -145,19 +151,19 @@ gbd <- st_read("data/plot_data/plots_with_landsat.gpkg", quiet=T) %>%
   dplyr::select(-dup, -OBJECTID)
 
 # why not just manually attempt to get rid of mixed pixels? --------------------
-shrubs<- dplyr::filter(gbd, SagebrushC > 0 & InvAnnGras < 2) %>%
-  mutate(cluster = "shrub")
-grasses <- dplyr::filter(gbd, SagebrushC <2 & InvAnnGras >2)%>%
-  mutate(cluster="grass")
+shrubs<- dplyr::filter(gbd, SagebrushC > 0 & InvAnnGras < 3) %>%
+  mutate(cluster = "shrub");dim(shrubs)
+grasses <- dplyr::filter(gbd, SagebrushC <2 & InvAnnGras >3)%>%
+  mutate(cluster="grass");dim(grasses)
 
 gbd_new <- rbind(grasses,shrubs) %>%
   dplyr::select(cluster, sr_band1, sr_band2, sr_band3, sr_band4, sr_band5, sr_band7,
-                elevation,
-                ndvi,evi,tndvi,sr,ndsvi,
+                starts_with("rel_"), green_ndvi,
+                ndvi,evi,tndvi,sr,ndsvi,ndi7,SLA_index, ndti,
                 folded_aspect_ns, brightness, greenness, wetness,
                 slope, tri, roughness) %>%
-  st_set_geometry(NULL)%>%
-  rbind(vbd_new)
+  st_set_geometry(NULL) #%>%
+  # rbind(vbd_new)
 
 # perhaps a line here to make the observations exactly equal...
 
