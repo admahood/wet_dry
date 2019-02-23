@@ -18,7 +18,7 @@ system("aws s3 sync s3://earthlab-amahood/data/fire_perimeters/ data/fire_perims
 results_list <- list()
 
 for(i in 1:length(all_years_files)) {
- results_list[i]  <- raster(all_years_files[i])
+  results_list[i]  <- raster(all_years_files[i])
 }
 
 # 
@@ -127,7 +127,7 @@ for(i in 1:length(results_list)) {
 }
 
 df2 <- mutate(df2, 
-       na_pixel_count = as.numeric(na_value_list))
+              na_pixel_count = as.numeric(na_value_list))
 
 
 
@@ -144,10 +144,10 @@ df2 <- df2 %>% mutate(year = c(1984:2011),
                       percent_check = as.numeric(percent_grass_total + percent_shrub_total + percent_na),
                       shrubvgrass = as.numeric(grass1  / shrub1),
                       shrubgrassdiff = as.numeric(percent_shrub_total - percent_grass_total)
-                      )
-                      
+)
 
-ggplot(data=df2, aes(y=df2$shrubgrassdiff, x = df2$year)) + geom_point() + geom_smooth(method = "lm") 
+
+ggplot(data=df2, aes(y=df2$percent_check, x = df2$year)) + geom_point() + geom_smooth(method = "lm") 
 
 #filtering out years with >1 sd variability in either class
 df3 <- filter(df2, (percent_shrub_total - mean(percent_shrub_total)) < sd(percent_shrub_total)) %>%
@@ -168,7 +168,6 @@ scene_poly <- st_make_grid(results_list[[1]])
 fire_perims <- st_crop(fire_perims, scene_poly)
 
 years <- c(1984:2011)
-class_totals_oneyr <- list()
 class_totals_twoyr <- list()
 class_totals_threeyr <- list()
 class_totals_fouryr <- list()
@@ -177,16 +176,30 @@ cores <- detectCores()
 registerDoParallel(cores)
 iterator <- c(1:28)
 
-foreach(i = iterator) %dopar% {
+annual_oneyrpostburn <- list()
+
+for(i in 1:length(iterator)) {
   fire_perims2 <- fire_perims %>% filter(Year == years[i])
-  fire_names <- as.character(fire_perims2$Fire_Name)
-  class_totals_oneyr[[i]] <- raster::extract(results_list[[(i + 1)]], y = fire_perims2)
-  names(class_totals_oneyr[[i]]) <- fire_names
+  result_year <- names(results_list[[k]])
+  fire_names <- seq(length((fire_perims2$Fire_Name)))
+  k = i + 1 #counter
+  class_totals_oneyr <- raster::extract(results_list[[k]], y = fire_perims2, df = T)
+  oneyr_df <- list()
   for(j in 1:length(fire_names)) {
-   
-    sum(class_totals_oneyr[[i]][j]$`IZEN 1`)
+    fire <- class_totals_oneyr[class_totals_oneyr$ID == j,] %>% dplyr::select(-ID)
+    class0 <- sum(fire[,1] == 0, na.rm = T)
+    class1 <- sum(fire[,1] == 1, na.rm = T)
+    class2 <- sum(fire[,1] == 2, na.rm = T)
+    class3 <- sum(fire[,1] == 3, na.rm = T)
+    grass <- class0 + class1
+    sage <- class2 + class3
+    fire_stats <- c(grass,sage) 
+    oneyr_df[[j]] <- fire_stats
   }
+  annual_oneyrpostburn[[i]] <- oneyr_df
+  names(annual_oneyrpostburn[[i]]) <- years[i]
 }
+
 
 
 # class_totals_twoyr[i] <- raster::extract(results_list[[(i + 2)]], y = fire_perims2)
@@ -202,4 +215,3 @@ fire_perims2 <- st_crop(fire_perims2, scene_poly)
 class_totals_burned_2007 <- raster::extract(results_list[[26]], y = fire_perims2)
 names(class_totals_burned_2007) <- fire_perims2$Fire_Name
 ggplot(df2, aes(year)) + geom_smooth(aes(y = percent_shrub_total, color = "green"), method = "lm", se = F) + geom_smooth(aes(y = percent_grass_total, color = "yellow"), method = "lm", se = F) + geom_point(aes(y=df2$percent_shrub_total, color = "green")) + geom_point(aes(y=df2$percent_grass_total, color = "yellow")) 
-
