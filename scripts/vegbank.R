@@ -110,8 +110,12 @@ for(i in 1:length(years)){
                                    path_row_combos[j],
                                    "*.tar.gz")) 
       if(length(tar_files)>0){
+        dates<- substr(tar_files, 55,58) %>%
+          as.numeric()
+        
         print("untarring")
-        untar(tar_files[1], exdir = exdir)
+        untar(tar_files[which.max(dates)], exdir = exdir)
+       
         #listing only the tif files we've extracted (there's a bunch of metadata etc too, which you should familiarize yourself with)
         tif_files <- Sys.glob(paste0(exdir,"*.tif"))
         
@@ -201,9 +205,8 @@ system("aws s3 sync s3://earthlab-amahood/data/terrain_gb /home/rstudio/wet_dry/
 # system("aws s3 cp home/rstudio/wet_dry/data/terrain_2/terrain_gb.tif s3://earthlab-amahood/data/terrain_2/terrain_gb.tif")
 # keep only sunny days ----------------------------------------------------------------------
 
-df <- result[result$pixel_qa == 66, ] %>%
-  dplyr::select(-percentbaresoil,-slopeaspect, -elevation, -slopegradient) %>%
-  na.omit()
+df <- result[result$pixel_qa == 66,] %>%
+  na.omit
 
 # Create vegetation indices -------------------------------------------------------------------
 df$ndvi <- get_ndvi(df$sr_band3,df$sr_band4)
