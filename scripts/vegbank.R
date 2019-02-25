@@ -19,21 +19,34 @@ system("aws s3 sync s3://earthlab-amahood/data/ecoregions /home/rstudio/wet_dry/
 system("aws s3 sync s3://earthlab-amahood/data/WRS2_paths/wrs2_asc_desc /home/rstudio/wet_dry/data/WRS2_paths/wrs2_asc_desc")
 system("aws s3 sync s3://earthlab-amahood/data/landfire_esp_rcl /home/rstudio/wet_dry/data/landfire_esp_rcl")
 
-plot_data <-  read_csv("data/vegbank/plot_env.csv") %>%
+env <-  read_csv("data/vegbank/plot_env.csv") %>%
   dplyr::select(observation_id,
                 date = obsstartdate_vb,
                 latitude,
-                longitude,
-                percentrockgravel,
-                percentbaresoil,
-                treecover,
-                shrubcover,
-                fieldcover,
-                slopeaspect,
-                slopegradient,
-                elevation) %>%
+                longitude)
+
+tfol <- read_csv("data/vegbank/plot_taxa.csv") %>%
+  dplyr::select(observation_id, cover) %>%
+  group_by(observation_id) %>%
+  summarise(total_foliar_cover = sum(cover, na.rm=T))
+
+plot_data <- read_csv("data/vegbank/plot_taxa.csv") %>%
+  dplyr::select(observation_id, authorplantname_vb, cover) %>% # also there is stratum
+  mutate(cover = as.numeric(cover)) %>%
+  mutate(cover = replace(cover, is.na(cover)==T, 0),
+         dup = duplicated(dplyr::select(., observation_id,authorplantname_vb))) %>%
+  filter(dup == FALSE) %>% # a couple of unknowns with the same name in the same plot
+  dplyr::select(-dup)%>%
+  spread(authorplantname_vb, cover, fill=0) %>%
+  dplyr::select(observation_id, brte=`Bromus tectorum L.`, starts_with("Artemisia")) %>%
+  mutate(sage = rowSums(.[3:22])) %>%
+  dplyr::select(sage, brte, observation_id) %>%
+  left_join(tfol) %>%
+  left_join(env) %>%
   st_as_sf(coords = c("longitude", "latitude"), 
-                   crs = 4326, agr = "constant")
+           crs = 4326, agr = "constant")
+
+
 
 
 ecoregions <- st_read("data/ecoregions/NA_CEC_Eco_Level3.shp") #ecoregions
@@ -42,7 +55,7 @@ binary_clip <- raster("data/landfire_esp_rcl/clipped_binary.tif") #clipped (in a
 
 plot_data <- plot_data %>% st_transform(crs = crs(binary_clip, asText = TRUE)) %>%
   mutate(binary = raster::extract(binary_clip, plot_data)) %>%
-  filter(binary == 1)
+  filter(binary >0)
 
 # tweak data -------------------------------------------------------------------
 great_basin <- subset(ecoregions, NA_L3NAME %in% c("Northern Basin and Range", 
@@ -50,18 +63,17 @@ great_basin <- subset(ecoregions, NA_L3NAME %in% c("Northern Basin and Range",
                                                    "Snake River Plain"))
 
 
-great_basin <- st_transform(great_basin, st_crs(plot_data)) # matching projections
-great_basin <- st_union(great_basin) # dissolve into one polygon
-gb_plots <- st_intersection(plot_data,great_basin)# clipping to great basin
-gb_plots$year <- substr(as.character(gb_plots$date),1,4) # making a year field
+great_basin <- st_transform(great_basin, st_crs(plot_data)) %>% st_union() # dissolve into one polygon
+gb_plots <- st_intersection(plot_data,great_basin) %>%
+  mutate(year = substr(as.character(date),1,4)) # making a year field
 
-scenes <- st_transform(scenes,st_crs(gb_plots)) # matching projections
-scenes <- scenes[scenes$ROW<100,] # getting rid of path/rows we don't want 
+scenes <- st_transform(scenes,st_crs(gb_plots)) %>%
+  filter(ROW<100) # getting rid of path/rows we don't want 
 gb_plots <- st_intersection(gb_plots,scenes[,9:10]) # grabbing only the row and path
 gb_plots$path_row <- as.character(paste0("0",gb_plots$PATH,"0",gb_plots$ROW)) 
 
 landsat_s3 <- "s3://earthlab-amahood/data/landsat"
-landsat_local <- "/home/rstudio/wet_dry/data/landsat" 
+landsat_local <- "/home/rstudio/wet_dry/data/landsat"
 dir.create("data/scrap", showWarnings = FALSE)
 exdir <- "data/scrap/"
 
