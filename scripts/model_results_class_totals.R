@@ -203,6 +203,7 @@ for(i in 1:length(iterator)) {
 
 
 
+
 # class_totals_twoyr[i] <- raster::extract(results_list[[(i + 2)]], y = fire_perims2)
 # class_totals_threeyr[i] <- raster::extract(results_list[[(i + 3)]], y = fire_perims2)
 # class_totals_fouryr[i] <- raster::extract(results_list[[(i + 4)]], y = fire_perims2)
