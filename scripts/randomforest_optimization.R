@@ -32,111 +32,114 @@ corz <- detectCores()-1
 
 system("aws s3 cp s3://earthlab-amahood/data/plots_with_landsat.gpkg data/plot_data/plots_with_landsat.gpkg")
 system("aws s3 cp s3://earthlab-amahood/data/vegbank_plots_with_landsat.gpkg data/plot_data/vegbank_plots_with_landsat.gpkg")
-
-
-
-#veg_bank data
-
-vbd <- read_csv("/home/a/data/vegetation/vegbank_bigger/plot_taxa.csv") %>%
-  dplyr::select(observation_id, authorplantname_vb, cover) %>% # also there is stratum
-  mutate(cover = as.numeric(cover)) %>%
-  mutate(cover = replace(cover, is.na(cover)==T, 0),
-         dup = duplicated(dplyr::select(., observation_id,authorplantname_vb))) %>%
-  filter(dup == FALSE) %>% # a couple of unknowns with the same name in the same plot
-  dplyr::select(-dup)%>%
-  spread(authorplantname_vb, cover, fill=0) %>%
-  dplyr::select(observation_id, brte=`Bromus tectorum L.`, starts_with("Artemisia"))
-
-vbd$sage <- rowSums(vbd[3:22])
-
+#recently generated favoring mid-summer over less cloudy
+system("aws s3 cp s3://earthlab-amahood/data/plots_with_landsat_feb19.gpkg data/plot_data/plots_with_landsat.gpkg")
 
 # here the idea is to get pure grass & shrub plots. The vegbank data is a little
 # less precise, so here we fiddle around and raise the shrub cover cutoff until
 # the number of shrub observations is almost equal to the number of grass observations
 
-
-
-
-vbd_old <- st_read("data/plot_data/vegbank_plots_with_landsat.gpkg", quiet=T) %>%
+vbd <- st_read("data/plot_data/vegbank_plots_with_landsat.gpkg", quiet=T) %>%
   mutate(ndsvi = get_ndsvi(sr_band3, sr_band5),
          folded_aspect_ns = get_folded_aspect_ns(aspect)) %>%
-  rename(total_shrubs = shrubcover, esp_mask = binary) %>%
+  rename(esp_mask = binary) %>%
   dplyr::select(sr_band1, sr_band2, sr_band3, sr_band4, sr_band5, sr_band7, 
                 observation_id,
                 ndvi, evi, savi,sr, ndsvi,
                 greenness, brightness, wetness,
-                total_shrubs,
-                elevation,
-                folded_aspect_ns,
+                sage, brte,
+                folded_aspect_ns, aspect,
                 slope, folded_aspect, tri, roughness)  %>%
-  mutate(satvi = get_satvi(sr_band3, sr_band5,sr_band7),
-         tndvi = (ndvi+1)*50, #formerly index57
+  mutate(tndvi = (ndvi+1)*50, #formerly index57
          ndti = (sr_band5 - sr_band7)/(sr_band5+sr_band7),
          green_ndvi = (sr_band4 - sr_band2)/(sr_band4+sr_band2),
          SLA_index = sr_band4/(sr_band3+sr_band7),
          ndi7 = (sr_band4 - sr_band7)/(sr_band4+sr_band7))
 
-vbd_new_j <- left_join(vbd, vbd_old) %>% na.omit() 
 
-vgrass <- vbd_new_j %>%
+vgrass <- vbd %>%
   dplyr::filter(sage ==0 & brte>10) %>%
   mutate(cluster = "grass");dim(vgrass)
 
-vshrub <- vbd_new_j %>%
+vshrub <- vbd %>%
   dplyr::filter(sage > 30 & brte ==0) %>%
-  mutate(cluster = "shrub") %>%
-  dplyr::filter(elevation < 2000);dim(vshrub) 
+  mutate(cluster = "shrub");dim(vshrub) 
+
 # shrubs are higher in elevation on average, might be confounding things
 
 vbd_new <- rbind(vshrub, vgrass) %>%
   dplyr::select(cluster, sr_band1, sr_band2, sr_band3, sr_band4, sr_band5, sr_band7,
-                elevation,
                 ndvi,evi,
-                #satvi,
-                tndvi,sr,ndsvi,
+                tndvi,sr,ndsvi, aspect,
                 folded_aspect_ns, brightness, greenness, wetness,
                 slope, tri, roughness, tndvi, ndti, green_ndvi,
-                SLA_index, ndi7)
+                SLA_index, ndi7) %>%
+  st_set_geometry(NULL)
 # blm-aim data 
 
 gbd <- st_read("data/plot_data/plots_with_landsat.gpkg", quiet=T) %>%
   filter(esp_mask == 1) %>%
-  mutate(total_shrubs = NonInvShru + SagebrushC,
-         ndsvi = get_ndsvi(sr_band3, sr_band5),
+  mutate(ndsvi = get_ndsvi(sr_band3, sr_band5),
+         m_ndsvi = get_ndsvi(mean_sr_band3, mean_sr_band5),
+         rel_ndsvi = ndsvi-m_ndsvi,
          folded_aspect_ns = get_folded_aspect_ns(aspect)) %>%
   dplyr::select(sr_band1, sr_band2, sr_band3, sr_band4, sr_band5, sr_band7,
-                ndvi=NDVI, evi=EVI, savi=SAVI,sr=SR, ndsvi,
+                mean_sr_band1, mean_sr_band2, mean_sr_band3, mean_sr_band4, 
+                mean_sr_band5, mean_sr_band7,
+                ndvi, evi, savi,sr, ndsvi,
                 greenness, brightness, wetness, OBJECTID,Latitude,
-                total_shrubs,
                 BareSoilCo,InvAnnGras, InvAnnFo_1,InvPlantCo,
-                GapPct_25_,GapPct_51_, GapPct_101, GapPct_200, GapPct_251,
                 TotalFolia, SagebrushC,
                 elevation,
-                folded_aspect_ns,
-                slope, tri=TRI, roughness) %>%
-  mutate(satvi = get_satvi(sr_band3, sr_band5,sr_band7),
+                folded_aspect_ns, aspect,
+                slope, tri, roughness) %>%
+  mutate(m_ndvi = get_ndvi(mean_sr_band3, mean_sr_band4), 
+         rel_ndvi = ndvi - m_ndvi,
+         m_evi = get_evi(mean_sr_band1, mean_sr_band3, mean_sr_band4), 
+         rel_evi = evi-m_evi,
+         m_savi = get_savi(mean_sr_band3, mean_sr_band4),
+         rel_savi = savi-m_savi,
+         m_sr = get_sr(mean_sr_band3, mean_sr_band4), 
+         rel_sr = sr - m_sr,
+         m_greenness = green7(mean_sr_band1, mean_sr_band2, mean_sr_band3, mean_sr_band4,mean_sr_band5, mean_sr_band7),
+         m_brightness = bright7(mean_sr_band1, mean_sr_band2, mean_sr_band3, mean_sr_band4,mean_sr_band5, mean_sr_band7),
+         m_wetness = wet7(mean_sr_band1, mean_sr_band2, mean_sr_band3, mean_sr_band4,mean_sr_band5, mean_sr_band7),
+         rel_greenness = greenness - m_greenness,
+         rel_wetness = wetness - m_wetness,
+         rel_brightness = brightness - m_brightness,
          tndvi = (ndvi+1)*50,
+         m_tndvi = (m_ndvi+1)*50,
+         rel_tndvi = tndvi - m_tndvi,
          dup = duplicated(Latitude))%>%
   mutate(ndti = (sr_band5 - sr_band7)/(sr_band5+sr_band7),
          green_ndvi = (sr_band4 - sr_band2)/(sr_band4+sr_band2),
          SLA_index = sr_band4/(sr_band3+sr_band7),
-         ndi7 = (sr_band4 - sr_band7)/(sr_band4+sr_band7))  %>%
-  filter(dup == F) %>%
+         ndi7 = (sr_band4 - sr_band7)/(sr_band4+sr_band7),
+         m_ndti = (mean_sr_band5 - mean_sr_band7)/(mean_sr_band5+mean_sr_band7),
+         m_green_ndvi = (mean_sr_band4 - mean_sr_band2)/(mean_sr_band4+mean_sr_band2),
+         m_SLA_index = mean_sr_band4/(mean_sr_band3+mean_sr_band7),
+         m_ndi7 = (mean_sr_band4 - mean_sr_band7)/(mean_sr_band4+mean_sr_band7),
+         rel_ndti = ndti - m_ndti,
+         rel_green_ndvi = green_ndvi - m_green_ndvi,
+         rel_SLA_index = SLA_index-m_SLA_index,
+         rel_ndi7 = ndi7 -m_ndi7)  %>%
+  #filter(dup == F) %>%
   dplyr::select(-dup, -OBJECTID)
 
 # why not just manually attempt to get rid of mixed pixels? --------------------
-shrubs<- dplyr::filter(gbd, SagebrushC > 0 & InvAnnGras < 2) %>%
-  mutate(cluster = "shrub")
-grasses <- dplyr::filter(gbd, SagebrushC <2 & InvAnnGras >2)%>%
-  mutate(cluster="grass")
+shrubs<- dplyr::filter(gbd, SagebrushC > 0 & InvAnnGras < 4) %>%
+  mutate(cluster = "shrub");dim(shrubs)
+grasses <- dplyr::filter(gbd, SagebrushC <2 & InvAnnGras >4)%>%
+  mutate(cluster="grass");dim(grasses)
 
 gbd_new <- rbind(grasses,shrubs) %>%
   dplyr::select(cluster, sr_band1, sr_band2, sr_band3, sr_band4, sr_band5, sr_band7,
-                elevation,
-                ndvi,evi,tndvi,sr,ndsvi,
+                #starts_with("rel_"), 
+                green_ndvi,aspect,
+                ndvi,evi,tndvi,sr,ndsvi,ndi7,SLA_index, ndti,
                 folded_aspect_ns, brightness, greenness, wetness,
                 slope, tri, roughness) %>%
-  st_set_geometry(NULL)%>%
+  st_set_geometry(NULL) %>%
   rbind(vbd_new)
 
 # perhaps a line here to make the observations exactly equal...
@@ -214,9 +217,15 @@ for (i in 1:rvars){ # this takes 10-30 minutes
               "Accuracy:",  round(max(mods[[i]]$results$Accuracy)*100),
               "% | Dropped", vvv, Sys.time()-t0))
 }
+# first visually inspect and find the sweet spot
 var_results
-best <- 18
 
+ggplot(var_results, aes(x=nvars-1, y=accuracy)) + 
+  geom_line()
+
+best <- 12
+
+# then make a nice plot
 names(ddd[[best]]) -> nnn
 nnn <- nnn[-1]
 imp <- varImp(mods[[best]])
@@ -225,22 +234,20 @@ ggplot(var_results, aes(x=nvars-1, y=accuracy)) +
   geom_line(aes(y=mean_acc), col = "red", lwd=1) +
   # geom_annotate("text", label = dropped) + #something like this
   xlab("# Variables dropped") +
-  geom_vline(xintercept = best, lty=3) +
-  annotate("text",x=0, y=0.86, hjust=0, vjust=1,
+  geom_vline(xintercept = best-1, lty=3) +
+  annotate("text",x=0, y=var_results$accuracy[best]-0.02, hjust=0, vjust=1,
            label = paste("Remaining Variables: \n", 
                          paste(nnn, collapse = "\n")
                         ," \nmtry",mods[[best]]$bestTune[[1]],
                          " \nmin.node.size", mods[[best]]$bestTune[[3]]
                          )) +
-    ggsave("var_dropping_feb_11_w_vegbank_w_elev.pdf")
+    ggsave("var_dropping_w_vegbank.pdf")
 
 # apply the model --------------------------------------------------------------
 
 gbd_new$cluster <- as.factor(gbd_new$cluster)
 
-f<- formula(paste("cluster~",paste(nnn, collapse="+")))
-#f<- formula(paste("cluster~",paste(nnn, collapse="+")))
-
+f <- formula(paste("cluster~",paste(nnn, collapse="+")))
 mod <- randomForest(formula=f, 
                     data=gbd_new,
                     mtry = mods[[best]]$bestTune[[1]],
@@ -251,75 +258,101 @@ mod <- randomForest(formula=f,
 
 
 #2010
+system("aws s3 sync s3://earthlab-amahood/data/naip data/naip")
+system("aws s3 sync s3://earthlab-amahood/data/landsat_mucc_feb19 data/ls5")
+system("aws s3 sync s3://earthlab-amahood/data/terrain_by_pathrow/4231 data/terrain")
 naip<-list()
-naip[[1]] <- raster("/home/a/data/naip/2010/m_4011703_ne_11_1_20100704.tif") #wmuc
-naip[[2]] <- raster("/home/a/data/naip/2010/m_4111761_nw_11_1_20100704.tif") #frank
-naip[[3]] <- raster("/home/a/data/naip/2006/n_4111823_sw_11_1_20060714.tif") #kings river
+naip[[1]] <- raster("data/naip/m_4011703_ne_11_1_20100704.tif") #wmuc
+naip[[2]] <- raster("data/naip/n_4111761_nw_11_1_20060813.tif") #frank
+naip[[3]] <- raster("data/naip/m_4111823_sw_11_1_20100628.tif") #kings river
 
 naip_names<-c("wmuc", "frank", "kings")
 
 # also, we'll throw in a mean/variance table just for fun
-#mean_var <- data.frame(scene_mean=NA, scene_variance = NA, variable = NA, year = NA)
+# mean_var <- data.frame(scene_mean=NA, scene_variance = NA, variable = NA, year = NA)
 years = 1984:2011
 # cc = 1
 registerDoParallel(corz)
-system("rm /home/a/data/ls_naip_preds/wmuc/*")
-foreach(yy = years)%dopar%{
-  # dir.create("/home/a/data/ls_naip_preds/kings")
-  l_file <- paste0("/home/a/data/landsat/p42r31/ls5_", yy, "_042031_.tif")
-  ls5 <- raster::stack(l_file) %>%
-    crop(naip)
-  names(ls5) <-c("sr_band1", "sr_band2","sr_band3", "sr_band4", "sr_band5", "sr_band7")
-  ls5$elevation<- raster("/home/a/data/background/elevation/p42_r31_elevation.tif") %>%
-    raster::projectRaster(ls5)
-  ls5$tri <- terrain(ls5$elevation, opts="tri")
-  ls5$ndvi <- get_ndvi(band3 = ls5$sr_band3, band4 = ls5$sr_band4)
-  ls5$ndti <- (ls5$sr_band5 - ls5$sr_band7)/(ls5$sr_band5+ls5$sr_band7)
-  ls5$green_ndvi <- (ls5$sr_band4 - ls5$sr_band2)/(ls5$sr_band4+ls5$sr_band2)
-  ls5$evi <- get_evi(ls5$sr_band1, band3 = ls5$sr_band3, band4 =ls5$sr_band4)
-  ls5$wetness <- wet5(band1 = ls5$sr_band1,band2 = ls5$sr_band2, band3 =  ls5$sr_band3,
-                      band4 = ls5$sr_band4, band5 = ls5$sr_band5, band7 =  ls5$sr_band7)
- # ls5$ndsvi <- get_ndsvi(band3 = ls5$sr_band3,band5 = ls5$sr_band5)
-  ls5$sr <- get_sr(band3 = ls5$sr_band3, band4 = ls5$sr_band4)
-  ls5$tndvi <- (ls5$ndvi+1)*50
+dir.create("data/ls_naip_preds")
+system("rm data/ls_naip_preds/*")
+for(np in 1:length(naip)){
+  foreach(yy = years)%dopar%{
+    l_file <- paste0("data/ls5/ls5_", yy, "_042031_feb19.tif")
+    ls5 <- raster::stack(l_file) %>%
+      crop(naip[[np]])
+    names(ls5) <-c("sr_band1", "sr_band2","sr_band3", "sr_band4", "sr_band5", "sr_band7")
+
+    ls5$folded_aspect_ns <- raster("data/terrain/aspect.tif") %>% projectRaster(ls5) %>%get_folded_aspect_ns()
+    ls5$slope <- raster("data/terrain/p42_r31_slope.tif") %>% projectRaster(ls5)
+    
+    ls5$evi <- get_evi(ls5$sr_band1, band3 = ls5$sr_band3, band4 =ls5$sr_band4)
+    ls5$ndti <- (ls5$sr_band5 - ls5$sr_band7)/(ls5$sr_band5+ls5$sr_band7)
+    ls5$green_ndvi <- (ls5$sr_band4 - ls5$sr_band2)/(ls5$sr_band4+ls5$sr_band2)
+    ls5$ndsvi <- get_ndsvi(ls5$sr_band3, ls5$sr_band5)
+    ls5$ndvi <- get_ndvi(ls5$sr_band3, ls5$sr_band4)
+    ls5$tndvi <- (ls5$ndvi +1)*50
+    
+    # m_green_ndvi <-(mean(getValues(ls5$sr_band4), na.rm=T) - mean(getValues(ls5$sr_band2), na.rm=T))/(mean(getValues(ls5$sr_band4), na.rm=T)+mean(getValues(ls5$sr_band2), na.rm=T))
+    # ls5$rel_green_ndvi <- ls5$green_ndvi - m_green_ndvi
+    # ls5$SLA_index <- ls5$sr_band4/(ls5$sr_band3+ls5$sr_band7)
+    # m_SLA_index <- mean(getValues(ls5$sr_band4), na.rm=T)/(mean(getValues(ls5$sr_band3), na.rm=T)+mean(getValues(ls5$sr_band7), na.rm=T))
+    # ls5$rel_SLA_index <- ls5$SLA_index-m_SLA_index
+    # m_evi <- get_evi(band1=mean(getValues(ls5$sr_band1), na.rm=T),
+    #                  band3=mean(getValues(ls5$sr_band3), na.rm=T),
+    #                  band4=mean(getValues(ls5$sr_band4), na.rm=T))
+    # ls5$rel_evi <- ls5$evi - m_evi
+    ls5$greenness <- green5(band1 = ls5$sr_band1,band2 = ls5$sr_band2, band3 =  ls5$sr_band3,
+                            band4 = ls5$sr_band4, band5 = ls5$sr_band5, band7 =  ls5$sr_band7)
+    ls5$wetness <- wet5(band1 = ls5$sr_band1,band2 = ls5$sr_band2, band3 =  ls5$sr_band3,
+                            band4 = ls5$sr_band4, band5 = ls5$sr_band5, band7 =  ls5$sr_band7)
+    ls5$sr <- get_sr(band3 = ls5$sr_band3, band4 = ls5$sr_band4)
   
-  ls5_classed <- raster::predict(ls5, mod)
-  
-  writeRaster(ls5_classed, 
-              filename = paste0("/home/a/data/ls_naip_preds/wmuc/wmuc",yy,".tif"), 
-              format = "GTiff", overwrite = T) #save prediction raster
-  system(paste("echo",yy))
+    ls5_classed <- raster::predict(ls5, mod)
+    dir.create(paste0("data/ls_naip_preds/",naip_names[[np]]))
+    writeRaster(ls5_classed, 
+                filename = paste0("data/ls_naip_preds/",naip_names[[np]],"/",yy,".tif"), 
+                format = "GTiff", overwrite = T) #save prediction raster
+    system(paste("echo",yy))
 
-}
+    
+}}
 
+system("rm  data/ls_naip_preds/frank/*.xml")
+system("rm data/ls_naip_preds/kings/*.xml")
+system("rm data/ls_naip_preds/wmuc/*.xml")
 
+files <- list.files("data/ls_naip_preds", full.names = T, recursive = T)
 
-library(gganimate)
-years = 1984:2011
-system("rm /home/a/data/ls_naip_preds/wmuc/*.xml")
-rastStack <- raster::stack(list.files("/home/a/data/ls_naip_preds/wmuc/", full.names = T))
 ts_df=list()
-for (i in 1:length(years)) {
-  rr <- as.data.frame(rastStack[[i]], xy = TRUE)
-  names(rr) <- c("x","y", "Shrubs")
-  rr$Shrubs <- as.factor(rr$Shrubs)
-  nn <- names(rastStack[[i]])
-  rr$year=as.numeric(substr(nn, nchar(nn)-3, nchar(nn)))
-  ts_df[[i]]<-rr
+counter <- 1
+for(i in 1:length(files)){
+  rast<- raster(files[i])
+  rr <- as.data.frame(rast, xy = TRUE)
+  names(rr) <- c("x","y", "Value")
+  rr$year <- substr(files[i], nchar(files[i])-7,nchar(files[i])-4) %>% as.numeric
+  rr$scene <- substr(files[i], nchar(files[i])-13,nchar(files[i])-9)
+  rr$x <- rr$x - min(rr$x)
+  rr$y <- rr$y - min(rr$y)
+  ts_df[[counter]]<-rr
+  counter<-counter+1
 }
 ts_df<-do.call("rbind",ts_df)
 
-anim<-ggplot(ts_df, aes(x=x,y=y,fill=Shrubs))+
+library(gganimate)
+system("sudo apt-get install cargo")
+install.packages("gifski")
+library(gifski)
+anim<-ggplot(ts_df, aes(x=x,y=y,fill=Value))+
   geom_raster() +
-  theme_void() +
-  scale_fill_manual(values=c("yellowgreen", "darkgreen"),labels="grass", "shrub") +
-  ggtitle(paste(years[i])) +
-  coord_fixed()+
+  theme_void() +    
+  facet_wrap(~scene) +
+  scale_fill_viridis_c(name = "class") +
   labs(title = 'Year: {frame_time}') +
   transition_time(year)
 
 aa<-gganimate::animate(anim, fps=2, nframes = length(years))
-anim_save(aa, filename="/home/a/data/gifs/wmuc_wvb_welev.gif")
+anim_save(aa, filename="data/first_shot_feb_22.gif")
+system("aws s3 cp data/first_shot_feb_22.gif s3://earthlab-amahood/data/gifs/w_vegbank_no_scene_means_feb_24")
 
 
 
@@ -526,7 +559,7 @@ resp <- dplyr::select(gbd, SagebrushC,
 ) %>%
   st_set_geometry(NULL) 
 clm <- dplyr::select(gbd, sr_band1, sr_band2, sr_band3, sr_band4, sr_band5, sr_band7,
-                     elevation,ndvi,evi,satvi,tndvi,sr,ndsvi,Latitude,
+                     elevation,ndvi,evi,tndvi,sr,ndsvi,Latitude,
                      folded_aspect_ns, brightness, greenness, wetness,
                      slope,  tri, roughness) %>%
   st_set_geometry(NULL) %>%
@@ -614,7 +647,7 @@ arrange(res_df,desc(R2))[1:20,]
 # now plotting!! ---------------------------------------------------------------
 dd<- dplyr::rename(dd,ndti=index57)
 
-m <- glm(SagebrushC~InvPlantCo + elevation +green_ndvi, gbd, family=quasibinomial(link="logit"))
+m <- glm(SagebrushC~InvPlantCo + elevation +green_ndvi, dd, family=quasibinomial(link="logit"))
 summary(m); rsq::rsq(m) # still just .266
 ggplot(data=dd,aes(y=SagebrushC,x=green_ndvi))+
   geom_point()+
@@ -624,8 +657,8 @@ ggplot(data=dd,aes(y=SagebrushC,x=green_ndvi))+
   theme_bw()
 
 m_tf <- glm(TotalFolia ~ ndti+ sr_band2*green_ndvi, dd, family=quasibinomial(link="logit"))
-summary(m); rsq::rsq(m)
-ggplot(data=dd,aes(y=TotalFolia,x=index57))+
+summary(m_tf); rsq::rsq(m)
+ggplot(data=dd,aes(y=TotalFolia,x=ndti, color=SagebrushC))+
   geom_point()+
   geom_smooth(method = "glm", 
               method.args = list(family=quasibinomial(link="logit")), 
@@ -633,8 +666,8 @@ ggplot(data=dd,aes(y=TotalFolia,x=index57))+
   theme_bw()
 
 m_bs <- glm(BareSoilCo ~ ndti+ sr_band4*brightness, dd, family=quasibinomial(link="logit"))
-summary(m); rsq::rsq(m)
-ggplot(data=dd,aes(y=BareSoilCo,x=index57))+
+summary(m_bs); rsq::rsq(m)
+ggplot(data=dd,aes(y=BareSoilCo,x=ndti))+
   geom_point()+
   geom_smooth(method = "glm", 
               method.args = list(family=quasibinomial(link="logit")), 

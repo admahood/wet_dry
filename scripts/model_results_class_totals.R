@@ -18,7 +18,7 @@ system("aws s3 sync s3://earthlab-amahood/data/fire_perimeters/ data/fire_perims
 results_list <- list()
 
 for(i in 1:length(all_years_files)) {
- results_list[i]  <- raster(all_years_files[i])
+  results_list[i]  <- raster(all_years_files[i])
 }
 
 # 
@@ -127,7 +127,7 @@ for(i in 1:length(results_list)) {
 }
 
 df2 <- mutate(df2, 
-       na_pixel_count = as.numeric(na_value_list))
+              na_pixel_count = as.numeric(na_value_list))
 
 
 
@@ -144,8 +144,8 @@ df2 <- df2 %>% mutate(year = c(1984:2011),
                       percent_check = as.numeric(percent_grass_total + percent_shrub_total + percent_na),
                       shrubvgrass = as.numeric(grass1  / shrub1),
                       shrubgrassdiff = as.numeric(percent_shrub_total - percent_grass_total)
-                      )
-                      
+)
+
 
 ggplot(data=df2, aes(y=df2$percent_check, x = df2$year)) + geom_point() + geom_smooth(method = "lm") 
 
@@ -202,6 +202,7 @@ for(i in 1:length(iterator)) {
   
 
 
+
 # class_totals_twoyr[i] <- raster::extract(results_list[[(i + 2)]], y = fire_perims2)
 # class_totals_threeyr[i] <- raster::extract(results_list[[(i + 3)]], y = fire_perims2)
 # class_totals_fouryr[i] <- raster::extract(results_list[[(i + 4)]], y = fire_perims2)
@@ -215,4 +216,3 @@ fire_perims2 <- st_crop(fire_perims2, scene_poly)
 class_totals_burned_2007 <- raster::extract(results_list[[26]], y = fire_perims2)
 names(class_totals_burned_2007) <- fire_perims2$Fire_Name
 ggplot(df2, aes(year)) + geom_smooth(aes(y = percent_shrub_total, color = "green"), method = "lm", se = F) + geom_smooth(aes(y = percent_grass_total, color = "yellow"), method = "lm", se = F) + geom_point(aes(y=df2$percent_shrub_total, color = "green")) + geom_point(aes(y=df2$percent_grass_total, color = "yellow")) 
-

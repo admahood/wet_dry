@@ -3,23 +3,30 @@ MAINTAINER "Adam Mahood" adam.mahood@colorado.edu
 
 RUN apt-get update \
   && apt-get install -y --no-install-recommends \
-    awscli
+    awscli \
+    cargo \
+    htop
 
-RUN install2.r --error \ 
-  assertthat \ 
+RUN install2.r --error \
+  assertthat \
   caret \
   caTools \
-  doParallel \ 
+  doParallel \
   foreach \
   gdalUtils \
-  ggthemes \ 
+  ggthemes \
   httr \
   party \
+  gganimate \
+  gifski \
   picante \
   randomForest \
-  rasterVis \ 
-  RCurl \ 
+  ranger \
+  rasterVis \
+  rfUtilities \
+  RCurl \
   ROCR \
-  snowfall \ 
-  tidyverse \ 
+  sf \
+  snowfall \
+  tidyverse \
   viridis
