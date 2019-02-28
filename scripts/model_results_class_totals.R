@@ -133,11 +133,12 @@ df2 <- mutate(df2,
 
 df2 <- df2 %>% mutate(year = c(1984:2011),
                       total_pixels = as.numeric(grass1 + grass2 + shrub1 + shrub2 + na_pixel_count),
+                      total_nonna = as.numeric(grass1 + grass2 + shrub1 + shrub2),
                       total_study_area = as.numeric(grass1 + grass2 + shrub1 + shrub2),
-                      percent_grass_certain = as.numeric((grass1 / total_pixels) * 100),
-                      percent_grass_likely = as.numeric((grass2 / total_pixels) * 100),
-                      percent_shrub_certain = as.numeric((shrub1 / total_pixels) * 100),
-                      percent_shrub_likely = as.numeric((shrub2 / total_pixels) * 100),
+                      percent_grass_certain = as.numeric((grass1 / total_nonna) * 100),
+                      percent_grass_likely = as.numeric((grass2 / total_nonna) * 100),
+                      percent_shrub_certain = as.numeric((shrub1 / total_nonna) * 100),
+                      percent_shrub_likely = as.numeric((shrub2 / total_nonna) * 100),
                       percent_shrub_total = as.numeric(percent_shrub_certain + percent_shrub_likely),
                       percent_grass_total = as.numeric(percent_grass_certain + percent_grass_likely),
                       percent_na = as.numeric((na_pixel_count / total_pixels) * 100),
@@ -147,10 +148,10 @@ df2 <- df2 %>% mutate(year = c(1984:2011),
 )
 
 
-ggplot(data=df2, aes(y=df2$percent_check, x = df2$year)) + geom_point() + geom_smooth(method = "lm") 
+ggplot(data=df3, aes(y=df3$percent_grass_total, x = df3$year)) + geom_point() + geom_smooth(method = "lm") + ylim(0, 75)
 
-#filtering out years with >1 sd variability in either class
-df3 <- filter(df2, (percent_shrub_total - mean(percent_shrub_total)) < sd(percent_shrub_total)) %>%
+#filtering out years with >2 sd variability in either class
+df3 <- filter(df2, (percent_shrub_total - mean(percent_shrub_total)) < 1.5 * sd(percent_shrub_total)) %>%
   filter((percent_grass_total - mean(percent_grass_total)) < sd(percent_grass_total))
 
 #scatter plot of cheat and sage totals with linear trend line ----
@@ -161,7 +162,7 @@ ggplot(data=df, aes(x=raster, y=n, group = Var1, colour = as.factor(Var1))) + ge
 #begin work here (1/23) for getting table of combined counts for high and low certainty ensemble results ----
 r2011b <- bind_rows(r2011[1, 2] + r2011[2,2], r2011[3,2] + r2011[4,2])
 
-#working with fire perimeter data (2/21)
+####working with fire perimeter data (2/21) ####
 fire_perims <- st_read("data/fire_perims/dissolve_mtbs_perims_1984-2015_DD_20170501.shp")
 fire_perims <- st_transform(fire_perims, as.character(crs(results_list[[1]])))
 scene_poly <- st_make_grid(results_list[[1]])
@@ -172,17 +173,18 @@ class_totals_twoyr <- list()
 class_totals_threeyr <- list()
 class_totals_fouryr <- list()
 
-cores <- detectCores()
-registerDoParallel(cores)
+#cores <- detectCores()
+#registerDoParallel(cores)
 iterator <- c(1:28)
 
 annual_oneyrpostburn <- list()
 
 for(i in 1:length(iterator)) {
   fire_perims2 <- fire_perims %>% filter(Year == years[i])
+  k = i + 1 #counter
   result_year <- names(results_list[[k]])
   fire_names <- seq(length((fire_perims2$Fire_Name)))
-  k = i + 1 #counter
+   
   class_totals_oneyr <- raster::extract(results_list[[k]], y = fire_perims2, df = T)
   oneyr_df <- list()
   for(j in 1:length(fire_names)) {
