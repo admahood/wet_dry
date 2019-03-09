@@ -53,11 +53,11 @@ test2 <- raster::stack(l_files) # works!!
 blank <- raster(filename) %>% 
   setValues(0) %>%
   writeRaster(filename = paste0(local_path,"/trimmed_extent_",scene_path),
-              dType="LOG1S") 
+              format = "GTiff") 
 
 
 #uploading extent fixed ls5 rasters and template raster to s3
-system(paste0("aws s3 cp ", local_path,"/trimmed_extent_",scene_path, ".gri"," ", s3_upload_path))
+system(paste0("aws s3 cp ", local_path,"/trimmed_extent_",scene_path, ".tif"," ", s3_upload_path))
 
 for(i in 1:length(l_files)) { 
   system(paste0("aws s3 cp ", l_files[i], " ", s3_upload_path))

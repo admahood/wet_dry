@@ -177,3 +177,48 @@ urb_nacount_binary <- reclassify(urb_nacount_raster, rclmat)
 writeRaster(urb_nacount_binary, filename = paste0(urbag_folder, "/binary_allyears_urb_nacount.tif"))
 system(paste0("aws s3 sync", " ", urbag_folder, " ", " s3://earthlab-amahood/data/annual_urb_masks_mucc/"))
 
+
+
+#create na count for masked clouds in original ls5 images
+
+scene_rclss <- list()
+for(i in 1:length(scene_full)) {
+  scene <- raster(scene_full[i])
+  scene[!is.na(scene[])] <- 1
+  scene[is.na(scene[])] <- 0 
+  
+  scene_rclss[[i]] <- scene
+  
+}
+
+xmin <- as.vector(c())
+xmax <- as.vector(c())
+ymin <- as.vector(c())
+ymax <- as.vector(c())
+e <- c()
+
+for (i in 1:length(scene_rclss)) {
+  xmin[i] <- extent(scene_rclss[[i]])@xmin
+  xmax[i] <- extent(scene_rclss[[i]])@xmax
+  ymin[i] <- extent(scene_rclss[[i]])@ymin
+  ymax[i] <- extent(scene_rclss[[i]])@ymax
+}
+
+xm <- min(xmin)
+xma <- max(xmax)
+ym <- min(ymin)
+yma <- max(ymax)
+
+e <- matrix(c(xm, ym, xma, yma), nrow = 2, ncol = 2)
+e <- extent(e)
+
+for(i in 1:length(scene_rclss)) { 
+  scene_rclss[[i]] <- extend(scene_rclss[[i]], e, value = 0)
+  gc()
+}
+
+
+scene_nacount_stack <- stack(scene_rclss)
+rm(scene_rclss)
+scene_nacount_raster <- sum(scene_nacount_stack)
+rm(urb_nacount_stack)

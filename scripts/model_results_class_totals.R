@@ -12,8 +12,9 @@ system ("aws s3 sync s3://earthlab-amahood/data/mucc_ensemble_results_done data/
 all_years_files <- list.files("data/allyears_results", full = T)
 
 system("aws s3 sync s3://earthlab-amahood/data/annual_esp_masks_mucc/ data/esp_masks/")
+system("aws s3 sync s3://earthlab-amahood/data/annual_urb_masks_mucc/ data/urb_masks/")
 system("aws s3 sync s3://earthlab-amahood/data/fire_perimeters/ data/fire_perims/")
-
+system("aws s3 sync s3://earthlab-amahood/data/ls5_mucc_extent_matched/ data/extent_matched/")
 #step 3: extract class totals ----
 results_list <- list()
 
@@ -61,8 +62,10 @@ for(i in 1:length(all_years_files)) {
 
 #attempting to take masked pixels out of the total to get accurate percentages for classes ----
 esp_na <- raster("data/esp_masks/binary_allyears_esp_nacount.tif")
+urb_na <- raster("data/urb_masks/binary_allyears_urb_nacount.tif")
 
-
+total_na <- esp_na + urb_na
+matched_extent <- ("data/extent_matched/trimmed_extent_p42r31.gri")
 
 cores <- 6
 registerDoParallel(cores)
@@ -70,13 +73,13 @@ registerDoParallel(cores)
 masked_results_list <- list()
 for(i in 1:length(results_list)) {
   # esp_mask <- projectRaster(esp_mask, i, res = 30)
-  masked <- raster::extend(results_list[[i]], esp_na)
-  masked <- raster::crop(masked, esp_na)
+  masked <- raster::extend(results_list[[i]], total_na)
+  masked <- raster::crop(masked, total_na)
   masked_results_list[[i]] <- masked
 }
 
 for(i in 1:length(masked_results_list)) {
-  masked <- mask(masked_results_list[[i]], esp_na, maskvalue = 0)
+  masked <- mask(masked_results_list[[i]], total_na, maskvalue = 0)
   masked_results_list[[i]] <- masked
 }
 
@@ -135,10 +138,10 @@ df2 <- df2 %>% mutate(year = c(1984:2011),
                       total_pixels = as.numeric(grass1 + grass2 + shrub1 + shrub2 + na_pixel_count),
                       total_nonna = as.numeric(grass1 + grass2 + shrub1 + shrub2),
                       total_study_area = as.numeric(grass1 + grass2 + shrub1 + shrub2),
-                      percent_grass_certain = as.numeric((grass1 / total_nonna) * 100),
-                      percent_grass_likely = as.numeric((grass2 / total_nonna) * 100),
-                      percent_shrub_certain = as.numeric((shrub1 / total_nonna) * 100),
-                      percent_shrub_likely = as.numeric((shrub2 / total_nonna) * 100),
+                      percent_grass_certain = as.numeric((grass1 / total_pixels) * 100),
+                      percent_grass_likely = as.numeric((grass2 / total_pixels) * 100),
+                      percent_shrub_certain = as.numeric((shrub1 / total_pixels) * 100),
+                      percent_shrub_likely = as.numeric((shrub2 / total_pixels) * 100),
                       percent_shrub_total = as.numeric(percent_shrub_certain + percent_shrub_likely),
                       percent_grass_total = as.numeric(percent_grass_certain + percent_grass_likely),
                       percent_na = as.numeric((na_pixel_count / total_pixels) * 100),
@@ -147,8 +150,19 @@ df2 <- df2 %>% mutate(year = c(1984:2011),
                       shrubgrassdiff = as.numeric(percent_shrub_total - percent_grass_total)
 )
 
+fit <- lm(df2$percent_grass_total ~ df2$year)
+coef  <- coefficients(fit)       # coefficients
+resid <- residuals(fit)          # residuals
+pred  <- predict(fit)            # fitted values
+rsq   <- summary(fit)$r.squared  # R-sq for the fit
+se    <- summary(fit)$sigma  
 
-ggplot(data=df3, aes(y=df3$percent_grass_total, x = df3$year)) + geom_point() + geom_smooth(method = "lm") + ylim(0, 75)
+
+
+#plotting shrub and grass totals together
+ggplot(data=df2) + geom_point(aes(y=df2$percent_grass_total, x = df2$year)) + geom_smooth(aes(y=df2$percent_grass_total, x = df2$year), method = "lm") +
+geom_point(aes(y=df2$percent_shrub_total, x = df2$year, color = 'shrub')) + geom_smooth(aes(y=df2$percent_shrub_total, x = df2$year, color = "shrub"), method = "lm") +
+ylim(10, 35)
 
 #filtering out years with >2 sd variability in either class
 df3 <- filter(df2, (percent_shrub_total - mean(percent_shrub_total)) < 1.5 * sd(percent_shrub_total)) %>%
