@@ -221,4 +221,29 @@ for(i in 1:length(scene_rclss)) {
 scene_nacount_stack <- stack(scene_rclss)
 rm(scene_rclss)
 scene_nacount_raster <- sum(scene_nacount_stack)
-rm(urb_nacount_stack)
+rm(scene_nacount_stack)
+
+writeRaster(scene_nacount_raster, filename = paste0(urbag_folder, "/detailed_allyears_scene_nacount.tif"))
+system(paste0("aws s3 sync", " ", urbag_folder, " ", " s3://earthlab-amahood/data/annual_urb_masks_mucc/"))
+
+
+
+m <- c(0, 27, 0,  27.5, 28, 1)
+rclmat <- matrix(m, ncol=3, byrow=TRUE)
+
+scene_nacount_binary <- reclassify(scene_nacount_raster, rclmat)
+writeRaster(scene_nacount_binary, filename = paste0(urbag_folder, "/binary_allyears_scene_nacount.tif"))
+system(paste0("aws s3 sync", " ", urbag_folder, " ", " s3://earthlab-amahood/data/annual_urb_masks_mucc/"))
+
+esp_na <- raster("data/esp_masks/binary_allyears_esp_nacount.tif")
+urb_na <- raster("data/urb_masks/binary_allyears_urb_nacount.tif")
+scene_na <- raster("data/urb_masks/binary_allyears_scene_nacount.tif")
+
+total_na <- esp_na + urb_na + scene_na
+m <- c(0, 2, 0,  2.5, 3, 1)
+rclmat <- matrix(m, ncol=3, byrow=TRUE)
+
+total_nacount_binary <- reclassify(total_na, rclmat)
+
+writeRaster(total_nacount_binary, filename = paste0(urbag_folder, "/binary_allyears_total_nacount.tif"))
+system(paste0("aws s3 sync", " ", urbag_folder, " ", " s3://earthlab-amahood/data/annual_urb_masks_mucc/"))

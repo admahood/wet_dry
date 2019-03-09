@@ -61,10 +61,11 @@ for(i in 1:length(all_years_files)) {
 
 
 #attempting to take masked pixels out of the total to get accurate percentages for classes ----
-esp_na <- raster("data/esp_masks/binary_allyears_esp_nacount.tif")
-urb_na <- raster("data/urb_masks/binary_allyears_urb_nacount.tif")
+# esp_na <- raster("data/esp_masks/binary_allyears_esp_nacount.tif")
+# urb_na <- raster("data/urb_masks/binary_allyears_urb_nacount.tif")
+# scene_na <- raster("data/urb_masks/binary_allyears_scene_nacount.tif")
 
-total_na <- esp_na + urb_na
+total_na <- raster("data/urb_masks/binary_allyears_total_nacount.tif")
 matched_extent <- ("data/extent_matched/trimmed_extent_p42r31.gri")
 
 cores <- 6
