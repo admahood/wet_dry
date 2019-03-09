@@ -65,7 +65,7 @@ for(i in 1:length(all_years_files)) {
 # urb_na <- raster("data/urb_masks/binary_allyears_urb_nacount.tif")
 # scene_na <- raster("data/urb_masks/binary_allyears_scene_nacount.tif")
 
-total_na <- raster("data/urb_masks/binary_allyears_total_nacount.tif")
+total_na <- raster("data/urb_masks/inclusivebinary_allyears_total_nacount.tif")
 matched_extent <- ("data/extent_matched/trimmed_extent_p42r31.gri")
 
 cores <- 6
@@ -122,12 +122,13 @@ df2 <- rbind(
   , r2010 = as.vector(table(values(results_list[[27]])))
   , r2011 = as.vector(table(values(results_list[[28]])))
 )
+
 df2 <- as_data_frame(df2)
 names(df2) <- c("grass1", "grass2", "shrub2", "shrub1")
 
 na_value_list <- list()
-for(i in 1:length(results_list)) {
-  na_value_list[i] <- as.vector(sum(values(is.na(results_list[[i]]))))
+for(i in 1:length(masked_results_list)) {
+  na_value_list[i] <- as.vector(sum(values(is.na(masked_results_list[[i]]))))
 }
 
 df2 <- mutate(df2, 
@@ -139,10 +140,10 @@ df2 <- df2 %>% mutate(year = c(1984:2011),
                       total_pixels = as.numeric(grass1 + grass2 + shrub1 + shrub2 + na_pixel_count),
                       total_nonna = as.numeric(grass1 + grass2 + shrub1 + shrub2),
                       total_study_area = as.numeric(grass1 + grass2 + shrub1 + shrub2),
-                      percent_grass_certain = as.numeric((grass1 / total_pixels) * 100),
-                      percent_grass_likely = as.numeric((grass2 / total_pixels) * 100),
-                      percent_shrub_certain = as.numeric((shrub1 / total_pixels) * 100),
-                      percent_shrub_likely = as.numeric((shrub2 / total_pixels) * 100),
+                      percent_grass_certain = as.numeric((grass1 / total_study_area) * 100),
+                      percent_grass_likely = as.numeric((grass2 / total_study_area) * 100),
+                      percent_shrub_certain = as.numeric((shrub1 / total_study_area) * 100),
+                      percent_shrub_likely = as.numeric((shrub2 / total_study_area) * 100),
                       percent_shrub_total = as.numeric(percent_shrub_certain + percent_shrub_likely),
                       percent_grass_total = as.numeric(percent_grass_certain + percent_grass_likely),
                       percent_na = as.numeric((na_pixel_count / total_pixels) * 100),
@@ -151,6 +152,9 @@ df2 <- df2 %>% mutate(year = c(1984:2011),
                       shrubgrassdiff = as.numeric(percent_shrub_total - percent_grass_total)
 )
 
+write.csv(df2, file = "data/results_3_7_2019.csv")
+system("aws s3 cp data/results_3_7_2019.csv s3://earthlab-amahood/data/")
+
 fit <- lm(df2$percent_grass_total ~ df2$year)
 coef  <- coefficients(fit)       # coefficients
 resid <- residuals(fit)          # residuals
@@ -158,8 +162,9 @@ pred  <- predict(fit)            # fitted values
 rsq   <- summary(fit)$r.squared  # R-sq for the fit
 se    <- summary(fit)$sigma  
 
+ggplot(data=df2) + geom_line(aes(y=df2$grass1, x = df2$year)) + geom_smooth(aes(y=df2$grass1, x = df2$year), method = "lm")
 
-
+write.csv(df2)
 #plotting shrub and grass totals together
 ggplot(data=df2) + geom_point(aes(y=df2$percent_grass_total, x = df2$year)) + geom_smooth(aes(y=df2$percent_grass_total, x = df2$year), method = "lm") +
 geom_point(aes(y=df2$percent_shrub_total, x = df2$year, color = 'shrub')) + geom_smooth(aes(y=df2$percent_shrub_total, x = df2$year, color = "shrub"), method = "lm") +
