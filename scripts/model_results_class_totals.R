@@ -145,10 +145,10 @@ df2 <- df2 %>% mutate(year = c(1984:2011),
                       total_pixels = as.numeric(grass1 + grass2 + shrub1 + shrub2 + na_pixel_count),
                       total_nonna = as.numeric(grass1 + grass2 + shrub1 + shrub2),
                       total_study_area = as.numeric(grass1 + grass2 + shrub1 + shrub2),
-                      percent_grass_certain = as.numeric((grass1 / total_pixels) * 100),
-                      percent_grass_likely = as.numeric((grass2 / total_pixels) * 100),
-                      percent_shrub_certain = as.numeric((shrub1 / total_pixels) * 100),
-                      percent_shrub_likely = as.numeric((shrub2 / total_pixels) * 100),
+                      percent_grass_certain = as.numeric((grass1 / total_study_area) * 100),
+                      percent_grass_likely = as.numeric((grass2 / total_study_area) * 100),
+                      percent_shrub_certain = as.numeric((shrub1 / total_study_area) * 100),
+                      percent_shrub_likely = as.numeric((shrub2 / total_study_area) * 100),
                       percent_shrub_total = as.numeric(percent_shrub_certain + percent_shrub_likely),
                       percent_grass_total = as.numeric(percent_grass_certain + percent_grass_likely),
                       percent_na = as.numeric((na_pixel_count / total_pixels) * 100),
@@ -157,23 +157,37 @@ df2 <- df2 %>% mutate(year = c(1984:2011),
                       shrubgrassdiff = as.numeric(percent_shrub_total - percent_grass_total)
 )
 
-write.csv(df2, file = "data/results_3_12_2019.csv")
-system("aws s3 cp data/results_3_12_2019.csv s3://earthlab-amahood/data/")
+write.csv(df2, file = "data/results_inclusive75_3_20_2019.csv")
+system("aws s3 cp data/results_inclusive75_3_20_2019.csv s3://earthlab-amahood/data/")
 
-fit <- lm(df2$percent_grass_total ~ df2$year)
+#pulling in already completed results csv
+
+system("aws s3 cp s3://earthlab-amahood/data/results_3_12_2019.csv data/results_3_12_2019.csv")
+df2 <- read.csv("data/results_3_12_2019.csv/results_3_12_2019.csv")
+
+
+fit <- lm(df2$percent_shrub_total ~ df2$year)
 coef  <- coefficients(fit)       # coefficients
 resid <- residuals(fit)          # residuals
 pred  <- predict(fit)            # fitted values
 rsq   <- summary(fit)$r.squared  # R-sq for the fit
 se    <- summary(fit)$sigma  
 
-ggplot(data=df2) + geom_point(aes(y=df2$percent_shrub_certain, x = df2$year)) + geom_smooth(aes(y=df2$percent_shrub_certain, x = df2$year), method = "lm")
+ggplot(data=df2) + 
+aes(x = df2$year) + 
+geom_point(aes(y=df2$percent_shrub_total), color = 'darkgreen') + 
+geom_smooth(aes(y=df2$percent_shrub_total), color = 'darkgreen', method = "lm") +
+xlab("year") +
+ylab("Sagebrush %") +
+ylim(0, 50)
+
 
 write.csv(df2)
+
 #plotting shrub and grass totals together
-ggplot(data=df2) + geom_point(aes(y=df2$percent_grass_total, x = df2$year)) + geom_smooth(aes(y=df2$percent_grass_total, x = df2$year), method = "lm") +
-geom_point(aes(y=df2$percent_shrub_total, x = df2$year, color = 'shrub')) + geom_smooth(aes(y=df2$percent_shrub_total, x = df2$year, color = "shrub"), method = "lm") +
-ylim(10, 35)
+ggplot(data=df2) + geom_point(aes(y=df2$percent_grass_total, x = df2$year), color = 'yellow') + geom_smooth(aes(y=df2$percent_grass_total, x = df2$year), method = "lm", color = 'yellow') +
+geom_point(aes(y=df2$percent_shrub_total, x = df2$year), color = 'green') + geom_smooth(aes(y=df2$percent_shrub_total, x = df2$year), method = "lm", color = 'green') +
+ylim(0, 50)
 
 #filtering out years with >2 sd variability in either class
 df3 <- filter(df2, (percent_shrub_total - mean(percent_shrub_total)) < 1.5 * sd(percent_shrub_total)) %>%
@@ -186,6 +200,10 @@ ggplot(data=df, aes(x=raster, y=n, group = Var1, colour = as.factor(Var1))) + ge
 
 #begin work here (1/23) for getting table of combined counts for high and low certainty ensemble results ----
 r2011b <- bind_rows(r2011[1, 2] + r2011[2,2], r2011[3,2] + r2011[4,2])
+
+
+
+
 
 ####working with fire perimeter data (2/21) ####
 fire_perims <- st_read("data/fire_perims/dissolve_mtbs_perims_1984-2015_DD_20170501.shp")
