@@ -82,6 +82,7 @@ foreach(i = scene_full,
           # names to match exactly with training data that goes into model. 
           # The order matters for these
           # -- adam-- just name them correctly the first time in the script and delete this
+          # -- dylan -- I don't want to delete it because the variable names have changed several times, eg aspect vs folded aspect, and this makes it easier to make sure the right names go to the right layers
           names(ls5) <- c("sr_band1", "sr_band2", "sr_band3", "sr_band4", 
                           "sr_band5", "sr_band7", "wetness", "brightness", 
                           "greenness",  "ndvi", "savi", "sr", "evi",
