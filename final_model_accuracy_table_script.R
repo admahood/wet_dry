@@ -1,4 +1,8 @@
+install.packages("dplyr")
 library(knitr, dplyr)
+
+dir.create(table_data)
+system("aws s3 cp s3://earthlab-amahood/data/thesis_final_models_accuracy_table.csv data/table_data")
 
 data <- read.csv("data/table_data/thesis_final_models_accuracy_table.csv", stringsAsFactors = F, header = T)
 data <- as.tibble(data) %>% dplyr::select(-X, -elevation, - oob_balanced, - ac_null, -ac_upper, -ac_lower, -mcnemar_p, -pos_pred_value, -neg_pred_value, -F1, -prevalence, -balanced_accuracy) 
