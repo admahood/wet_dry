@@ -182,8 +182,6 @@ ylab("Sagebrush %") +
 ylim(0, 50)
 
 
-write.csv(df2)
-
 #plotting shrub and grass totals together
 ggplot(data=df2) + geom_point(aes(y=df2$percent_grass_total, x = df2$year), color = 'yellow') + geom_smooth(aes(y=df2$percent_grass_total, x = df2$year), method = "lm", color = 'yellow') +
 geom_point(aes(y=df2$percent_shrub_total, x = df2$year), color = 'green') + geom_smooth(aes(y=df2$percent_shrub_total, x = df2$year), method = "lm", color = 'green') +
