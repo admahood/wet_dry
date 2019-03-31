@@ -7,13 +7,14 @@ output:
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
-library(knitr, dplyr)
+library(knitr, dplyr, kableExtra)
 ```
 
 
 And this code makes the table itself
 
 ```{r}
-kable(data, col.names = model_names, row.names = T)
+kable(data, col.names = model_names, row.names = T) %>%
+kable_styling(bootstrap_options = "striped", full_width = F)
 ```
 
