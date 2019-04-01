@@ -162,45 +162,57 @@ system("aws s3 cp data/results_inclusive75_3_20_2019.csv s3://earthlab-amahood/d
 
 #pulling in already completed results csv
 
-system("aws s3 cp s3://earthlab-amahood/data/results_3_12_2019.csv data/results_3_12_2019.csv")
-df2 <- read.csv("data/results_3_12_2019.csv/results_3_12_2019.csv")
+system("aws s3 cp s3://earthlab-amahood/data/results_inclusive75_3_20_2019_precip.csv data/results_inclusive75_3_20_2019_precip.csv")
+df2 <- read.csv("data/results_inclusive75_3_20_2019_precip.csv")
 
+# separating wet and dry years
+wetdry <- list()
+for(i in 1:length(df2$precip_anomaly)) {
+if(df2$precip_anomaly[i] > 0) {
+  wetdry[i] = "wet" } else {
+    wetdry[i] = "dry" }
+}
+wetdry <- unlist(wetdry)
 
-fit <- lm(df2$percent_shrub_total ~ df2$year)
-coef  <- coefficients(fit)       # coefficients
+df2 <- df2 %>% mutate(wetdry = wetdry
+)
+
+dfwet <- df2[df2$wetdry == "wet", ]
+dfdry <- df2[df2$wetdry == "dry", ]
+
+#linear models
+fit <- lm(df2$percent_shrub_certain ~ df2$year)
+fit2 <- lm(df2$percent_grass_certain ~ df2$precip_anomaly)
+coef  <- coefficients(fit)      # coefficients
 resid <- residuals(fit)          # residuals
 pred  <- predict(fit)            # fitted values
 rsq   <- summary(fit)$r.squared  # R-sq for the fit
 se    <- summary(fit)$sigma  
 
+#plotting annual class totals 
 ggplot(data=df2) + 
 aes(x = df2$year) + 
 geom_point(aes(y=df2$percent_shrub_total), color = 'darkgreen') + 
 geom_smooth(aes(y=df2$percent_shrub_total), color = 'darkgreen', method = "lm") +
 xlab("year") +
-ylab("Sagebrush %") +
-ylim(0, 50)
+ylab("Sagebrush %")
 
+#trying to plot precip anomaly with class totals
+ggplot(data = df2) + 
+aes(x=df2$year) +
+# geom_point(aes(y=df2$percent_shrub_total), color = 'darkgreen') + 
+# geom_point(aes(y=df2$percent_grass_total), color = 'orange') + 
+geom_line(aes(y=df2$precip_anomaly), color = 'blue') + 
+scale_y_continuous(sec.axis = sec_axis(~., name = "Precipitation difference from 30 year normal"))
 
 #plotting shrub and grass totals together
 ggplot(data=df2) + geom_point(aes(y=df2$percent_grass_total, x = df2$year), color = 'yellow') + geom_smooth(aes(y=df2$percent_grass_total, x = df2$year), method = "lm", color = 'yellow') +
 geom_point(aes(y=df2$percent_shrub_total, x = df2$year), color = 'green') + geom_smooth(aes(y=df2$percent_shrub_total, x = df2$year), method = "lm", color = 'green') +
-ylim(0, 50)
+ylim(0, 100)
 
 #filtering out years with >2 sd variability in either class
 df3 <- filter(df2, (percent_shrub_total - mean(percent_shrub_total)) < 1.5 * sd(percent_shrub_total)) %>%
   filter((percent_grass_total - mean(percent_grass_total)) < 1.5 * sd(percent_grass_total))
-
-#scatter plot of cheat and sage totals with linear trend line ----
-ggplot(data=df, aes(x=raster, y=n, group = Var1, colour = as.factor(Var1))) + geom_point() 
-+ geom_smooth(method = "lm")
-+ geom_line(x)
-
-#begin work here (1/23) for getting table of combined counts for high and low certainty ensemble results ----
-r2011b <- bind_rows(r2011[1, 2] + r2011[2,2], r2011[3,2] + r2011[4,2])
-
-
-
 
 
 ####working with fire perimeter data (2/21) ####

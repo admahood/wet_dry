@@ -1,0 +1,48 @@
+---
+title: "Untitled"
+output:
+  word_document: default
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+library(kableExtra)
+```
+
+
+ this code makes the final model accuracy table 
+
+```{r}
+library(kableExtra, dplyr, knitr)
+kable(data, col.names = model_names, row.names = T, digits = 4) %>%
+kable_styling(bootstrap_options = "striped", full_width = F)
+```
+This code makes the veg indices table
+```{r}
+kable(veg_indices_data) %>%
+kable_styling(bootstrap_options = "striped")
+```
+
+This code makes the tasseled cap table
+```{r}
+kable(tasseledcap_data) %>%
+kable_styling(bootstrap_options = "striped")
+```
+
+This code makes the landsat bands table
+```{r}
+kable(landsatbands_data) %>%
+kable_styling(bootstrap_options = "striped")
+```
+
+This code makes the example hypergrid table
+```{r}
+kable(hypergrid_ex_results, digits = 3) %>%
+kable_styling(bootstrap_options = "striped", full_width = F)
+```
+
+```{r}
+stargazer(fit, fit2, title = "Class Total Linear Regressions", align = T, header = F, ci=TRUE, ci.level=0.90, omit.stat = "f")
+```
+
