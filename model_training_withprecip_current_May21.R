@@ -4,8 +4,9 @@
 
 #### 1: Load Packages/Source scripts/set seed
 
-libs <- c("randomForest", "dplyr","sf", "caTools")
+libs <- c("randomForest", "dplyr","sf", "caTools", "dplyr")
 lapply(libs, library, character.only = TRUE, verbose = FALSE)
+#lapply(libs, install.packages, character.only = TRUE, verbose = FALSE) # - optional line to install packages
 source("scripts/functions.R")
 set.seed(11)
 
@@ -43,7 +44,7 @@ gtrain <- gtrain %>%
                 folded_aspect = get_folded_aspect(aspect = gtrain$aspect),
                 binary = as.factor(ifelse(total_shrubs < parameters$sc, "Grass", "Shrub"))
                 ) %>%
-  dplyr::select(-total_shrubs)
+  dplyr::select(-total_shrubs, - aspect)
 
 #Making sure that shrub and grass classes have an even number of training values to avoid bias
 
@@ -61,7 +62,7 @@ if(nrow(gtrain[gtrain$binary == "Grass",])<nrow(gtrain[gtrain$binary == "Shrub",
 
 
 #### 4.1.2: new method of training class labelling - manually remove mixed pixels ####
-shrubs<- dplyr::filter(gtrain, SagebrushC > 0 & InvAnnGras < 4) %>%
+shrubs <- dplyr::filter(gtrain, SagebrushC > 0 & InvAnnGras < 4) %>%
   mutate(cluster = 2);dim(shrubs)
 
 grasses <- dplyr::filter(gtrain, SagebrushC <2 & InvAnnGras >4)%>%
@@ -76,8 +77,8 @@ gtrain <- gtrain %>%
   dplyr::mutate(ndsvi = get_ndsvi(band3 = gtrain$sr_band3, band5 = gtrain$sr_band5),
                 satvi = get_satvi(band3 = gtrain$sr_band3, band5 = gtrain$sr_band5, band7 = gtrain$sr_band7, L = 0.5),
                 folded_aspect = get_folded_aspect(aspect = gtrain$aspect),
-                binary = gtrain$cluster) %>%
-  dplyr::select(-cluster)
+                binary = as.factor(gtrain$cluster)) %>%
+  dplyr::select(-cluster, -aspect, -elevation)
 
 #### 4.2: Random Forest Model Training ####
 
