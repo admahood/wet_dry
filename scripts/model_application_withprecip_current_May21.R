@@ -54,9 +54,9 @@ landsat <- stack(scene_full[1])
 crs <- crs(landsat)
 
 #create naip scene raster object for cropping 
-naip <- raster("data/naip/m_4011703_ne_11_1_20100704.tif") %>% projectRaster(crs = crs, res = 30) #wmuc
+#naip <- raster("data/naip/m_4011703_ne_11_1_20100704.tif") %>% projectRaster(crs = crs, res = 30) #wmuc
 #naip <- raster("data/naip/n_4111761_nw_11_1_20060813.tif") %>% projectRaster(crs = crs, res = 30) #frank
-#naip <- raster("data/naip/m_4111823_sw_11_1_20100628.tif") %>% projectRaster(crs = crs, res = 30) #kings
+naip <- raster("data/naip/m_4111823_sw_11_1_20100628.tif") %>% projectRaster(crs = crs, res = 30) #kings
 #parallelized model application loop
 foreach(i = scene_full, 
         .packages = 'raster') %dopar% {         
@@ -74,7 +74,7 @@ foreach(i = scene_full,
           ls5 <- stack(i) %>% crop(naip)
           
           #crop terrain data to naip scene
-          ter <- stack(list.files(local_terrain, full.names =T)) %>% crop(e) %>% resample(ls5)
+          ter <- stack(list.files(local_terrain, full.names =T)) %>% crop(naip) %>% resample(ls5)
           
           #get proper names for landsat bands - important for use in veg indice/tassel cap functions later
           names(ls5)<- c("sr_band1", "sr_band2","sr_band3", "sr_band4","sr_band5", "sr_band7")
@@ -82,8 +82,8 @@ foreach(i = scene_full,
           #progress check
           system(paste("echo", "stack created and cropped", i))
           
-          #grab precip anomaly for a particular year
-          precip <- raster(paste0("data/prism/naip_trimmed_annual_precip_anomaly/precip_anomaly_trimmed_wmuc", year, ".tif")) %>% resample(ls5)
+          #grab precip anomaly for a particular year - change "frank"/"wmuc"/"kings" in both folder and filename depending on which you want to use
+          precip <- raster(paste0("data/prism/naip_trimmed_annual_precip_anomaly/kings/precip_anomaly_trimmed_kings_", year, ".tif")) %>% resample(ls5)
           
           # create additional index variables - make sure all the names of this stack match the names that go into the model 
           ls5$wetness <- wet5(ls5$sr_band1,ls5$sr_band2,ls5$sr_band3,ls5$sr_band4,ls5$sr_band5,ls5$sr_band7)
@@ -136,8 +136,8 @@ foreach(i = scene_full,
           #for saving memory
           gc() 
           
-          #make filename 
-          filenamet <- paste0("data/results/", "manual_labels_model_results_w_precip", "_", year, ".tif") 
+          #make filename - change "frank"/"wmuc"/"kings" depending on naip scene used for extent
+          filenamet <- paste0("data/results/", "manual_labels_model_results_w_precip", "_kings_", year, ".tif") 
           system(paste("echo", "filename created", i))
           
           #apply the RF model to raster stack and create "ls5_classed", an annual predicted sage/cheat raster!
@@ -150,7 +150,7 @@ foreach(i = scene_full,
           #save resulting land cover rasters and upload to s3
           writeRaster(ls5_classed, filename = filenamet, format = "GTiff", overwrite = T) 
           system(paste("echo", "file saved to disk"))
-          system(paste0("aws s3 cp ", filenamet, " s3://earthlab-amahood/data/summer19_model_results/May22_modelrun_w_precip/", substr(filenamet, 14, 150)))
+          system(paste0("aws s3 cp ", filenamet, " s3://earthlab-amahood/data/summer19_model_results/May23_modelrun_w_precip/kings/", substr(filenamet, 14, 150)))
           system(paste("echo", "aws sync done"))
           
         }

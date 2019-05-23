@@ -1,6 +1,6 @@
 # PRISM PRECIPITATION ANOMALY RASTERS & EXTRACTION TO TRAINING DATA POINTS SCRIPT
 # Author: Dylan Murphy
-# Date Last Modified: 5/21/19
+# Date Last Modified: 5/23/19
 
 #### 1: Set up ####
 #### Load Packages
@@ -29,11 +29,11 @@ system("aws s3 sync s3://earthlab-amahood/data/ls5_mucc_2011 data/ls5")
 #### 2: creating NAIP trimmed precip anomaly rasters for model input ####
 
 #### Naip scene for trimming
-naip <- raster("data/naip/m_4011703_ne_11_1_20100704.tif") #wmuc scene - switch path to one from below to make new naip crops
+naip <- raster("data/naip/m_4111823_sw_11_1_20100628.tif") #kings scene - switch path to one from below to make new naip crops
 # naip<-list()
 # naip[[1]] <- raster("data/naip/m_4011703_ne_11_1_20100704.tif") #wmuc
 # naip[[2]] <- raster("data/naip/n_4111761_nw_11_1_20060813.tif") #frank
-# naip[[3]] <- raster("data/naip/m_4111823_sw_11_1_20100628.tif")
+# naip[[3]] <- raster("data/naip/m_4111823_sw_11_1_20100628.tif") #kings
 
 #### ls5 scene for projection/resolution matching while downsampling
 ls5 <- stack(list.files("data/ls5", full.names = T))
@@ -62,11 +62,14 @@ dir.create("data/precip_annual/naip_trimmed_anomaly")
 
 #### loop over each annual precip raster and create precip anomaly rasters (annual deviation from 30yr normals)
 for (i in 1:length(prism)) {
-  filename <- paste0("data/precip_annual/naip_trimmed_anomaly/precip_anomaly_trimmed_wmuc_", years[i], ".tif")
-  filename_short <- paste0("precip_anomaly_trimmed_wmuc", years[i], ".tif")
+  #filenames - change "frank"/"wmuc"/"kings" to name file based on which naip was used
+  filename <- paste0("data/precip_annual/naip_trimmed_anomaly/precip_anomaly_trimmed_kings_", years[i], ".tif")
+  filename_short <- paste0("precip_anomaly_trimmed_kings_", years[i], ".tif")
+  
   annual_precip_anomaly <- prism[[i]] - normals
   writeRaster(annual_precip_anomaly, filename = filename)
-  system(paste0("aws s3 cp ", filename, " ", "s3://earthlab-amahood/data/PRISM_precip_annual/naip_trimmed_annual_precip_anomaly/", filename_short))
+  #change "frank"/"wmuc"/"kings" to the desired folder on s3 based on which naip was used below
+  system(paste0("aws s3 cp ", filename, " ", "s3://earthlab-amahood/data/PRISM_precip_annual/naip_trimmed_annual_precip_anomaly/", "kings/", filename_short))
 }
 
 gc()
