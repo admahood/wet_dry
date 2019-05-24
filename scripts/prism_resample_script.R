@@ -159,12 +159,12 @@ for(i in 1:nrow(gbd)) {
 gbd <- dplyr::mutate(gbd, precip_anomaly = precip_anomaly_vec)
 
 #### save new blm data with precip as a spatially registered gpkg and upload to s3 (use this for future variable extraction)
-st_write(gbd, dsn = "data/gbd_train_w_precip_5_20_19_points.gpkg")
-system("aws s3 cp data/gbd_train_w_precip_5_20_19_points.gpkg s3://earthlab-amahood/data/gbd_plots_w_precip_5_20_19_points.gpkg")
+st_write(gbd, dsn = "data/gbd_plots_w_precip_5_20_19_points.gpkg")
+system("aws s3 cp data/gbd_plots_w_precip_5_20_19_points.gpkg s3://earthlab-amahood/data/gbd_plots_w_precip_5_20_19_points.gpkg")
 
 #### save new blm data with precip as a csv and upload to s3
-write.csv(gbd, file = "data/gbd_train_w_precip_5_20_19.csv")
-system("aws s3 cp data/gbd_train_w_precip_5_20_19.csv s3://earthlab-amahood/data/PRISM_precip_annual/gbd_plots_w_precip_5_20_19.csv")
+write.csv(gbd, file = "data/gbd_plots_w_precip_5_20_19.csv")
+system("aws s3 cp data/gbd_plots_w_precip_5_20_19.csv s3://earthlab-amahood/data/PRISM_precip_annual/gbd_plots_w_precip_5_20_19.csv")
 
 #### 4: training/test data splitting & saving to s3 for reuse (5/21/19) ####
 # **THESE ARE THE MOST RECENT TRAINING/TEST DATA**

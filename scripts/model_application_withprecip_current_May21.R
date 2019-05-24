@@ -1,6 +1,6 @@
 # Title: Random Forest Model Application - GB Land Cover Classification Using Precip Anomaly
 # Author(s): Dylan Murphy
-# Date last modified: 5/21/19
+# Date last modified: 5/23/19
 
 #### 1.1: Setup - Load Packages/Source Scripts
 libs <- c("sf", "tidyverse", "raster", "rgdal", "rgeos", "foreach", "doParallel", "gdalUtils")
@@ -158,9 +158,11 @@ foreach(i = scene_full,
 #### Extracting pixel counts to data table and quickly viewing through plots ####
 
 #list results raster files
+dir.create("data/results")
+system("aws s3 sync s3://earthlab-amahood/data/summer19_model_results/May23_modelrun_w_precip/ data/results")
 
-
-all_years_files <- list.files("data/results", pattern = "\\.tif$", full.names = T)
+#change "kings"/"frank"/"wmuc" to select results for a specific naip scene 
+all_years_files <- list.files("data/results/kings", pattern = "\\.tif$", full.names = T)
 all_years_stack <- stack(all_years_files)
 
 results_list <- list()
@@ -221,8 +223,8 @@ df2 <- df2 %>% mutate(year = c(1984:2011),
 
 ggplot(data=df2) + 
   aes(x = df2$year) + 
-  geom_point(aes(y=df2$grass), color = 'darkgreen') + 
-  geom_smooth(aes(y=df2$grass), color = 'darkgreen', method = "lm") +
+  geom_point(aes(y=df2$percent_shrub), color = 'darkgreen') + 
+  geom_smooth(aes(y=df2$percent_shrub), color = 'darkgreen', method = "lm") +
   xlab("year") +
   ylab("Sagebrush total pixels")
 
