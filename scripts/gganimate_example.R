@@ -25,3 +25,7 @@ anim<-ggplot(df, aes(x=x,y=y,fill=value))+
 
 aa<-gganimate::animate(anim, fps=2, nframes = length(unique(df$year)))
 anim_save(aa, filename="data/example.gif")
+
+system(paste("aws s3 cp",
+             "data/example.gif",
+             "s3://earthlab-amahood/data/summer19_model_results/animations/kings_ex.gif"))
