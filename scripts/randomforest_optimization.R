@@ -4,6 +4,7 @@ libs <- c("randomForest", "tidyverse","sf", "foreach", "doParallel",
           "caret", # for confusionMatrix
           "ranger",
           "gganimate",
+          "gifski",
           "raster",
           #"meteo", #for tiling
           "spdep", #for the weights
@@ -338,10 +339,8 @@ for(i in 1:length(files)){
 }
 ts_df<-do.call("rbind",ts_df)
 
-library(gganimate)
 system("sudo apt-get install cargo")
 install.packages("gifski")
-library(gifski)
 anim<-ggplot(ts_df, aes(x=x,y=y,fill=Value))+
   geom_raster() +
   theme_void() +    

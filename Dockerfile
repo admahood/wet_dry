@@ -5,8 +5,8 @@ RUN apt-get update \
   && apt-get install -y --no-install-recommends \
     awscli \
     cargo \
-    htop
-
+    htop 
+    
 RUN install2.r --error \
   assertthat \
   caret \
@@ -30,3 +30,4 @@ RUN install2.r --error \
   snowfall \
   tidyverse \
   viridis
+
