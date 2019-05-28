@@ -27,6 +27,7 @@ df <- do.call("rbind",lst) # rbinding to one df
 
 anim<-ggplot(df, aes(x=x,y=y,fill=value))+ 
   geom_raster() + # the business
+  # facet_wrap(~type) + # if the type thing
   theme_void() + # this is a theme without any annoying lines  
   scale_fill_viridis_c(name = "class") + # setting the color scheme and naming the legend
   labs(title = 'Year: {frame_time}') + # this is setting the label on top
