@@ -3,32 +3,26 @@ library(sf)
 library(raster)
 library(foreach)
 library(doParallel)
-csv_file <- "/home/a/Desktop/baecv_no_ll.csv"
-latlong<- "+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs" 
-baecv_crs <- "+proj=aea +lat_1=29.5 +lat_2=45.5 +lat_0=23 +lon_0=-96 +x_0=0 +y_0=0 +datum=NAD83 +units=m +no_defs +ellps=GRS80 +towgs84=0,0,0 "
-corz <- detectCores() -1
-
-
-  
-gb_fires <- st_read("/home/a/data/fire/wf1870-2015/Wildfires_1870_2015_Great_Basin.shp")
-
-dd <-read_csv(csv_file)%>%
-  mutate(duped = duplicated(lat)) %>%
-  filter(duped==F)%>%
-  dplyr::select(-duped,-topdepth_cm, -bottomdepth_cm, -BD_estimated,-veg,-thick,
-                -Article_ID, -pool,-pool_value) %>%
-  st_as_sf(coords=c("long","lat"), crs = latlong) %>%
-  st_transform(st_crs(baecv_crs))
-
-dd_gb<- dd%>%
-  st_transform(st_crs(gb_fires))%>%
-  st_intersection(gb_fires) %>%
-  filter(Fire_Year < yr_samp)
-
-y_max <- max(dd$yr_samp)
 
 local_scrap<- "/home/a/data/scrap/"
 dir.create(local_scrap)
+#
+gpkg_file <- ""
+latlong<- "+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs" 
+
+baecv_crs <- "+proj=aea +lat_1=29.5 +lat_2=45.5 +lat_0=23 +lon_0=-96 +x_0=0 +y_0=0 +datum=NAD83 +units=m +no_defs +ellps=GRS80 +towgs84=0,0,0 "
+
+dd <-st_read(gpkg_file)%>%
+ # dplyr::select() %>%
+  st_transform(st_crs(baecv_crs))
+
+# change yr_samp to whatever the year of sampling
+y_max <- max(dd$yr_samp)
+
+
+
+corz <- detectCores() -1
+
 registerDoParallel(corz)
 results <- list()
 counter <- 1
@@ -41,9 +35,9 @@ foreach(yy = 1984:y_max)%dopar%{
   
   bc_file <- paste0(local_scrap, target_file)
   bc<- raster(bc_file)
-  dd <-mutate(dd, burned = raster::extract(bc,dd),
-              burn_year = yy)
-  results[[counter]] <- dd
+  
+  results[[counter]] <- mutate(dd, burned = raster::extract(bc,dd), # burned will be 0 or 1
+              burn_year = yy) # burn year will be year
   
   system(paste0("rm ", local_file))
   system(paste0("rm ", bc_file))
@@ -53,7 +47,7 @@ foreach(yy = 1984:y_max)%dopar%{
 }
 final <-do.call("rbind", results) %>%
   dplyr::filter(burned > 0) %>%
-  mutate(Study_ID = as.factor(Study_ID)) %>%
+  mutate(Study_ID = as.factor(Study_ID)) %>% # change to plot ID
   group_by(Study_ID) %>%
   summarise(lyb = max(burn_year))
 
