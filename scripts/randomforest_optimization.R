@@ -180,7 +180,7 @@ rvars <- ncol(ddd[[1]])-2
 # also need to try this with vbd only
 
 control <- trainControl(method='repeatedcv',
-                        number=10, 
+                        number=10,
                         repeats=3,
                         search="grid")
 var_results <- data.frame(accuracy=NA, nvars = NA, mean_acc=NA,sd_acc=NA, dropped = NA)
