@@ -53,3 +53,4 @@ final <-do.call("rbind", results) %>%
   summarise(lyb = max(burn_year))
 
 st_write(final, "lyb_forthoseplots.gpkg")
+system("aws s3 cp ............")
