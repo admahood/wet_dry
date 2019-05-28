@@ -11,10 +11,17 @@ for(i in 1:length(files)){
   r <- raster(files[i])
   # initially, the name of the column with the values is the filename.
   # here we need value column to be the same for each year so we can rbind at the end
+  # filename has something that says typeprob or typepred
+  type =  str_extract(names(r), "type\\D{4}") %>% substr(5,8)
+  
   names(r) <- "value" 
   lst[[i]] <- r %>%
     as.data.frame(xy=TRUE) %>%
-    mutate(year = i+1983) #hackjob method to get the year in there
+    mutate(year = i+1983,
+           type = type) #hackjob method to get the year in there
+  # for pred & and errors, first add something filename that says if it's 
+  # a prediction or an error raster, extract that string from the filename
+  # using str_extract, then add an extra mutate(type = type) 
 }
 df <- do.call("rbind",lst) # rbinding to one df
 
