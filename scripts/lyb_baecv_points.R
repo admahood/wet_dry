@@ -46,7 +46,8 @@ foreach(yy = 1984:y_max)%dopar%{
   counter <- counter+1
 }
 final <-do.call("rbind", results) %>%
-  dplyr::filter(burned > 0) %>%
+  dplyr::filter(burned > 0,
+                burn_year < yr_samp) %>%
   mutate(Study_ID = as.factor(Study_ID)) %>% # change to plot ID
   group_by(Study_ID) %>%
   summarise(lyb = max(burn_year))
