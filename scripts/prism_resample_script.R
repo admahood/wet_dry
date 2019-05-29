@@ -133,6 +133,9 @@ for (i in 1:length(trainprism)) {
 #### 3.4: Extracting precip data to blm data points - IF NORMALS AND ANOMALY RASTERS ARE DONE START HERE ####
 
 ####load training data points
+
+system("aws s3 cp s3://earthlab-amahood/data/plots_with_landsat_feb19.gpkg data/plot_data/plots_with_landsat.gpkg")
+
 gbd <- st_read("data/plot_data/plots_with_landsat.gpkg", quiet=T) %>%
   filter(esp_mask == 1) 
 

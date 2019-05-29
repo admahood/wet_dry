@@ -4,24 +4,42 @@ library(raster)
 library(foreach)
 library(doParallel)
 
-local_scrap<- "/home/a/data/scrap/"
+local_scrap<- "data/scrap/"
+dir.create("data")
 dir.create(local_scrap)
-#
-gpkg_file <- ""
-latlong<- "+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs" 
+
+system("aws s3 cp s3://earthlab-amahood/data/plots_with_landsat_feb19.gpkg data/plot_data/plots_with_landsat.gpkg")
+
+gpkg_file <- "data/plot_data/plots_with_landsat.gpkg"
+#latlong<- "+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs" 
 
 baecv_crs <- "+proj=aea +lat_1=29.5 +lat_2=45.5 +lat_0=23 +lon_0=-96 +x_0=0 +y_0=0 +datum=NAD83 +units=m +no_defs +ellps=GRS80 +towgs84=0,0,0 "
 
 dd <-st_read(gpkg_file)%>%
- # dplyr::select() %>%
+  dplyr::select(-sr_band1,
+                -mean_sr_band1,
+                -sr_band2,
+                -mean_sr_band2,
+                -sr_band3,
+                -mean_sr_band3,
+                -sr_band4,
+                -mean_sr_band4,
+                -sr_band5,
+                -mean_sr_band5,
+                -sr_band7,
+                -mean_sr_band7,
+                -sr_cloud_qa,
+                -ndvi, - evi, -savi, -sr, 
+                -greenness, -wetness, -brightness) %>%
+    dplyr::mutate(plot_year = as.numeric(as.character(dd$year)))
   st_transform(st_crs(baecv_crs))
 
 # change yr_samp to whatever the year of sampling
-y_max <- max(dd$yr_samp)
+y_max <- max(dd$plot_year)
 
 
 
-corz <- detectCores() -1
+corz <- detectCores() /2
 
 registerDoParallel(corz)
 results <- list()
@@ -45,11 +63,12 @@ foreach(yy = 1984:y_max)%dopar%{
   raster::removeTmpFiles(h=0.25)
   counter <- counter+1
 }
+
 final <-do.call("rbind", results) %>%
   dplyr::filter(burned > 0,
-                burn_year < yr_samp) %>%
-  mutate(Study_ID = as.factor(Study_ID)) %>% # change to plot ID
-  group_by(Study_ID) %>%
+                burn_year < plot_year) %>%
+  mutate(plot_ID = as.factor(OBJECTID)) %>% # change to plot ID
+  group_by(plot_ID) %>%
   summarise(lyb = max(burn_year))
 
 st_write(final, "lyb_forthoseplots.gpkg")
