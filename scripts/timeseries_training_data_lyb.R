@@ -68,12 +68,16 @@ for (i in 1:length(timeseries_list)) {
     
       timeseries_list[[i]][y + 1,69] <- years_vec[y]
     }
+
+    label_vec <- c()
+    label_count <- 1:(length(years_vec) + 1)
     
-    label_vec = for(yy in 1:length(years_vec)) { 
-      ifelse(timeseries_list[[i]][yy, 69] >= plot_lyb, "grass", "shrub")
+    for(k in 1:length(label_count)) { 
+      label_vec[k] <- ifelse(timeseries_list[[i]][k, 69] >= plot_lyb, "grass", "shrub")
     }
-    
-    dplyr::mutate(timeseries_list[[i]], label = label_vec)
+      for(j in 1:length(label_count)) {
+      dplyr::mutate(timeseries_list[[i]][j,], label = label_vec[j])
+      }
   }
 }
    
