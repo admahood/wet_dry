@@ -81,3 +81,15 @@ for (i in 1:length(timeseries_list)) {
   }
 }
    
+
+
+for (i in 1:length(timeseries_list)) {
+  label_count <- 1:(length(timeseries_list[[i]]$plot_year))
+  for(k in 1:length(label_count)) {
+    label_vec <- c()
+    label_vec[k] <- ifelse(timeseries_list[[i]][k, 69] >= plot_lyb, 1, 2)
+        }
+      for(j in 1:length(label_count)) {
+        dplyr::mutate(timeseries_list[[i]][j,], label = label_vec[j])
+        }
+}
