@@ -22,25 +22,35 @@ gbd_lyb <- gbd_lyb %>%
   filter(duplicated == 0) 
 
 
+#3. Create Training Data Time Series Based on Fire History
+
 #grab unique plot IDs in vector form as an iterator
 plotIDs <- unique(gbd_lyb$OBJECTID)
 
 #initiate empty list
 timeseries_list <- list()
 
-#isolate each plot in a list 
+#3.1: isolate each plot in a list to work with each training "time series" individually
 for(i in 1:length(plotIDs)) { 
   plotdf <- data.frame(gbd_lyb[i,])
   timeseries_list[[i]] <- plotdf
   }
 
+#3.2: Looping over each point in the list, create duplicates for time series and 
+#change year labels to match
+
 for (i in 1:length(timeseries_list)) {
   
-  plot_lyb <- timeseries_list[[i]]$lyb
+  # grab last year burned
+  plot_lyb <- timeseries_list[[i]]$lyb 
   
+  #if the plot never burned, plot_lyb = NA and the plot gets a five year time series of shrub labels
   if(is.na(plot_lyb)) { 
-    start_year <- timeseries_list[[i]]$plot_year - 5
     
+    #get the first year to begin the time series (5 years prior to plot recording in this case)
+    start_year <- timeseries_list[[i]]$plot_year - 5 
+    
+    #duplicate plot points within the list and change plot_year label to match time series position
     timeseries_list[[i]][2,] <- timeseries_list[[i]][1,] 
     timeseries_list[[i]][2,69] <- start_year
     
@@ -56,40 +66,59 @@ for (i in 1:length(timeseries_list)) {
     timeseries_list[[i]][6,] <- timeseries_list[[i]][1,] 
     timeseries_list[[i]][6,69] <- start_year + 4
     
-    dplyr::mutate(timeseries_list[[i]], label = "shrub")
-    } else {
+    #if the plot did burn at some point, create a time series from five years before burning up until the plot's recording
+    } else { 
+    #grab start year for time series (five years prior to the most recent burn)
     start_year <- plot_lyb - 5 
     
+    #create vector of years for time series as iterator
     years_vec <- c(start_year:timeseries_list[[i]]$plot_year)
     
+    #loop over years vector, duplicating the plot point within the list and changing the plot_year to match the time series position
     for(y in 1:length(years_vec)) {
       
       timeseries_list[[i]][y + 1,] <- timeseries_list[[i]][1,]
     
       timeseries_list[[i]][y + 1,69] <- years_vec[y]
     }
-
-    label_vec <- c()
-    label_count <- 1:(length(years_vec) + 1)
-    
-    for(k in 1:length(label_count)) { 
-      label_vec[k] <- ifelse(timeseries_list[[i]][k, 69] >= plot_lyb, "grass", "shrub")
     }
-      for(j in 1:length(label_count)) {
-      dplyr::mutate(timeseries_list[[i]][j,], label = label_vec[j])
-      }
+}
+ 
+# 3.3: now that we have a list containing a time series for each data point, 
+#we need to attach shrub/grass labels to them based on fire history, and convert them back 
+#into one dataframe for easy writing out as a gpkg. 
+
+#create empty dataframe for storing time series points
+gbd_full_timeseries <- data.frame()
+
+#loop over the list of different "time series", add labels based on fire history, convert into single dataframe
+for(i in 1:length(timeseries_list)) {
+  
+  #create dataframe with each row as one year in a particular point's time series
+  timeseries_point <- as.data.frame(timeseries_list[[i]]) 
+  
+  #grab last year burned for a particular point
+  plot_lyb <- plot_lyb <- timeseries_list[[i]][1,]$lyb
+  
+  #create empty vector to store labels 
+  label_vec <- as.character(c())
+  
+  #loop over each year and determine how to label it based on fire history (store labels in vector):
+  #if never burned, then label = shrub. 
+  #if the plot did burn at some point, attach shrub label up until the last year burned and grass label after
+  for(k in 1:length(timeseries_point$plot_year)) { 
+    label_vec[k] <- if (!is.na(plot_lyb)) {ifelse(timeseries_point[,69][k] >= plot_lyb, "grass", "shrub")} 
+    else { "shrub"}
   }
-}
-   
 
+#add label column using label vector
+timeseries_point <- dplyr::mutate(timeseries_point, label = label_vec)
 
-for (i in 1:length(timeseries_list)) {
-  label_count <- 1:(length(timeseries_list[[i]]$plot_year))
-  for(k in 1:length(label_count)) {
-    label_vec <- c()
-    label_vec[k] <- ifelse(timeseries_list[[i]][k, 69] >= plot_lyb, 1, 2)
-        }
-      for(j in 1:length(label_count)) {
-        dplyr::mutate(timeseries_list[[i]][j,], label = label_vec[j])
-        }
+#add to main dataframe containing all time series points
+gbd_full_timeseries <- rbind(gbd_full_timeseries, timeseries_point)
 }
+
+# 4: Save and Upload to S3
+st_write(gbd_full_timeseries, "data/gbd_plots_w_lyb_timeseries_Jun3.gpkg")
+system("aws s3 cp data/gbd_plots_w_lyb_timeseries_Jun3.gpkg s3://earthlab-amahood/data/training_plots_timeseries/gbd_plots_w_lyb_timeseries_Jun3.gpkg")
+
