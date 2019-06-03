@@ -1,6 +1,6 @@
 #Title: Time Series Training Data w/ sagebrush and cheatgrass labels based on fire history
 #Author: Dylan Murphy
-#Date last modified: 5/31/19
+#Date last modified: 6/3/19
 
 #1. Set Up
 #Install/Load Packages
