@@ -66,25 +66,58 @@ for (i in 1:length(timeseries_list)) {
     timeseries_list[[i]][6,] <- timeseries_list[[i]][1,] 
     timeseries_list[[i]][6,69] <- start_year + 4
     
-    #if the plot did burn at some point, create a time series from five years before burning up until the plot's recording
+    print(paste0(timeseries_list[[i]]$OBJECTID, " did not burn during the study period"))
+    
+    #if the plot did burn at some point, create a time series from two years after burning up 
+    #until the plot's recording, OR five years if last burn was over seven years prior to recording
     } else { 
-    #grab start year for time series (five years prior to the most recent burn)
-    start_year <- plot_lyb - 5 
     
-    #create vector of years for time series as iterator
-    years_vec <- c(start_year:timeseries_list[[i]]$plot_year)
+    #determine if there is room for a full five year time series 
+    if(timeseries_list[[i]]$plot_year - plot_lyb >= 7) { 
     
-    #loop over years vector, duplicating the plot point within the list and changing the plot_year to match the time series position
+    #grab start year for time series (two years after the most recent burn)
+    start_year <- timeseries_list[[i]]$plot_year - 5
+    
+    #create vector iterator for time series years
+    years_vec <- c(start_year:(timeseries_list[[i]]$plot_year - 1))
+    
+    #create time series and attach proper year attributes
     for(y in 1:length(years_vec)) {
       
       timeseries_list[[i]][y + 1,] <- timeseries_list[[i]][1,]
-    
+      
       timeseries_list[[i]][y + 1,69] <- years_vec[y]
+      print(paste0(timeseries_list[[i]]$OBJECTID, " has a full time series and burned at some point in the past"))
     }
+    } else {
+      #get start year 
+      start_year <- plot_lyb + 2
+        #determine if there is room for a time series at all, and if there is:
+        if (timeseries_list[[i]]$plot_year - start_year > 0) {
+        
+        #create years vector iterator
+        years_vec <- c(start_year:(timeseries_list[[i]]$plot_year - 1))
+        
+        #loop on years vector andcreate time series (likely truncated) and attach proper year attribute values
+        for(y in 1:length(years_vec)) {
+          
+        timeseries_list[[i]][y + 1,] <- timeseries_list[[i]][1,]
+          
+        timeseries_list[[i]][y + 1,69] <- years_vec[y]
+        }
+        print(paste0(timeseries_list[[i]]$OBJECTID, " has a truncated time series")) 
+        } else {
+          
+          #in the case that the most recent burn is so recent that the time series will not fit, print this
+          print(paste0(timeseries_list[[i]]$OBJECTID, " burned too recently for time series")) 
+        }
+      }
     }
 }
  
-# 3.3: now that we have a list containing a time series for each data point, 
+# 3.3: NEEDS UPDATING TO MATCH CORRECTED LABEL METHOD - WORK STOPPED HERE 6/4
+
+#now that we have a list containing a time series for each data point, 
 #we need to attach shrub/grass labels to them based on fire history, and convert them back 
 #into one dataframe for easy writing out as a gpkg. 
 
