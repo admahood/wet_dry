@@ -6,7 +6,7 @@
 
 #Packages
 
-libs <- c("raster", "sf", "dplyr", "tidyverse", "doParallel", "foreach")
+libs <- c("raster", "sf", "dplyr", "tidyverse", "doParallel", "foreach", "stringr")
 lapply(libs, library, character.only = TRUE, verbose = FALSE)
 
 #source scripts 
@@ -22,7 +22,7 @@ system("aws s3 sync s3://earthlab-amahood/data/landfire_esp_rcl /home/rstudio/we
 # Paths 
 
 landsat_s3 <- "s3://earthlab-amahood/data/landsat_5and7_pixel_replaced_Jun3/"
-landsat_local <- "/home/rstudio/wet_dry/data/landsat_5and7_pixel_replaced_Jun3/" 
+landsat_local <- "data/landsat_5and7_pixel_replaced_Jun3/" 
 dir.create("data/scrap", showWarnings = FALSE)
 exdir <- "data/scrap/"
 
@@ -34,7 +34,16 @@ scenes <- st_read("data/WRS2_paths/wrs2_asc_desc/wrs2_asc_desc.shp")
 years <- unique(gb_plots$plot_year) # getting the years plots were monitored - 2011-2015
 path_row_combos <- unique(gb_plots$path_row)
 
+ls_files_list <- system("aws s3 ls s3://earthlab-amahood/data/landsat_5and7_pixel_replaced_Jun3/", intern = T)
+
+for(i in 1:length(ls_files_list)) {
+  ls_files_list[i] <- substr(ls_files_list[i], 32, 51)
+}
+
+
+
 gbplots_list <- list()
+
 
 
 #### Unmodified loop from wet_dry_initial_script_sortingbydate_Feb19.R for landsat band extraction to points 
@@ -42,29 +51,36 @@ gbplots_list <- list()
 for(i in 1:length(years)){ 
   if(years[i] >= 2011) { ls_platform <- 7 } else {ls_platform <- 5}
   
-  system(paste0("aws s3 cp", " ", landsat_s3, "ls", ls_platform, "_", years[[i]])) #WORK ENDED HERE 6/3
   
+  ls_files_annual <- str_subset(ls_files_list, pattern = fixed(years[i]))
+  
+  for(k in 1:length(ls_files_annual)) {
+    system(paste0("aws s3 cp ", landsat_s3, ls_files_annual[k], " ", landsat_local, ls_files_annual[k]))
+  }
   for(j in 1:length(path_row_combos)){
     
     # subsetting the plots for the year and row/column combination
     print("subsetting")
     gbplots_subset <- gb_plots[gb_plots$path_row == path_row_combos[j]
-                               & gb_plots$year == years[i],]
+                               & gb_plots$plot_year == years[i],]
     print(paste(round(counter/125*100), "%")) #progress indicator
     
-    if(nrow(gbplots_subset) > 0) {
-      # listing all the files with the right year and path/row combo
-      
-      tar_files <- Sys.glob(paste0(landsat_local,"/", years[i], "/","LE07", 
-                                   path_row_combos[j],
-                                   "*.tar.gz")) 
-      dates<- substr(tar_files, 56,59) %>%
-        as.numeric()
-      
-      print("untarring")
-      untar(tar_files[which.max(dates)], exdir = exdir)
+    # if(nrow(gbplots_subset) > 0) {
+    #   # listing all the files with the right year and path/row combo
+    #   
+    #   tar_files <- Sys.glob(paste0(landsat_local,"/", years[i], "/","LE07", 
+    #                                path_row_combos[j],
+    #                                "*.tar.gz")) 
+    #   dates<- substr(tar_files, 56,59) %>%
+    #     as.numeric()
+    #   
+    #   print("untarring")
+    #   untar(tar_files[which.max(dates)], exdir = exdir)
       #listing only the tif files we've extracted (there's a bunch of metadata etc too, which you should familiarize yourself with)
-      tif_files <- Sys.glob(paste0(exdir,"*.tif"))
+      
+    # WORK ENDS HERE 6/4/19 #
+    
+    tif_files <- Sys.glob(paste0(exdir,"*.tif"))
       tif_names <- substr(tif_files, 53, nchar(tif_files)-4)
       
       for(k in 1:length(tif_files)){
