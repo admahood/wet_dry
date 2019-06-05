@@ -62,13 +62,15 @@ if(nrow(gtrain[gtrain$binary == "Grass",])<nrow(gtrain[gtrain$binary == "Shrub",
 
 
 #### 4.1.2: new method of training class labelling - manually remove mixed pixels ####
-shrubs <- dplyr::filter(gtrain, SagebrushC > 0 & InvAnnGras < 4) %>%
+shrubs <- dplyr::filter(gtrain, SagebrushC > 5 & InvAnnGras < 2) %>%
   mutate(cluster = 2);dim(shrubs)
 
-grasses <- dplyr::filter(gtrain, SagebrushC <2 & InvAnnGras >4)%>%
+grasses <- dplyr::filter(gtrain, SagebrushC < 1 & InvAnnGras >4)%>%
   mutate(cluster= 1);dim(grasses)
 
-gtrain_new <- rbind(grasses,shrubs)
+mixed <- dplyr::filter(gtrain, SagebrushC > 3 & InvAnnGras > 3) %>% mutate(cluster = 3);dim(mixed)
+
+gtrain_new <- rbind(grasses,shrubs, mixed)
 gtrain <- gtrain_new 
 gtrain <- gtrain %>% 
   dplyr::select(sr_band1, sr_band2, sr_band3, sr_band4, sr_band5, sr_band7, ndvi, evi, savi, sr, greenness, 

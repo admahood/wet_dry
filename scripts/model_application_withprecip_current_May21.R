@@ -54,9 +54,9 @@ landsat <- stack(scene_full[1])
 crs <- crs(landsat)
 
 #create naip scene raster object for cropping 
-#naip <- raster("data/naip/m_4011703_ne_11_1_20100704.tif") %>% projectRaster(crs = crs, res = 30) #wmuc
+naip <- raster("data/naip/m_4011703_ne_11_1_20100704.tif") %>% projectRaster(crs = crs, res = 30) #wmuc
 #naip <- raster("data/naip/n_4111761_nw_11_1_20060813.tif") %>% projectRaster(crs = crs, res = 30) #frank
-naip <- raster("data/naip/m_4111823_sw_11_1_20100628.tif") %>% projectRaster(crs = crs, res = 30) #kings
+#naip <- raster("data/naip/m_4111823_sw_11_1_20100628.tif") %>% projectRaster(crs = crs, res = 30) #kings
 #parallelized model application loop
 foreach(i = scene_full, 
         .packages = 'raster') %dopar% {         
@@ -74,7 +74,7 @@ foreach(i = scene_full,
           ls5 <- stack(i) %>% crop(naip)
           
           #crop terrain data to naip scene
-          ter <- stack(list.files(local_terrain, full.names =T)) %>% crop(naip) %>% resample(ls5)
+          ter <- stack(list.files(local_terrain, full.names =T)) %>% crop(naip) %>% resample(ls5) 
           
           #get proper names for landsat bands - important for use in veg indice/tassel cap functions later
           names(ls5)<- c("sr_band1", "sr_band2","sr_band3", "sr_band4","sr_band5", "sr_band7")
@@ -83,7 +83,7 @@ foreach(i = scene_full,
           system(paste("echo", "stack created and cropped", i))
           
           #grab precip anomaly for a particular year - change "frank"/"wmuc"/"kings" in both folder and filename depending on which you want to use
-          precip <- raster(paste0("data/prism/naip_trimmed_annual_precip_anomaly/kings/precip_anomaly_trimmed_kings_", year, ".tif")) %>% resample(ls5)
+          precip <- raster(paste0("data/prism/naip_trimmed_annual_precip_anomaly/wmuc/precip_anomaly_trimmed_wmuc", year, ".tif")) %>% resample(ls5)
           
           # create additional index variables - make sure all the names of this stack match the names that go into the model 
           ls5$wetness <- wet5(ls5$sr_band1,ls5$sr_band2,ls5$sr_band3,ls5$sr_band4,ls5$sr_band5,ls5$sr_band7)
@@ -137,7 +137,7 @@ foreach(i = scene_full,
           gc() 
           
           #make filename - change "frank"/"wmuc"/"kings" depending on naip scene used for extent
-          filenamet <- paste0("data/results/", "manual_labels_model_results_w_precip", "_kings_", year, ".tif") 
+          filenamet <- paste0("data/results/", "three_class_model_results_w_precip", "_wmuc_", year, "_Jun5", ".tif") 
           system(paste("echo", "filename created", i))
           
           #apply the RF model to raster stack and create "ls5_classed", an annual predicted sage/cheat raster!
@@ -150,7 +150,7 @@ foreach(i = scene_full,
           #save resulting land cover rasters and upload to s3
           writeRaster(ls5_classed, filename = filenamet, format = "GTiff", overwrite = T) 
           system(paste("echo", "file saved to disk"))
-          system(paste0("aws s3 cp ", filenamet, " s3://earthlab-amahood/data/summer19_model_results/May23_modelrun_w_precip/kings/", substr(filenamet, 14, 150)))
+          system(paste0("aws s3 cp ", filenamet, " s3://earthlab-amahood/data/summer19_model_results/Jun5_3class_modelrun_w_precip/wmuc/", substr(filenamet, 14, 150)))
           system(paste("echo", "aws sync done"))
           
         }
@@ -159,10 +159,11 @@ foreach(i = scene_full,
 
 #list results raster files
 dir.create("data/results")
-system("aws s3 sync s3://earthlab-amahood/data/summer19_model_results/May23_modelrun_w_precip/ data/results")
+#change path below to desired model results folder on s3
+system("aws s3 sync s3://earthlab-amahood/data/summer19_model_results/Jun5_3class_modelrun_w_precip/ data/results")
 
 #change "kings"/"frank"/"wmuc" to select results for a specific naip scene 
-all_years_files <- list.files("data/results/kings", pattern = "\\.tif$", full.names = T)
+all_years_files <- list.files("data/results/wmuc", pattern = "\\.tif$", full.names = T)
 all_years_stack <- stack(all_years_files)
 
 results_list <- list()
@@ -209,22 +210,23 @@ df2 <- rbind(
 df2 <- as_data_frame(df2)
 
 #name the class total columns
-names(df2) <- c("grass", "shrub")
+names(df2) <- c("grass", "shrub", "mixed")
 
 #create additional class total variables (e.g. percentages of total study area, etc)
 
 df2 <- df2 %>% mutate(year = c(1984:2011),
-                      total_pixels = as.numeric(grass + shrub),
+                      total_pixels = as.numeric(grass + shrub + mixed),
                       percent_grass = as.numeric((grass / total_pixels) * 100),
                       percent_shrub = as.numeric((shrub / total_pixels) * 100),
+                      percent_mixed = as.numeric((mixed/total_pixels) * 100), 
                       shrubvgrass = as.numeric(shrub/grass))
 
 #plot class totals over time using ggplot - switch "grass" to "shrub" or vice versa to look at each class
 
 ggplot(data=df2) + 
   aes(x = df2$year) + 
-  geom_point(aes(y=df2$percent_shrub), color = 'darkgreen') + 
-  geom_smooth(aes(y=df2$percent_shrub), color = 'darkgreen', method = "lm") +
+  geom_point(aes(y=df2$percent_grass), color = 'darkgreen') + 
+  geom_smooth(aes(y=df2$percent_grass), color = 'darkgreen', method = "lm") +
   xlab("year") +
   ylab("Sagebrush total pixels")
 
@@ -233,7 +235,7 @@ anim_libs <- c("gganimate","gifski")
 lapply(anim_libs, install.packages, character.only = TRUE, verbose = FALSE)
 lapply(anim_libs, library, character.only = TRUE, verbose = FALSE)
 
-lcc_rasters <- list.files("data/results", pattern = "\\.tif$", full.names = T)
+lcc_rasters <- list.files("data/results/wmuc", pattern = "\\.tif$", full.names = T)
 
 lcc_stack <- stack(lcc_rasters)
 
@@ -245,7 +247,7 @@ for (i in 1:length(years)) {
   rr <- as.data.frame(rrr, xy = TRUE)
   names(rr) <- c("x","y", "Prediction")
   nn <- lcc_rasters[i]
-  rr$year=as.numeric(substr(nn, 37, 40))
+  rr$year=as.numeric(substr(nn, 59, 62))
   ts_df[[i]]<-rr
 }
 
@@ -262,5 +264,6 @@ anim<-ggplot(ts_df, aes(x=x,y=y,fill=as.numeric(Prediction)))+
 
 #this isnt working because I cannot install the "gifski" package since the Rust compiler is required and for some reason it will not let me install it from the command line on EC2...
 aa<-gganimate::animate(anim, fps=2, nframes = length(years))
+
 
 

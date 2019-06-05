@@ -131,27 +131,41 @@ for(i in 1:length(timeseries_list)) {
   timeseries_point <- as.data.frame(timeseries_list[[i]]) 
   
   #grab last year burned for a particular point
-  plot_lyb <- plot_lyb <- timeseries_list[[i]][1,]$lyb
+  plot_lyb <- timeseries_list[[i]][1,]$lyb
   
   #create empty vector to store labels 
   label_vec <- as.character(c())
+ 
+  #
+  #if never burned, then label based on shrub cover and annual grass cover for all of time series. (assume steady state) 
+  #if the plot did burn at some point, label based on shrub cover and annual grass cover (assume steady state)
   
+  
+  if(timeseries_point[1,]$SagebrushC > 5 & timeseries_point[1,]$InvAnnGras < 2) {
+    label_vec <- rep("shrub", length(timeseries_point$plot_year))
+  }else if(timeseries_point[1,]$SagebrushC < 1 & timeseries_point[1,]$InvAnnGras >4) {
+    label_vec <- rep("grass", length(timeseries_point$plot_year))
+ } else { label_vec <- rep("mixed", length(timeseries_point$plot_year))}
+ 
+  
+  #OLD for loop commented out below  
   #loop over each year and determine how to label it based on fire history (store labels in vector):
-  #if never burned, then label = shrub. 
-  #if the plot did burn at some point, attach shrub label up until the last year burned and grass label after
-  for(k in 1:length(timeseries_point$plot_year)) { 
-    label_vec[k] <- if (!is.na(plot_lyb)) {ifelse(timeseries_point[,69][k] >= plot_lyb, "grass", "shrub")} 
-    else { "shrub"}
-  }
 
-#add label column using label vector
+#   for(k in 1:length(timeseries_point$plot_year)) { 
+#     label_vec[k] <- if (!is.na(plot_lyb)) {ifelse(timeseries_point[,69][k] >= plot_lyb, "grass", "shrub")} 
+#     else { "shrub"}
+#   }
+# 
+# #add label column using label vector
 timeseries_point <- dplyr::mutate(timeseries_point, label = label_vec)
+
 
 #add to main dataframe containing all time series points
 gbd_full_timeseries <- rbind(gbd_full_timeseries, timeseries_point)
 }
 
+gbd_full_timeseries <- gbd_full_timeseries %>% mutate(cluster = as.numeric(as.factor(label)))
 # 4: Save and Upload to S3
-st_write(gbd_full_timeseries, "data/gbd_plots_w_lyb_timeseries_Jun3.gpkg")
-system("aws s3 cp data/gbd_plots_w_lyb_timeseries_Jun3.gpkg s3://earthlab-amahood/data/training_plots_timeseries/gbd_plots_w_lyb_timeseries_Jun3.gpkg")
+st_write(gbd_full_timeseries, "data/gbd_plots_w_lyb_timeseries_Jun5.gpkg")
+system("aws s3 cp data/gbd_plots_w_lyb_timeseries_Jun5.gpkg s3://earthlab-amahood/data/training_plots_timeseries/gbd_plots_w_lyb_timeseries_Jun5.gpkg")
 
