@@ -63,41 +63,83 @@ counter = 1
 kounter = 1
 for(i in 1:length(years)){ 
   if(years[i] >= 2011) { ls_platform <- 7 } else {ls_platform <- 5}
+  print(paste0("platform selected", years[i]))
   
   for(j in 1:length(path_row_combos)){
   gbplots_subset <- gb_plots[gb_plots$path_row == path_row_combos[j]
                              & gb_plots$plot_year == years[i],]
+  print(paste0("plots subsetted for ", years[i], path_row_combos[j]))
   print(paste(round(counter/125*100), "%")) #progress indicator
   
   ls_files_annual <- str_subset(ls_files_list, pattern = fixed(years[i]))
   ls_files_annual <- str_subset(ls_files_annual, pattern = fixed(path_row_combos[j]))
-  system(paste0("aws s3 cp ", landsat_s3, ls_files_annual, " ", landsat_local, ls_files_annual[k]))
-      
+  system(paste0("aws s3 cp ", landsat_s3, ls_files_annual[1], " ", landsat_local, ls_files_annual[1]))
+  print(paste0("landsat downloaded", years[i], path_row_combos[j]))    
         # now we loop through each tif file and extract the values
        
-        ls_stack <- raster::stack(paste0(landsat_local, ls_files_annual)) # this just loads the raster
-        names(ls_stack) <- c("sr_band1", "sr_band2", "sr_band3", "sr_band4", "sr_band5", "sr_band7")
+  ls_stack <- raster::stack(paste0(landsat_local, "ls", ls_platform, "_", substr(ls_files_annual[1], 5, 20))) # this just loads the raster
+  names(ls_stack) <- c("sr_band1", "sr_band2", "sr_band3", "sr_band4", "sr_band5", "sr_band7")
         
-        gbplots_subset <- raster::extract(ls_stack, gbplots_subset, sp=TRUE)
-     
-      gbplots_subset <- st_transform(st_as_sf(gbplots_subset),crs = st_crs(plot_data))
-      
-      
-      file.remove(paste0(landsat_local, ls_files_annual)) # now we delete the tifs
-      print("extracted")
-    
-      gbplots_list[[kounter]] <- gbplots_subset
-      
-      if(kounter == 1){
-        result <- gbplots_subset
-      }else{
-        result <- rbind(result, gbplots_subset)
-      }
-      
-      
-      kounter <- kounter + 1
+  if(length(gbplots_subset$plot_year) > 0) { 
+    gbplots_subset <- raster::extract(ls_stack, gbplots_subset, sp=TRUE)
+  print(paste0("band values extracted to points", years[i], path_row_combos[j])) 
+  gbplots_subset <- st_transform(st_as_sf(gbplots_subset),crs = st_crs(plot_data))
+  print(paste0("points transformed to lat long", years[i], path_row_combos[j]))    
+  
+  file.remove(paste0(landsat_local, ls_files_annual)) # now we delete the tifs
+  print(paste0("landsat files deleted", years[i], path_row_combos[j]))  
+  
+  # gbplots_list[[kounter]] <- gbplots_subset
+  
+  if(kounter == 1){
+    result <- gbplots_subset
+  }else{
+    result <- rbind(result, gbplots_subset)
+  }
+  print(paste0("points attached to big training dataframe", years[i], path_row_combos[j])) 
+  
+  kounter <- kounter + 1
+  } else {
+    print("no points")
+  }
     }
     counter <- counter + 1 
-    
   }
-  head(resultd)
+  
+head(result)
+
+
+####MISSING LANDSAT FILES? START HERE####
+#find any missing landsat files
+for (i in 1:length(years)) {
+  for (j in 1:length(path_row_combos)) {
+    ls_files_annual <- str_subset(ls_files_list, pattern = fixed(years[i]))
+    ls_files_annual <- str_subset(ls_files_annual, pattern = fixed(path_row_combos[j]))
+    if(length(ls_files_annual) < 1) { 
+     print(paste0(years[i], path_row_combos[j], "missing")) 
+       }
+  }
+}
+
+
+missing_ls_files <- system("aws s3 ls s3://earthlab-amahood/data/missing_landsat_2008_Jun7/", intern = T)
+missing_ls_files <- missing_ls_files[-1]
+
+for (i in 1:length(missing_ls_files)) {
+  missing_ls_files[i] <- substr(missing_ls_files[i], 32, 100)
+  system(paste0("aws s3 cp s3://earthlab-amahood/data/missing_landsat_2008_Jun7/", missing_ls_files[i], " data/missing_ls_files/", missing_ls_files[i]))
+  yr <- substr(missing_ls_files[i], 11, 14)
+  prc <- substr(missing_ls_files[i], 5, 10)
+  exdir <- "data/ls_tifs"
+  dir.create(exdir)
+  untar(paste0("data/missing_ls_files/", missing_ls_files[i]), exdir = exdir)
+  tifs <- Sys.glob(paste0("data/ls_tifs/", "/*band*.tif"))
+  tif_stack <- stack(tifs)
+  names(tif_stack) <- c("sr_band1", "sr_band2", "sr_band3", "sr_band4", "sr_band5", "sr_band7")
+  filename <- paste0("data/missing_ls_files/ls5_", yr, "_", prc, "_.tif")
+  writeRaster(tif_stack, filename)
+  system(paste0("aws s3 cp ", filename, " ", "s3://earthlab-amahood/data/missing_landsat_2008_Jun7/", substr(filename, 23, 42)))
+  a <- list.files("data/missing_ls_files", full.names = T)
+  file.remove(list.files("data/missing_ls_files", full.names = T))
+  file.remove(list.files("data/ls_tifs", full.names = T))
+}
