@@ -52,6 +52,40 @@ ls_files_list <- system("aws s3 ls s3://earthlab-amahood/data/landsat_5and7_pixe
 for(l in 1:length(ls_files_list)) {
   ls_files_list[l] <- substr(ls_files_list[l], 32, 51)
 }
+####MISSING LANDSAT FILES? START HERE####
+#find any missing landsat files
+for (i in 1:length(years)) {
+  for (j in 1:length(path_row_combos)) {
+    ls_files_annual <- str_subset(ls_files_list, pattern = fixed(years[i]))
+    ls_files_annual <- str_subset(ls_files_annual, pattern = fixed(path_row_combos[j]))
+    if(length(ls_files_annual) < 1) { 
+      print(paste0(years[i], path_row_combos[j], "missing")) 
+    }
+  }
+}
+
+
+missing_ls_files <- system("aws s3 ls s3://earthlab-amahood/data/missing_landsat_2008_Jun7/", intern = T)
+missing_ls_files <- missing_ls_files[-1]
+
+for (i in 1:length(missing_ls_files)) {
+  missing_ls_files[i] <- substr(missing_ls_files[i], 32, 100)
+  system(paste0("aws s3 cp s3://earthlab-amahood/data/missing_landsat_2008_Jun7/", missing_ls_files[i], " data/missing_ls_files/", missing_ls_files[i]))
+  yr <- substr(missing_ls_files[i], 11, 14)
+  prc <- substr(missing_ls_files[i], 5, 10)
+  exdir <- "data/ls_tifs"
+  dir.create(exdir)
+  untar(paste0("data/missing_ls_files/", missing_ls_files[i]), exdir = exdir)
+  tifs <- Sys.glob(paste0("data/ls_tifs/", "/*band*.tif"))
+  tif_stack <- stack(tifs)
+  names(tif_stack) <- c("sr_band1", "sr_band2", "sr_band3", "sr_band4", "sr_band5", "sr_band7")
+  filename <- paste0("data/missing_ls_files/ls5_", yr, "_", prc, "_.tif")
+  writeRaster(tif_stack, filename)
+  system(paste0("aws s3 cp ", filename, " ", "s3://earthlab-amahood/data/missing_landsat_2008_Jun7/", substr(filename, 23, 42)))
+  a <- list.files("data/missing_ls_files", full.names = T)
+  file.remove(list.files("data/missing_ls_files", full.names = T))
+  file.remove(list.files("data/ls_tifs", full.names = T))
+}
 
 #### EXTRACT LANDSAT BAND VALUES TO POINTS - MODIFIED LOOP FROM WET_DRY_INITIAL_SCRIPT_SORTING_BY_DATE_FEB19 ####
 ###It's finally working! Dylan - 6/10/19
@@ -122,48 +156,66 @@ for(i in 1:length(years)){
 
 #### TAKING MEAN BAND VALUE FOR POINTS WHICH LIE IN MULTIPLE SCENES & COLLAPSING TO ONE POINT ####
 
+#grab vector of all unique objectid values as an iterator
 objectid_vec <- unique(result$OBJECTID)
 
-duplicated_vec <- duplicated(result$OBJECTID)
+#start counter at 1 at beginning of loop 
+counter = 1
 
-
+#loop over each objectid and year combo (unique to one time series point) and collapse duplicate points into one 
 for (i in 1:length(objectid_vec)) { 
+  
+  #grab one point's time series with a unique objectid (a set of points with differing years and potential duplicates)
   objectid_group <- result[result$OBJECTID == objectid_vec[i],]
+  
+  #grab years present in selected point's time series as a secondary iterator
+  point_years <- unique(objectid_group$plot_year)
+  
+  #loop over each year and isolate the points for each year within the time series for band value aggregation
+    for (j in 1:length(point_years)) {
+      
+      #check to make sure that the selected point has a time series & or duplicates
+      if (length(objectid_group$plot_year) > 1) {
+      
+      #select duplicated points from the same year which lie in more than one landsat scene 
+      objectid_pair <- objectid_group[objectid_group$plot_year == point_years[j],] 
+      
+      #aggregate band values from different scenes for the pair of duplicate points by taking the average 
+      objectid_pair <- objectid_pair %>% dplyr::mutate(sr_band1 = mean(objectid_pair$sr_band1),
+                                                       sr_band2 = mean(objectid_pair$sr_band2),
+                                                       sr_band3 = mean(objectid_pair$sr_band3),
+                                                       sr_band4 = mean(objectid_pair$sr_band4),
+                                                       sr_band5 = mean(objectid_pair$sr_band5),
+                                                       sr_band7 = mean(objectid_pair$sr_band7))
+      #remove duplicated point
+      objectid_pair <- objectid_pair[1,] 
+      
+      #create dataframe and attach collapsed point to it 
+      if(counter == 1){
+        result2 <- objectid_pair
+      }else{
+        result2 <- rbind(result2, objectid_pair)
+      }  
+      
+      #advance the counter value
+      counter <- counter + 1
+  } else {
+  
+  #if there is only one point for a particular objectid: attach the point to the main training dataframe 
+  #(this occurs when it burned too recently to have a time series and lies only within one scene),
+  if(counter == 1){
+    result2 <- objectid_group
+  }else{
+    result2 <- rbind(result2, objectid_group)
+  }
+  
+  #advance the counter and print message that aggregation is skipped
+  counter <- counter + 1
+  print("point lies within one scene only")
+  }
+  }
   }
 
-subtest <- result[result$OBJECTID == objectid_vec[i],]
+#check to ensure that the points have been collapsed and no points were lost/duplicated from the original plot data
+length(result2$OBJECTID) == length(gb_plots$OBJECTID)
 
-####MISSING LANDSAT FILES? START HERE####
-#find any missing landsat files
-for (i in 1:length(years)) {
-  for (j in 1:length(path_row_combos)) {
-    ls_files_annual <- str_subset(ls_files_list, pattern = fixed(years[i]))
-    ls_files_annual <- str_subset(ls_files_annual, pattern = fixed(path_row_combos[j]))
-    if(length(ls_files_annual) < 1) { 
-     print(paste0(years[i], path_row_combos[j], "missing")) 
-       }
-  }
-}
-
-
-missing_ls_files <- system("aws s3 ls s3://earthlab-amahood/data/missing_landsat_2008_Jun7/", intern = T)
-missing_ls_files <- missing_ls_files[-1]
-
-for (i in 1:length(missing_ls_files)) {
-  missing_ls_files[i] <- substr(missing_ls_files[i], 32, 100)
-  system(paste0("aws s3 cp s3://earthlab-amahood/data/missing_landsat_2008_Jun7/", missing_ls_files[i], " data/missing_ls_files/", missing_ls_files[i]))
-  yr <- substr(missing_ls_files[i], 11, 14)
-  prc <- substr(missing_ls_files[i], 5, 10)
-  exdir <- "data/ls_tifs"
-  dir.create(exdir)
-  untar(paste0("data/missing_ls_files/", missing_ls_files[i]), exdir = exdir)
-  tifs <- Sys.glob(paste0("data/ls_tifs/", "/*band*.tif"))
-  tif_stack <- stack(tifs)
-  names(tif_stack) <- c("sr_band1", "sr_band2", "sr_band3", "sr_band4", "sr_band5", "sr_band7")
-  filename <- paste0("data/missing_ls_files/ls5_", yr, "_", prc, "_.tif")
-  writeRaster(tif_stack, filename)
-  system(paste0("aws s3 cp ", filename, " ", "s3://earthlab-amahood/data/missing_landsat_2008_Jun7/", substr(filename, 23, 42)))
-  a <- list.files("data/missing_ls_files", full.names = T)
-  file.remove(list.files("data/missing_ls_files", full.names = T))
-  file.remove(list.files("data/ls_tifs", full.names = T))
-}
