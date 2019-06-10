@@ -219,3 +219,6 @@ for (i in 1:length(objectid_vec)) {
 #check to ensure that the points have been collapsed and no points were lost/duplicated from the original plot data
 length(result2$OBJECTID) == length(gb_plots$OBJECTID)
 
+#### EXTRACTING ANNUAL PRECIP DATA TO TRAINING POINT TIME SERIES ####
+
+
