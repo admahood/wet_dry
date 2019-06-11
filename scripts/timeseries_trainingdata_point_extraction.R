@@ -219,6 +219,43 @@ for (i in 1:length(objectid_vec)) {
 #check to ensure that the points have been collapsed and no points were lost/duplicated from the original plot data
 length(result2$OBJECTID) == length(gb_plots$OBJECTID)
 
+st_write(result2, "data/gb_plots_timeseries_w_landsat_noprecip_Jun11.gpkg")
+
+system("aws s3 cp data/gb_plots_timeseries_w_landsat_noprecip_Jun11.gpkg s3://earthlab-amahood/data/training_plots_timeseries/gb_plots_timeseries_w_landsat_noprecip_Jun11.gpkg")
 #### EXTRACTING ANNUAL PRECIP DATA TO TRAINING POINT TIME SERIES ####
+
+system("aws s3 cp s3://earthlab-amahood/data/training_plots_timeseries/gb_plots_timeseries_w_landsat_noprecip_Jun11.gpkg data/gb_plots_timeseries_w_landsat_noprecip_Jun11.gpkg")
+system("aws s3 sync s3://earthlab-amahood/data/PRISM_precip_annual data/precip_annual/greatbasin_trimmed_anomaly_training")
+
+gbd <- st_read("data/gb_plots_timeseries_w_landsat_noprecip_Jun11.gpkg", quiet=T) %>% mutate(year_factor = as.numeric(as.factor(gbd$plot_year)))
+  
+
+
+
+####create objects for full great basin precip anomaly rasters
+training_anomaly_paths <- list.files("data/precip_annual/greatbasin_trimmed_anomaly_training", full.names = T)
+training_anomaly <- list()
+for(i in 1:length(training_anomaly_paths)) {
+  training_anomaly[i] <- raster(training_anomaly_paths[i])
+}
+
+#### extract precip anomaly to training data points with matching year 
+precip_anomaly_vec <- c()
+for(i in 1:nrow(gbd)) {
+  precip_year <- as.numeric(gbd[i,]$year_factor)
+  precip_anomaly_vec[i] <- raster::extract(training_anomaly[[precip_year]], gbd[i,])
+}
+
+
+#### attach annual precip anomaly to gb training data
+gbd <- dplyr::mutate(gbd, precip_anomaly = precip_anomaly_vec) %>% select(-year_factor)
+
+#### save new blm data with precip as a spatially registered gpkg and upload to s3 (use this for future variable extraction)
+st_write(gbd, dsn = "data/gbd_plots_timeseries_w_landsat_and_precip_Jun11.gpkg")
+system("aws s3 cp data/gbd_plots_timeseries_w_landsat_and_precip_Jun11.gpkg s3://earthlab-amahood/data/training_plots_timeseries/gbd_plots_timeseries_w_landsat_and_precip_Jun11.gpkg")
+
+#### save new blm data with precip as a csv and upload to s3
+write.csv(gbd, file = "data/gbd_plots_timeseries_w_landsat_and_precip_Jun11.csv")
+system("aws s3 cp data/gbd_plots_timeseries_w_landsat_and_precip_Jun11.csv s3://earthlab-amahood/data/training_plots_timeseries/gbd_plots_timeseries_w_landsat_and_precip_Jun11.csv")
 
 
