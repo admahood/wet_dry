@@ -22,7 +22,7 @@ s3_terrain <- "s3://earthlab-amahood/data/terrain_2"
 local_terrain <- "data/terrain_reproj_full"
 #precip anomaly raster paths (cropped to NAIP scene already)
 s3_precip <- "s3://earthlab-amahood/data/PRISM_precip_annual/naip_trimmed_annual_precip_anomaly"
-local_precip <- "s3://earthlab-amahood/data/precip_annual/naip_trimmed_annual_precip_anomaly"
+local_precip <- "data/prism/naip_trimmed_annual_precip_anomaly"
 
 #s3 syncs 
 system(paste0("aws s3 sync ", s3_ls_path, " ", local_ls_path))
@@ -36,8 +36,8 @@ system("aws s3 sync s3://earthlab-amahood/data/landfire_urban_ag_water_mask/ dat
 #s3 syncs cont. (naip)
 system("aws s3 sync s3://earthlab-amahood/data/naip data/naip")
 
-#s3 syncs cont. (precip anomaly stuff)
-system("aws s3 sync s3://earthlab-amahood/data/PRISM_precip_annual data/prism")
+#s3 syncs cont. (precip anomaly stuff (trimmed to naip scenes for now))
+system(paste0("aws s3 sync ", s3_precip, " ", local_precip))
 
 #grab filenames for ls5 stacks 
 scene <- list.files("data/ls5_mucc")
@@ -137,7 +137,7 @@ foreach(i = scene_full,
           gc() 
           
           #make filename - change "frank"/"wmuc"/"kings" depending on naip scene used for extent
-          filenamet <- paste0("data/results/", "three_class_model_results_w_precip", "_wmuc_", year, "_Jun5", ".tif") 
+          filenamet <- paste0("data/results/", "tstrained_three_class_model_results_w_precip", "_wmuc_", year, "_Jun12", ".tif") 
           system(paste("echo", "filename created", i))
           
           #apply the RF model to raster stack and create "ls5_classed", an annual predicted sage/cheat raster!
@@ -150,7 +150,7 @@ foreach(i = scene_full,
           #save resulting land cover rasters and upload to s3
           writeRaster(ls5_classed, filename = filenamet, format = "GTiff", overwrite = T) 
           system(paste("echo", "file saved to disk"))
-          system(paste0("aws s3 cp ", filenamet, " s3://earthlab-amahood/data/summer19_model_results/Jun5_3class_modelrun_w_precip/wmuc/", substr(filenamet, 14, 150)))
+          system(paste0("aws s3 cp ", filenamet, " s3://earthlab-amahood/data/summer19_model_results/Jun12_tstrained_3class_modelrun_w_precip/wmuc/", substr(filenamet, 14, 150)))
           system(paste("echo", "aws sync done"))
           
         }
@@ -160,7 +160,7 @@ foreach(i = scene_full,
 #list results raster files
 dir.create("data/results")
 #change path below to desired model results folder on s3
-system("aws s3 sync s3://earthlab-amahood/data/summer19_model_results/Jun5_3class_modelrun_w_precip/ data/results")
+system("aws s3 sync s3://earthlab-amahood/data/summer19_model_results/Jun12_tstrained_3class_modelrun_w_precip/ data/results")
 
 #change "kings"/"frank"/"wmuc" to select results for a specific naip scene 
 all_years_files <- list.files("data/results/wmuc", pattern = "\\.tif$", full.names = T)
@@ -225,8 +225,8 @@ df2 <- df2 %>% mutate(year = c(1984:2011),
 
 ggplot(data=df2) + 
   aes(x = df2$year) + 
-  geom_point(aes(y=df2$percent_grass), color = 'darkgreen') + 
-  geom_smooth(aes(y=df2$percent_grass), color = 'darkgreen', method = "lm") +
+  geom_point(aes(y=df2$percent_mixed), color = 'darkgreen') + 
+  geom_smooth(aes(y=df2$percent_mixed), color = 'darkgreen', method = "lm") +
   xlab("year") +
   ylab("Sagebrush total pixels")
 
@@ -247,7 +247,7 @@ for (i in 1:length(years)) {
   rr <- as.data.frame(rrr, xy = TRUE)
   names(rr) <- c("x","y", "Prediction")
   nn <- lcc_rasters[i]
-  rr$year=as.numeric(substr(nn, 59, 62))
+  rr$year=as.numeric(substr(nn, 69, 72))
   ts_df[[i]]<-rr
 }
 
@@ -261,8 +261,6 @@ anim<-ggplot(ts_df, aes(x=x,y=y,fill=as.numeric(Prediction)))+
   labs(title = 'Year: {frame_time}') +
   transition_time(year)
 
-
-#this isnt working because I cannot install the "gifski" package since the Rust compiler is required and for some reason it will not let me install it from the command line on EC2...
 aa<-gganimate::animate(anim, fps=2, nframes = length(years))
 
 

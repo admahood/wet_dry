@@ -6,7 +6,7 @@
 
 #Packages
 
-libs <- c("raster", "sf", "dplyr", "tidyverse", "doParallel", "foreach", "stringr")
+libs  <- c("raster", "sf", "dplyr", "tidyverse", "doParallel", "foreach", "stringr")
 lapply(libs, library, character.only = TRUE, verbose = FALSE)
 
 #source scripts 
@@ -15,7 +15,7 @@ source("/home/rstudio/wet_dry/scripts/functions.R")
 
 # S3 syncs
 
-system("aws s3 cp s3://earthlab-amahood/data/training_plots_timeseries/gbd_plots_w_lyb_timeseries_Jun5.gpkg data/gbd_plots_w_lyb_timeseries_Jun3.gpkg")
+system("aws s3 cp s3://earthlab-amahood/data/training_plots_timeseries/gbd_plots_w_lyb_timeseries_Jun5.gpkg data/gbd_plots_w_lyb_timeseries_Jun5.gpkg")
 system("aws s3 sync s3://earthlab-amahood/data/WRS2_paths/wrs2_asc_desc /home/rstudio/wet_dry/data/WRS2_paths/wrs2_asc_desc")
 system("aws s3 sync s3://earthlab-amahood/data/landfire_esp_rcl /home/rstudio/wet_dry/data/landfire_esp_rcl")
 system("aws s3 sync s3://earthlab-amahood/data/BLM_AIM /home/rstudio/wet_dry/data/BLM_AIM")
@@ -31,7 +31,7 @@ exdir <- "data/scrap/"
 plot_data <- st_read("data/BLM_AIM/BLM_AIM_20161025.shp") #raw BLM plots for grabbing crs
 
 
-gb_plots <- st_read("data/gbd_plots_w_lyb_timeseries_Jun3.gpkg") %>% dplyr::select(-PATH, -ROW, -path_row)
+gb_plots <- st_read("data/gbd_plots_w_lyb_timeseries_Jun5.gpkg") %>% dplyr::select(-PATH, -ROW, -path_row)
 
 #create scenes object, reproject, get rid of rows we dont want 
 scenes <- st_read("data/WRS2_paths/wrs2_asc_desc/wrs2_asc_desc.shp")
@@ -88,6 +88,7 @@ for (i in 1:length(missing_ls_files)) {
 }
 
 #### EXTRACT LANDSAT BAND VALUES TO POINTS - MODIFIED LOOP FROM WET_DRY_INITIAL_SCRIPT_SORTING_BY_DATE_FEB19 ####
+
 ###It's finally working! Dylan - 6/10/19
 
 kounter = 1 #set counter to 1 at beginning of loop 
@@ -227,7 +228,7 @@ system("aws s3 cp data/gb_plots_timeseries_w_landsat_noprecip_Jun11.gpkg s3://ea
 system("aws s3 cp s3://earthlab-amahood/data/training_plots_timeseries/gb_plots_timeseries_w_landsat_noprecip_Jun11.gpkg data/gb_plots_timeseries_w_landsat_noprecip_Jun11.gpkg")
 system("aws s3 sync s3://earthlab-amahood/data/PRISM_precip_annual data/precip_annual/greatbasin_trimmed_anomaly_training")
 
-gbd <- st_read("data/gb_plots_timeseries_w_landsat_noprecip_Jun11.gpkg", quiet=T) %>% mutate(year_factor = as.numeric(as.factor(gbd$plot_year)))
+gbd <- st_read("data/gb_plots_timeseries_w_landsat_noprecip_Jun11.gpkg", quiet=T) %>% mutate(year_factor = as.numeric(as.factor(plot_year)))
   
 
 
