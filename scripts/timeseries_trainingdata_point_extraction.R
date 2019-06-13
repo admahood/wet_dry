@@ -231,7 +231,7 @@ system("aws s3 cp data/gb_plots_timeseries_w_landsat_noprecip_Jun13.gpkg s3://ea
 #### EXTRACTING ANNUAL PRECIP DATA TO TRAINING POINT TIME SERIES ####
 
 system("aws s3 cp s3://earthlab-amahood/data/training_plots_timeseries/gb_plots_timeseries_w_landsat_noprecip_Jun13.gpkg data/gb_plots_timeseries_w_landsat_noprecip_Jun13.gpkg")
-system("aws s3 sync s3://earthlab-amahood/data/PRISM_precip_annual data/precip_annual/greatbasin_trimmed_anomaly_training")
+system("aws s3 sync s3://earthlab-amahood/data/PRISM_precip_annual/greatbasin_trimmed_anomaly_training data/precip_annual/greatbasin_trimmed_anomaly_training")
 
 gbd <- st_read("data/gb_plots_timeseries_w_landsat_noprecip_Jun13.gpkg", quiet=T) %>% mutate(year_factor = as.numeric(as.factor(plot_year)))
   
@@ -257,11 +257,11 @@ for(i in 1:nrow(gbd)) {
 gbd <- dplyr::mutate(gbd, precip_anomaly = precip_anomaly_vec) %>% select(-year_factor)
 
 #### save new blm data with precip as a spatially registered gpkg and upload to s3 (use this for future variable extraction)
-st_write(gbd, dsn = "data/gbd_plots_timeseries_w_landsat_and_precip_Jun11.gpkg")
+st_write(gbd, dsn = "data/gbd_plots_timeseries_w_landsat_and_precip_Jun13.gpkg")
 system("aws s3 cp data/gbd_plots_timeseries_w_landsat_and_precip_Jun11.gpkg s3://earthlab-amahood/data/training_plots_timeseries/gbd_plots_timeseries_w_landsat_and_precip_Jun11.gpkg")
 
 #### save new blm data with precip as a csv and upload to s3
-write.csv(gbd, file = "data/gbd_plots_timeseries_w_landsat_and_precip_Jun11.csv")
+write.csv(gbd, file = "data/gbd_plots_timeseries_w_landsat_and_precip_Jun13.csv")
 system("aws s3 cp data/gbd_plots_timeseries_w_landsat_and_precip_Jun11.csv s3://earthlab-amahood/data/training_plots_timeseries/gbd_plots_timeseries_w_landsat_and_precip_Jun11.csv")
 
 
