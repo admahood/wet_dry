@@ -180,6 +180,7 @@ for (i in 1:length(objectid_vec)) {
       
       #select duplicated points from the same year which lie in more than one landsat scene 
       objectid_pair <- objectid_group[objectid_group$plot_year == point_years[j],] 
+      objectid_pair <- objectid_pair[!is.na(objectid_pair$sr_band1),]
       
       #aggregate band values from different scenes for the pair of duplicate points by taking the average 
       objectid_pair <- objectid_pair %>% dplyr::mutate(sr_band1 = mean(objectid_pair$sr_band1),
@@ -204,6 +205,7 @@ for (i in 1:length(objectid_vec)) {
   
   #if there is only one point for a particular objectid: attach the point to the main training dataframe 
   #(this occurs when it burned too recently to have a time series and lies only within one scene),
+  if(!is.na(objectid_group$sr_band1)) {
   if(counter == 1){
     result2 <- objectid_group
   }else{
@@ -211,8 +213,11 @@ for (i in 1:length(objectid_vec)) {
   }
   
   #advance the counter and print message that aggregation is skipped
-  counter <- counter + 1
   print("point lies within one scene only")
+  counter <- counter + 1
+  } else {
+    print("only one point, point lies outside of ls scene")
+  }
   }
   }
   }
@@ -220,15 +225,15 @@ for (i in 1:length(objectid_vec)) {
 #check to ensure that the points have been collapsed and no points were lost/duplicated from the original plot data
 length(result2$OBJECTID) == length(gb_plots$OBJECTID)
 
-st_write(result2, "data/gb_plots_timeseries_w_landsat_noprecip_Jun11.gpkg")
+st_write(result2, "data/gb_plots_timeseries_w_landsat_noprecip_Jun13.gpkg")
 
-system("aws s3 cp data/gb_plots_timeseries_w_landsat_noprecip_Jun11.gpkg s3://earthlab-amahood/data/training_plots_timeseries/gb_plots_timeseries_w_landsat_noprecip_Jun11.gpkg")
+system("aws s3 cp data/gb_plots_timeseries_w_landsat_noprecip_Jun13.gpkg s3://earthlab-amahood/data/training_plots_timeseries/gb_plots_timeseries_w_landsat_noprecip_Jun13.gpkg")
 #### EXTRACTING ANNUAL PRECIP DATA TO TRAINING POINT TIME SERIES ####
 
-system("aws s3 cp s3://earthlab-amahood/data/training_plots_timeseries/gb_plots_timeseries_w_landsat_noprecip_Jun11.gpkg data/gb_plots_timeseries_w_landsat_noprecip_Jun11.gpkg")
+system("aws s3 cp s3://earthlab-amahood/data/training_plots_timeseries/gb_plots_timeseries_w_landsat_noprecip_Jun13.gpkg data/gb_plots_timeseries_w_landsat_noprecip_Jun13.gpkg")
 system("aws s3 sync s3://earthlab-amahood/data/PRISM_precip_annual data/precip_annual/greatbasin_trimmed_anomaly_training")
 
-gbd <- st_read("data/gb_plots_timeseries_w_landsat_noprecip_Jun11.gpkg", quiet=T) %>% mutate(year_factor = as.numeric(as.factor(plot_year)))
+gbd <- st_read("data/gb_plots_timeseries_w_landsat_noprecip_Jun13.gpkg", quiet=T) %>% mutate(year_factor = as.numeric(as.factor(plot_year)))
   
 
 

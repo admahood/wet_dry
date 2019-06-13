@@ -36,9 +36,6 @@ system("aws s3 sync s3://earthlab-amahood/data/landfire_urban_ag_water_mask/ dat
 #s3 syncs cont. (naip)
 system("aws s3 sync s3://earthlab-amahood/data/naip data/naip")
 
-#s3 syncs cont. (precip anomaly stuff (trimmed to naip scenes for now))
-system(paste0("aws s3 sync ", s3_precip, " ", local_precip))
-
 #grab filenames for ls5 stacks 
 scene <- list.files("data/ls5_mucc")
 scene_full <- list.files("data/ls5_mucc", full.names = T)
@@ -137,11 +134,11 @@ foreach(i = scene_full,
           gc() 
           
           #make filename - change "frank"/"wmuc"/"kings" depending on naip scene used for extent
-          filenamet <- paste0("data/results/", "tstrained_three_class_model_results_w_precip", "_wmuc_", year, "_Jun12", ".tif") 
+          filenamet <- paste0("data/results/", "tstrained_three_class_model_results_w_precip", "_wmuc_", year, "_Jun13", ".tif") 
           system(paste("echo", "filename created", i))
           
           #apply the RF model to raster stack and create "ls5_classed", an annual predicted sage/cheat raster!
-          ls5_classed <- raster::predict(ls5, model, inf.rm = T, na.rm = T) #apply model of choice from list to stack and make predictions
+          ls5_classed <- raster::predict(ls5, model, inf.rm = T, na.rm = T,) #apply model of choice from list to stack and make predictions
           
           #progress check
           system(paste("echo", "model applied"))
@@ -150,7 +147,7 @@ foreach(i = scene_full,
           #save resulting land cover rasters and upload to s3
           writeRaster(ls5_classed, filename = filenamet, format = "GTiff", overwrite = T) 
           system(paste("echo", "file saved to disk"))
-          system(paste0("aws s3 cp ", filenamet, " s3://earthlab-amahood/data/summer19_model_results/Jun12_tstrained_3class_modelrun_w_precip/wmuc/", substr(filenamet, 14, 150)))
+          system(paste0("aws s3 cp ", filenamet, " s3://earthlab-amahood/data/summer19_model_results/Jun13_tstrained_3class_modelrun_w_precip2/wmuc/", substr(filenamet, 14, 150)))
           system(paste("echo", "aws sync done"))
           
         }
@@ -160,7 +157,7 @@ foreach(i = scene_full,
 #list results raster files
 dir.create("data/results")
 #change path below to desired model results folder on s3
-system("aws s3 sync s3://earthlab-amahood/data/summer19_model_results/Jun12_tstrained_3class_modelrun_w_precip/ data/results")
+system("aws s3 sync s3://earthlab-amahood/data/summer19_model_results/Jun13_tstrained_3class_modelrun_w_precip2/ data/results")
 
 #change "kings"/"frank"/"wmuc" to select results for a specific naip scene 
 all_years_files <- list.files("data/results/wmuc", pattern = "\\.tif$", full.names = T)

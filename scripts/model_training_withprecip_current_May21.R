@@ -65,9 +65,9 @@ if(nrow(gtrain[gtrain$binary == "Grass",])<nrow(gtrain[gtrain$binary == "Shrub",
 
 #cluster variable creation commented out because labelling happens when creating the time series now - Dylan, 6/12
 
-shrubs <- dplyr::filter(gtrain, SagebrushC + NonInvShru > 14 & InvAnnGras < 2) %>%mutate(cluster = 2);dim(shrubs)
+shrubs <- dplyr::filter(gtrain, SagebrushC  > 15  & InvAnnGras == 0) %>%mutate(cluster = 2);dim(shrubs)
 
-grasses <- dplyr::filter(gtrain, SagebrushC + NonInvShru < 14 & InvAnnGras > 5) %>%mutate(cluster= 1);dim(grasses)
+grasses <- dplyr::filter(gtrain, SagebrushC == 0 & InvAnnGras > 15) %>%mutate(cluster= 1);dim(grasses)
 
 #mixed <- dplyr::filter(gtrain, SagebrushC > 3 & InvAnnGras > 2) %>% mutate(cluster = 3);dim(mixed)
 
