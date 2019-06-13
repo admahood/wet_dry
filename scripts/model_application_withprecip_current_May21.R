@@ -260,5 +260,6 @@ anim<-ggplot(ts_df, aes(x=x,y=y,fill=as.numeric(Prediction)))+
 
 aa<-gganimate::animate(anim, fps=2, nframes = length(years))
 
+anim_save(aa, filename = "data/gifs/Jun13_modelrun1_wmuc.gif")
 
 

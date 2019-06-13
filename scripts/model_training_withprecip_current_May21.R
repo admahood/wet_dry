@@ -30,7 +30,7 @@ parameters <- ensemble_parameters[1,] # selecting just the balanced model for no
 
 #### 4.1: Create Training Data Class Labels - needs to be refined going forward 
 
-gtrain <- st_read("data/training_timeseries/gbd_plots_timeseries_w_landsat_and_precip_Jun11.gpkg") %>% st_set_geometry(NULL)
+gtrain <- st_read("data/training_timeseries/gbd_plots_timeseries_w_landsat_and_precip_Jun13.gpkg") %>% st_set_geometry(NULL)
 
 #### 4.1.1: old method of training class labelling - based on shrub cover attribute ####
 
