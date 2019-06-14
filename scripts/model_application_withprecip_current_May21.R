@@ -1,6 +1,6 @@
 # Title: Random Forest Model Application - GB Land Cover Classification Using Precip Anomaly
 # Author(s): Dylan Murphy
-# Date last modified: 5/23/19
+# Date last modified: 6/14/19
 
 #### 1.1: Setup - Load Packages/Source Scripts
 libs <- c("sf", "tidyverse", "raster", "rgdal", "rgeos", "foreach", "doParallel", "gdalUtils")
@@ -44,7 +44,7 @@ scene_full <- list.files("data/ls5_mucc", full.names = T)
 cores <- detectCores(all.tests = FALSE, logical = TRUE)
 registerDoParallel(cores)
 
-#### 2. Model Application Loop (Parallized)
+#### 2. Model Application Loop (Parallelized) ####
 
 #get landsat crs
 landsat <- stack(scene_full[1])
@@ -134,11 +134,11 @@ foreach(i = scene_full,
           gc() 
           
           #make filename - change "frank"/"wmuc"/"kings" depending on naip scene used for extent
-          filenamet <- paste0("data/results/", "tstrained_three_class_model_results_w_precip", "_wmuc_", year, "_Jun13", ".tif") 
+          filenamet <- paste0("data/results/", "tstrained_model_results_w_precip", "_wmuc_", year, "_Jun14", ".tif") 
           system(paste("echo", "filename created", i))
           
           #apply the RF model to raster stack and create "ls5_classed", an annual predicted sage/cheat raster!
-          ls5_classed <- raster::predict(ls5, model, inf.rm = T, na.rm = T,) #apply model of choice from list to stack and make predictions
+          ls5_classed <- raster::predict(ls5, model, inf.rm = T, na.rm = T) #apply model of choice from list to stack and make predictions
           
           #progress check
           system(paste("echo", "model applied"))
@@ -147,7 +147,7 @@ foreach(i = scene_full,
           #save resulting land cover rasters and upload to s3
           writeRaster(ls5_classed, filename = filenamet, format = "GTiff", overwrite = T) 
           system(paste("echo", "file saved to disk"))
-          system(paste0("aws s3 cp ", filenamet, " s3://earthlab-amahood/data/summer19_model_results/Jun13_tstrained_3class_modelrun_w_precip2/wmuc/", substr(filenamet, 14, 150)))
+          system(paste0("aws s3 cp ", filenamet, " s3://earthlab-amahood/data/summer19_model_results/Jun14_tstrained_modelrun_w_precip/wmuc/", substr(filenamet, 14, 150)))
           system(paste("echo", "aws sync done"))
           
         }
