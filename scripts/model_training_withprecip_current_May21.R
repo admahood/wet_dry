@@ -1,5 +1,5 @@
 #Script Title: randomForest model training with precipitation anomaly data & two methods of class labelling
-#Date Last Edited: 6/12/19
+#Date Last Edited: 6/13/19
 #Author(s): Dylan Murphy
 
 #### 1: Load Packages/Source scripts/set seed
@@ -92,7 +92,10 @@ for(i in 1:length(gtrain$plot_year)) {
 
 gtrain <- gtrain %>% 
   dplyr::select(sr_band1, sr_band2, sr_band3, sr_band4, sr_band5, sr_band7, elevation, slope, aspect, 
-                tpi, tri, roughness, flowdir, cluster, precip_anomaly, plot_year, cluster) %>%
+                tpi, tri, roughness, flowdir, 
+                #cluster, 
+                precip_anomaly, plot_year,
+                label) %>%
   dplyr::mutate(ndvi = get_ndvi(band3 = gtrain$sr_band3, band4 = gtrain$sr_band4),
                 evi = get_evi(band1 = gtrain$sr_band1, band3 = gtrain$sr_band3, band4 = gtrain$sr_band4),
                 savi = get_savi(band3 = gtrain$sr_band3, band4 = gtrain$sr_band4),
@@ -103,15 +106,38 @@ gtrain <- gtrain %>%
                 ndsvi = get_ndsvi(band3 = gtrain$sr_band3, band5 = gtrain$sr_band5),
                 satvi = get_satvi(band3 = gtrain$sr_band3, band5 = gtrain$sr_band5, band7 = gtrain$sr_band7, L = 0.5),
                 folded_aspect = get_folded_aspect(aspect = gtrain$aspect),
-                binary = as.factor(gtrain$cluster)) %>%
-  dplyr::select(-cluster, -aspect, -elevation, -plot_year)
+                binary = as.factor(gtrain$label)
+                ) %>%
+  dplyr::select(#-cluster,
+                -aspect, -elevation, -plot_year)
 
+if(nrow(gtrain[gtrain$binary == "grass",])<nrow(gtrain[gtrain$binary == "shrub",])){
+  gps <- gtrain[gtrain$binary == "grass",]
+  sps <- gtrain[gtrain$binary == "shrub",]
+  mps <- gtrain[gtrain$binary == "mixed",]
+  nsps <- sample_n(sps, nrow(gps))
+  gtrain <- rbind(gps,nsps, mps)
+}else{
+  gps <- gtrain[gtrain$binary == "grass",]
+  sps <- gtrain[gtrain$binary == "shrub",]
+  mps <- gtrain[gtrain$binary == "mixed",]
+  ngps <- sample_n(gps, nrow(sps))
+  gtrain <- rbind(sps,ngps, mps)
+}
 
+if(nrow(gtrain[gtrain$binary == "mixed",]) > nrow(gtrain[gtrain$binary == "shrub",])) {
+  sps <- gtrain[gtrain$binary == "shrub",]
+  gps <- gtrain[gtrain$binary == "grass",]
+  mps <- gtrain[gtrain$binary == "mixed",]
+  nmps <- sample_n(mps, nrow(sps))
+  gtrain <- rbind(sps, nmps, gps)
+}
 
+gtrain <- dplyr::select(gtrain, -binary)
 
 #### 4.2: Random Forest Model Training ####
 
-model <- randomForest(binary ~ . ,
+model2 <- randomForest(label ~ . ,
                       data = gtrain, 
                       ntree = 2000, 
                       mtry = parameters$mtry, 
