@@ -4,7 +4,7 @@
 #Last Modified: 6/28/19
 
 #1: Load Packages & Set Up
-libs <- c("raster", "sf", "dplyr")
+libs <- c("raster", "sf", "dplyr", "stringr")
 lapply(libs, library, character.only = TRUE, verbose = FALSE)
 
 #source scripts
@@ -26,9 +26,16 @@ system("aws s3 sync s3://earthlab-amahood/data/BLM_AIM /home/rstudio/wet_dry/dat
 
 #2. create objects and extract path/row combos to each point
 
+plot_data <- st_read("data/BLM_AIM/BLM_AIM_20161025.shp")
+
+
 esp_mask <- raster("data/landfire_esp_rcl/clipped_binary.tif")
 
-gb_plots <- st_read("data/training_points/progress_check_Jun28.shp") %>% st_transform(as.character(crs(esp_mask))) %>% mutate(ID = row_number())
+
+gb_plots <- st_read("data/training_points/humboldt_nv013_spb_finalpoints.shp") %>% st_transform(as.character(crs(esp_mask))) %>% mutate(ID = row_number())
+
+
+
 
 #create scene path/row object and remove unneccessary path/rows
 scenes <- st_read("data/WRS2_paths/wrs2_asc_desc/wrs2_asc_desc.shp")
@@ -38,6 +45,11 @@ scenes <- scenes[scenes$ROW<100,]
 #extract pathrow combos to points
 gb_plots <- st_intersection(gb_plots,scenes[,9:10])
 gb_plots$path_row <- as.character(paste0("0",gb_plots$PATH,"0",gb_plots$ROW)) 
+
+#remove points that lie in more than one scene (duplicated points from st_intersection)
+dupl_vec <- duplicated(gb_plots$ID)
+gb_plots <- gb_plots %>% mutate(duplicated = dupl_vec) 
+gb_plots <- gb_plots[gb_plots$duplicated == F,]
 
 #grab the years and path row combos needed
 
@@ -119,17 +131,20 @@ for(i in 1:length(years)){
 }
 
 #### 4. clean up points - remove points with NA extracted values and collapse duplicated points to mean band value ####
-duplicate_vec <- duplicated(result$ID)
+# duplicate_vec <- duplicated(result$ID)
+# 
+# result <- result %>% mutate(duplicated = duplicate_vec)  <- these are commented out for now because I am trying out just removing the duplicated points before extraction
+  
+#removing NA values (points along the outer edge of landsat scene)
+result <- result[!is.na(result$sr_band1),]
 
-result <- result %>% mutate(duplicated = duplicate_vec)
-  result <- result[!is.na(result$sr_band1),]
 
 
+# objectid_vec <- unique(result$ID)
+# 
+# counter = 1
 
-objectid_vec <- unique(result$ID)
-
-counter = 1
-
+#SKIP THE LOOP BELOW FOR NOW - TRYING TO JUST REMOVE DUPLICATE POINTS INSTEAD OF TAKING MEAN VALUE
 #loop over each objectid and year combo (unique to one time series point) and collapse duplicate points into one 
 for (i in 1:length(objectid_vec)) { 
   
@@ -215,13 +230,7 @@ for(i in 1:nrow(gbd)) {
 # attach annual precip anomaly to gb training data 
 gbd <- dplyr::mutate(gbd, precip_anomaly = precip_anomaly_vec) %>% dplyr::select(-year_factor)
 #### 5. TERRAIN EXTRACTION ####
-system("aws s3 sync s3://earthlab-amahood/data/LF_DEM /home/rstudio/wet_dry/data/terrain_2")
-
-ter_local <- '/home/rstudio/wet_dry/data/terrain_2'
-
-system(paste("aws s3 sync",
-             ter_s3,
-             ter_local))
+system("aws s3 sync s3://earthlab-amahood/data/terrain_2 /home/rstudio/wet_dry/data/terrain_2")
 
 df <- gbd
 
@@ -246,8 +255,8 @@ df$wetness <- wet7(df$sr_band1,df$sr_band2,df$sr_band3,df$sr_band4,df$sr_band5,d
 
 #### 7. Saving extracted points and pushing to s3 bucket ####
 
-st_write(df, dsn = "data/gbd_plots_manual_naip_test_Jul1.gpkg")
-system("aws s3 cp data/gbd_plots_manual_naip_test_Jul1.gpkg s3://earthlab-amahood/data/training_plots_timeseries/gbd_plots_manual_naip_test_Jul1.gpkg")
+st_write(df, dsn = "data/gbd_plots_manual_naip_test_humboldt_Jul2.gpkg")
+system("aws s3 cp data/gbd_plots_manual_naip_test_humboldt_Jul2.gpkg s3://earthlab-amahood/data/training_plots_timeseries/gbd_plots_manual_naip_test_humbdolt_Jul2.gpkg")
 
 
 

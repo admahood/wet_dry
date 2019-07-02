@@ -30,7 +30,7 @@ parameters <- ensemble_parameters[1,] # selecting just the balanced model for no
 
 #### 4.1: Create Training Data Class Labels - needs to be refined going forward 
 
-gtrain <- st_read("data/training_timeseries/gbd_plots_timeseries_w_landsat_and_precip_Jun13.gpkg") %>% st_set_geometry(NULL)
+gtrain <- st_read("data/training_timeseries/gbd_plots_manual_naip_test_humbdolt_Jul2.gpkg") %>% st_set_geometry(NULL)
 
 #### 4.1.1: old method of training class labelling - based on shrub cover attribute ####
 
@@ -135,12 +135,29 @@ if(nrow(gtrain[gtrain$binary == "mixed",]) > nrow(gtrain[gtrain$binary == "shrub
 
 gtrain <- dplyr::select(gtrain, -binary)
 
+#### 4.1.3: create training data using manually created points (already labelled)
+gtrain <- gtrain %>% 
+  # dplyr::mutate(total_shrubs = SagebrushC) %>% 
+  dplyr::select(sr_band1, sr_band2, sr_band3, sr_band4, sr_band5, sr_band7, ndvi, evi, savi, sr, greenness, 
+                brightness, wetness, 
+                # total_shrubs, 
+                elevation, slope, aspect, 
+                tpi, tri, roughness, flowdir, precip_anomaly, Label) %>%
+  dplyr::mutate(ndsvi = get_ndsvi(band3 = gtrain$sr_band3, band5 = gtrain$sr_band5),
+                satvi = get_satvi(band3 = gtrain$sr_band3, band5 = gtrain$sr_band5, band7 = gtrain$sr_band7, L = 0.5),
+                folded_aspect = get_folded_aspect(aspect = gtrain$aspect),
+                binary = Label
+                #binary = as.factor(ifelse(total_shrubs < parameters$sc, "Grass", "Shrub"))
+  ) %>%
+  dplyr::select(#-total_shrubs, 
+    - aspect,
+    -Label)
 #### 4.2: Random Forest Model Training ####
 
-model2 <- randomForest(label ~ . ,
+model2 <- randomForest(binary ~ . ,
                       data = gtrain, 
                       ntree = 2000, 
-                      mtry = parameters$mtry, 
+                      mtry = 10, 
                       nodesize = parameters$nodesize,
                       na.action = na.exclude
 )
