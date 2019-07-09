@@ -107,7 +107,7 @@ results <- foreach(i = 1:length(yy),
   #counter <- counter+1
 }
 
-results <- results[[c(1984:ymax)]]
+
 
 #gather last year burned results and create new dataframe from them (grouped by plot ID)
 final <-do.call("rbind", results) %>%
@@ -118,8 +118,8 @@ final <-do.call("rbind", results) %>%
   summarise(lyb = max(burn_year))
 
 #save and upload results to s3
-st_write(final, "lyb_gb_blm_plots.gpkg")
-system("aws s3 cp lyb_gb_blm_plots.gpkg s3://earthlab-amahood/data")
+st_write(final, "lyb_gb_naip_humboldt_sbp_plots.gpkg")
+system("aws s3 cp lyb_gb_naip_humboldt_sbp_plots.gpkg s3://earthlab-amahood/data/naip_trainingdata/lyb_gb_naip_humboldt_sbp_points.gpkg")
 
 #### attaching lyb info to gbd plots ####
 
