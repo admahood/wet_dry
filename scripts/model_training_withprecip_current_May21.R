@@ -30,7 +30,7 @@ parameters <- ensemble_parameters[1,] # selecting just the balanced model for no
 
 #### 4.1: Create Training Data Class Labels - needs to be refined going forward 
 
-gtrain <- st_read("data/training_timeseries/gbd_plots_manual_naip_test_humbdolt_Jul2.gpkg") %>% st_set_geometry(NULL)
+gtrain <- st_read("data/training_timeseries/gbd_plots_manual_naip_test_2006_humbdolt_Jul10.gpkg") %>% st_set_geometry(NULL)
 
 #### 4.1.1: old method of training class labelling - based on shrub cover attribute ####
 
@@ -135,7 +135,7 @@ if(nrow(gtrain[gtrain$binary == "mixed",]) > nrow(gtrain[gtrain$binary == "shrub
 
 gtrain <- dplyr::select(gtrain, -binary)
 
-#### 4.1.3: create training data using manually created points (already labelled)
+#### 4.1.3: create training data using manually created points (already labelled) ####
 gtrain <- gtrain %>% 
   # dplyr::mutate(total_shrubs = SagebrushC) %>% 
   dplyr::select(sr_band1, sr_band2, sr_band3, sr_band4, sr_band5, sr_band7, ndvi, evi, savi, sr, greenness, 

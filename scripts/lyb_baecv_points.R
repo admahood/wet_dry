@@ -1,6 +1,6 @@
 #Title: Last Year Burned Point Extraction 
 #Authors: Adam Mahood and Dylan Murphy
-#Last Modified: 5/31/19
+#Last Modified: 7/10/19
 
 #1. Set up
 #Load Packages
@@ -110,20 +110,26 @@ results <- foreach(i = 1:length(yy),
 
 
 #gather last year burned results and create new dataframe from them (grouped by plot ID)
-final <-do.call("rbind", results) %>%
-  dplyr::filter(burned > 0,
-                burn_year < plot_year) %>%
-  mutate(plot_ID = as.factor(OBJECTID)) %>% # change to plot ID
-  group_by(plot_ID) %>%
-  summarise(lyb = max(burn_year))
+final <-do.call("rbind", results) # change to plot ID
+  
+final <- final %>% dplyr::filter(burned > 0,
+                burn_year < plot_year) %>% 
+  group_by(OBJECTID) %>%
+  summarise(lyb = max(burn_year)) 
 
+final1 <- st_drop_geometry(final)
+dd1 <- st_drop_geometry(dd)
+
+final <- merge(dd1, final1, by = 'OBJECTID', all.x = T)
+
+lyb_filename <- "lyb_gb_naip_humboldt_sbp_plots.gpkg"
 #save and upload results to s3
-st_write(final, "lyb_gb_naip_humboldt_sbp_plots.gpkg")
+st_write(final, lyb_filename)
 system("aws s3 cp lyb_gb_naip_humboldt_sbp_plots.gpkg s3://earthlab-amahood/data/naip_trainingdata/lyb_gb_naip_humboldt_sbp_points.gpkg")
 
 #### attaching lyb info to gbd plots ####
 
-#get original blm plot data and remove extracted band values
+#FOR BLM DATA get original blm plot data and remove extracted band values
 gbd <- st_read(gpkg_file) %>%
   dplyr::select(-sr_band1,
                 -mean_sr_band1,
@@ -142,22 +148,25 @@ gbd <- st_read(gpkg_file) %>%
                 -greenness, -wetness, -brightness) %>%
   st_transform(st_crs(baecv_crs))
 
+#FOR NAIP MANUALLY CREATED DATA
+gbd <- st_read(gpkg_file) %>% st_transform(st_crs(baecv_crs)) %>% mutate(OBJECTID = rownames(gbd))
+
 #make gbd into a data frame without spatial info
 gbd1 <- gbd %>% st_drop_geometry()
 
 #make last year burned into a data frame without spatial info
-lyb <- st_read("lyb_gb_blm_plots.gpkg")
+lyb <- st_read(lyb_filename)
 lyb1 <- lyb %>% st_drop_geometry()
 
 #merge lyb info to gbd data using object id to match plots
-gbd_lyb <- merge(gbd, lyb, by = "OBJECTID", all = T)
+gbd_lyb <- merge(gbd1, lyb1, by = "OBJECTID", all = T)
 
 #reattach geometry to point data
 gbd_lyb <- st_set_geometry(gbd_lyb, st_geometry(gbd))
 
 #save and upload to s3
-st_write(gbd_lyb, "data/gbd_plots_w_lyb_May31.gpkg")
-system("aws s3 cp data/gbd_plots_w_lyb_May31.gpkg s3://earthlab-amahood/data/gbd_plots_w_lyb_May31.gpkg")
+st_write(gbd_lyb, "data/naip_nv013_humboldt_points_w_lyb_July10.gpkg")
+system("aws s3 cp data/naip_nv013_humboldt_points_w_lyb_July10.gpkg s3://earthlab-amahood/data/naip_trainingdata/naip_nv013_humboldt_points_w_lyb_July10.gpkg")
 
 
 

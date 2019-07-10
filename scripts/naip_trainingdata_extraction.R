@@ -1,7 +1,7 @@
 #Title: Manual Training Data Raster Extraction to Points
 #Author(s): Dylan Murphy
 #Started: 6/28/19
-#Last Modified: 6/28/19
+#Last Modified: 7/10/19
 
 #1: Load Packages & Set Up
 libs <- c("raster", "sf", "dplyr", "stringr")
@@ -32,7 +32,7 @@ plot_data <- st_read("data/BLM_AIM/BLM_AIM_20161025.shp")
 esp_mask <- raster("data/landfire_esp_rcl/clipped_binary.tif")
 
 
-gb_plots <- st_read("data/training_points/humboldt_nv013_spb_finalpoints.shp") %>% st_transform(as.character(crs(esp_mask))) %>% mutate(ID = row_number())
+gb_plots <- st_read("data/training_points/humboldt_nv013_spb_finalpoints_2006.gpkg") %>% st_transform(as.character(crs(esp_mask))) %>% mutate(ID = row_number())
 
 
 
@@ -206,7 +206,9 @@ for (i in 1:length(objectid_vec)) {
 
 #### 5. PRECIP ANOMALY EXTRACTION ####
 system("aws s3 cp s3://earthlab-amahood/data/training_plots_timeseries/gb_plots_timeseries_w_landsat_noprecip_Jun13.gpkg data/gb_plots_timeseries_w_landsat_noprecip_Jun13.gpkg")
-system("aws s3 sync s3://earthlab-amahood/data/PRISM_precip_annual/greatbasin_trimmed_anomaly_training data/precip_annual/greatbasin_trimmed_anomaly_training")
+
+#change year in path to year of interest for extraction 
+system("aws s3 cp s3://earthlab-amahood/data/PRISM_precip_annual/greatbasin_trimmed_anomaly_training/precip_anomaly_train2006.tif data/precip_annual/greatbasin_trimmed_anomaly_training/")
 
 result2 <- result2 %>% mutate(year_factor = as.numeric(as.factor(Year)))
 gbd <- result2
@@ -255,10 +257,39 @@ df$wetness <- wet7(df$sr_band1,df$sr_band2,df$sr_band3,df$sr_band4,df$sr_band5,d
 
 #### 7. Saving extracted points and pushing to s3 bucket ####
 
-st_write(df, dsn = "data/gbd_plots_manual_naip_test_humboldt_Jul2.gpkg")
-system("aws s3 cp data/gbd_plots_manual_naip_test_humboldt_Jul2.gpkg s3://earthlab-amahood/data/training_plots_timeseries/gbd_plots_manual_naip_test_humbdolt_Jul2.gpkg")
+st_write(df, dsn = "data/gbd_plots_manual_naip_test_2006_humboldt_Jul10.gpkg")
+system("aws s3 cp data/gbd_plots_manual_naip_test_2006_humboldt_Jul10.gpkg s3://earthlab-amahood/data/training_plots_timeseries/gbd_plots_manual_naip_test_2006_humbdolt_Jul10.gpkg")
 
 
+#### 8. Changing Point Labels for different years based on fire history ####
 
+#download manually created NAIP point data from s3
+system("aws s3 sync s3://earthlab-amahood/data/naip_trainingdata data/plot_data")
 
+#read in original (2010) NAIP training data w/ lyb attached
+naip_points <- st_read("data/plot_data/naip_nv013_humboldt_points_w_lyb_July10.gpkg") %>% mutate(plot_year = 2010)
 
+#create new object to modify for a new year of labelling (change year in "mutate" to year desired for modeling/labelling)
+new_naip_points <- naip_points %>% mutate(plot_year = 2006) %>% 
+  filter(plot_year != lyb | is.na(lyb)) #removing points which burned in the year of interest and keeping those that did not burn
+
+new_labels_vec <- c()
+
+#loop through each point and determine whether a steady state can be assumed for the year of choice 
+# (because sagebrush takes a long time to establish, even if it burned in between the target year and 
+#the year of original labelling (2010) I assume it was sagebrush in the target year)
+
+for(i in 1:nrow(new_naip_points)) {
+  if(isTRUE(new_naip_points[i,]$lyb > 2006 & new_naip_points[i,]$Label == "grass")) {
+  new_naip_points <- new_naip_points[-i,]
+  }
+}
+
+#create filename for new points (change year to match year of interest)
+new_year_naip_filename <- "data/humboldt_nv013_spb_finalpoints_2006.gpkg"
+
+st_write(new_naip_points, new_year_naip_filename)
+
+system(paste0("aws s3 cp ", new_year_naip_filename, " s3://earthlab-amahood/data/naip_trainingdata/", substr(new_year_naip_filename, 6, 100)))
+
+       
