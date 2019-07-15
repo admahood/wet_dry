@@ -140,9 +140,10 @@ gtrain <- gtrain %>%
   # dplyr::mutate(total_shrubs = SagebrushC) %>% 
   dplyr::select(sr_band1, sr_band2, sr_band3, sr_band4, sr_band5, sr_band7, ndvi, evi, savi, sr, greenness, 
                 brightness, wetness, 
-                # total_shrubs, 
+                total_shrubs, 
                 elevation, slope, aspect, 
-                tpi, tri, roughness, flowdir, precip_anomaly, Label) %>%
+                tpi, tri, roughness, flowdir, 
+                precip_anomaly, Label) %>%
   dplyr::mutate(ndsvi = get_ndsvi(band3 = gtrain$sr_band3, band5 = gtrain$sr_band5),
                 satvi = get_satvi(band3 = gtrain$sr_band3, band5 = gtrain$sr_band5, band7 = gtrain$sr_band7, L = 0.5),
                 folded_aspect = get_folded_aspect(aspect = gtrain$aspect),

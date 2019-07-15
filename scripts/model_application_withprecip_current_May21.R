@@ -95,7 +95,7 @@ foreach(i = scene_full,
           system(paste("echo", "veg indices and tassel cap created", i))
           
           #create stack of ls5 data, terrain data, and precip anomaly
-          ls5 <- stack(ls5, 
+          ls5 <- stack(ls5) 
                        ter, 
                        precip)
           
@@ -122,9 +122,11 @@ foreach(i = scene_full,
           names(ls5) <- c("sr_band1", "sr_band2", "sr_band3", "sr_band4", 
                           "sr_band5", "sr_band7", "wetness", "brightness", 
                           "greenness",  "ndvi", "savi", "sr", "evi",
-                          "ndsvi", "satvi", "flowdir", "folded_aspect", "elevation",
+                          "ndsvi", "satvi", 
+                          "flowdir", "folded_aspect", "elevation",
                           "roughness", "slope", "tpi", "tri", 
-                          "precip_anomaly")
+                          "precip_anomaly"
+                          )
           
           #progress check for stack creation
           system(paste("echo", "stack created"))
@@ -134,7 +136,7 @@ foreach(i = scene_full,
           gc() 
           
           #make filename - change "frank"/"wmuc"/"kings" depending on naip scene used for extent
-          filenamet <- paste0("data/results/", "naippoints_humboldt_2006_sbp_test", "_wmuc_", year, "_Jul10", ".tif") 
+          filenamet <- paste0("data/results/", "naippoints_humboldt_2006_sbp_test_noterrain", "_wmuc_", year, "_Jul15", ".tif") 
           system(paste("echo", "filename created", i))
           
           #apply the RF model to raster stack and create "ls5_classed", an annual predicted sage/cheat raster!
@@ -147,7 +149,7 @@ foreach(i = scene_full,
           #save resulting land cover rasters and upload to s3
           writeRaster(ls5_classed, filename = filenamet, format = "GTiff", overwrite = T) 
           system(paste("echo", "file saved to disk"))
-          system(paste0("aws s3 cp ", filenamet, " s3://earthlab-amahood/data/summer19_model_results/Jul10_naippoints_humboldt_2006_sbp_test/wmuc/", substr(filenamet, 14, 150)))
+          system(paste0("aws s3 cp ", filenamet, " s3://earthlab-amahood/data/summer19_model_results/Jul15_naippoints_humboldt_2006_sbp_test_noterrain/wmuc/", substr(filenamet, 14, 150)))
           system(paste("echo", "aws sync done"))
           
         }
@@ -157,7 +159,7 @@ foreach(i = scene_full,
 #list results raster files
 dir.create("data/results")
 #change path below to desired model results folder on s3
-system("aws s3 sync s3://earthlab-amahood/data/summer19_model_results/Jun13_tstrained_3class_modelrun_w_precip2/ data/results")
+system("aws s3 sync s3://earthlab-amahood/data/summer19_model_results/Jul15_naippoints_humboldt_2006_sbp_test_noterrain_noprecip/ data/results")
 
 #change "kings"/"frank"/"wmuc" to select results for a specific naip scene 
 all_years_files <- list.files("data/results/wmuc", pattern = "\\.tif$", full.names = T)
@@ -232,7 +234,7 @@ anim_libs <- c("gganimate","gifski")
 lapply(anim_libs, install.packages, character.only = TRUE, verbose = FALSE)
 lapply(anim_libs, library, character.only = TRUE, verbose = FALSE)
 
-lcc_rasters <- list.files("data/results/", pattern = "\\.tif$", full.names = T)
+lcc_rasters <- list.files("data/results/wmuc", pattern = "\\.tif$", full.names = T)
 
 lcc_stack <- stack(lcc_rasters)
 
@@ -244,7 +246,7 @@ for (i in 1:length(years)) {
   rr <- as.data.frame(rrr, xy = TRUE)
   names(rr) <- c("x","y", "Prediction")
   nn <- lcc_rasters[i]
-  rr$year=as.numeric(substr(nn, 49, 52))
+  rr$year=as.numeric(years[i])
   ts_df[[i]]<-rr
 }
 
@@ -258,8 +260,11 @@ anim<-ggplot(ts_df, aes(x=x,y=y,fill=as.numeric(Prediction)))+
   labs(title = 'Year: {frame_time}') +
   transition_time(year)
 
-aa<-gganimate::animate(anim, fps=2, nframes = length(years))
+aa<-gganimate::animate(anim, fps=1, nframes = length(years))
 
-anim_save(aa, filename = "data/gifs/Jun13_modelrun1_wmuc.gif")
+anim_save(aa, filename = "data/gifs/Jul15_naippoints_humboldt_2006_sbp_test_noterrain_noprecip.gif")
+
+system("aws s3 cp data/gifs/Jul15_naippoints_humboldt_2006_sbp_test_noterrain_noprecip.gif s3://earthlab-amahood/data/summer19_model_results/animations/")
+
 
 
