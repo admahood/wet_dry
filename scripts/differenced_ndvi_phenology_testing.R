@@ -16,6 +16,9 @@ dir.create("data/phenology")
 # Pull Data from AWS S3 
 system("aws s3 sync s3://earthlab-amahood/data/landsat_phenology data/phenology")
 
+# Source scripts (functions)
+source("scripts/functions.R")
+
 #### 2. Data Prep ####
 ls_scene_paths <- list.files("data/phenology", full.names = T)
 years <- 1984:2011
@@ -27,8 +30,8 @@ ls_phenology_rasters <- list()
 for(i in 1:length(ls_scene_paths)) {
   year <- substr(ls_scene_paths[i], 26, 29)
   untar(ls_scene_paths[i], exdir = paste0("data/phenology/tifs"))
-  ls_tifs <- list.files(paste0("data/phenology/tifs", year), pattern = "\\.tif$", full.names = T)
-  ls_phenology_rasters[i] <- stack(ls_tifs)
-  file.remove(list.files("data/phenology/tifs", full.names = T))
   }
+
+ls_tifs <- list.files(paste0("data/phenology/tifs", year), pattern = "\\.tif$", full.names = T)
+ls_phenology_rasters[i] <- stack(ls_tifs)
 

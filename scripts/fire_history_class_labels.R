@@ -1,6 +1,6 @@
 # Title: Time Series Class Labels for Cheatgrass/Sagebrush Based on Fire History
 # Author(s): Dylan Murphy
-# Date last modified: 
+# Date last modified: June 2019
 
 #### Set Up: Load Packages and pull data from s3
 
