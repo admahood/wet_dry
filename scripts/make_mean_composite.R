@@ -1,6 +1,6 @@
 #Title: Creating Mean Composite Images from Landsat Analysis Ready Data (ARD)
 #Author(s): Adam Mahood, Dylan Murphy
-#Date Created: 7/20/19
+#Date Created: 7/18/19
 #Date last modified: 7/19/19
 
 
