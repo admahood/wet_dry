@@ -1,7 +1,7 @@
 #Title: Creating Mean Composite Images from Landsat Analysis Ready Data (ARD)
 #Author(s): Adam Mahood, Dylan Murphy
 #Date Created: 7/18/19
-#Date last modified: 7/19/19
+#Date last modified: 7/22/19
 
 
 #### 1. Set Up ####
@@ -147,6 +147,6 @@ for(b in 1:6){
   writeRaster(calcd_stk, filename = filename)
   
   #upload to s3 bucket
-  system(paste0("aws s3 cp ", filename, " ", ls_ard_path_s3, "mean_composites/", filename_short))
+  system(paste0("aws s3 cp ", filename, " ", "s3://earthlab-amahood/wet_dry/derived_raster_data", "mean_composites/", filename_short))
   
 }
