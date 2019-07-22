@@ -25,7 +25,7 @@ mean_comp_local <- "data/mean_composites"
 system(paste0("aws s3 sync ", mean_comp_s3, " ", mean_comp_local))
 
 #### 2. Create Differenced spring/summer NDVI rasters ####
-diff_ndvi_destination <- "s3://earthlab-amahood/wet_dry/derived_raster_data/differenced_ndvi/"
+diff_ndvi_destination <- "s3://earthlab-amahood/wet_dry/derived_raster_data/differenced_indices/ndvi/"
 
 mean_composites <- list.files("data/mean_composites", full.names = T)
 
@@ -64,7 +64,8 @@ for(i in 1:length(years)) {
 #### 3. OTHER DIFFERENCED VEG INDICES: ####
 
 #### DIFFERENCED SAVI ####
-diff_savi_destination <- "s3://earthlab-amahood/wet_dry/derived_raster_data/differenced_savi/"
+diff_savi_destination <- "s3://earthlab-amahood/wet_dry/derived_raster_data/differenced_indices/savi/"
+dir.create("data/diff_savi")
 
 for(i in 1:length(years)) {
   spring <- str_subset(mean_composites, pattern = fixed("spring"))
@@ -94,7 +95,8 @@ for(i in 1:length(years)) {
 
 
 #### DIFFERENCED SR ####
-diff_sr_destination <- "s3://earthlab-amahood/wet_dry/derived_raster_data/differenced_sr/"
+diff_sr_destination <- "s3://earthlab-amahood/wet_dry/derived_raster_data/differenced_indices/sr/"
+dir.create("data/diff_sr")
 
 for(i in 1:length(years)) {
   spring <- str_subset(mean_composites, pattern = fixed("spring"))
@@ -123,7 +125,8 @@ for(i in 1:length(years)) {
 }
 #### DIFFERENCED NDSVI ####
 
-diff_ndsvi_destination <- "s3://earthlab-amahood/wet_dry/derived_raster_data/differenced_ndsvi/"
+diff_ndsvi_destination <- "s3://earthlab-amahood/wet_dry/derived_raster_data/differenced_indices/ndsvi/"
+dir.create("data/diff_ndsvi")
 
 for(i in 1:length(years)) {
   spring <- str_subset(mean_composites, pattern = fixed("spring"))
@@ -135,7 +138,7 @@ for(i in 1:length(years)) {
   summer <- stack(str_subset(summer, pattern = fixed(years[i])))
   names(summer) <- c("sr_band1","sr_band2","sr_band3","sr_band4","sr_band5","sr_band7")
   
-  spr_ndsvi <- get_ndsvi(band3 = spring$sr_band3, band4 = spring$sr_band4)
+  spr_ndsvi <- get_ndsvi(band3 = spring$sr_band3, band5 = spring$sr_band5)
   smr_ndsvi <- get_ndsvi(band3 = summer$sr_band3, band5 = summer$sr_band5)
   
   diff_ndsvi = spr_ndsvi - smr_ndsvi
@@ -155,7 +158,8 @@ for(i in 1:length(years)) {
 
 
 #### DIFFERENCED EVI ####
-diff_evi_destination <- "s3://earthlab-amahood/wet_dry/derived_raster_data/differenced_evi/"
+diff_evi_destination <- "s3://earthlab-amahood/wet_dry/derived_raster_data/differenced_indices/evi/"
+dir.create("data/diff_evi")
 
 for(i in 1:length(years)) {
   spring <- str_subset(mean_composites, pattern = fixed("spring"))
@@ -186,7 +190,8 @@ for(i in 1:length(years)) {
 
 
 #### DIFFERENCED SATVI ####
-diff_satvi_destination <- "s3://earthlab-amahood/wet_dry/derived_raster_data/differenced_satvi/"
+diff_satvi_destination <- "s3://earthlab-amahood/wet_dry/derived_raster_data/differenced_indices/satvi/"
+dir.create("data/diff_satvi")
 
 for(i in 1:length(years)) {
   spring <- str_subset(mean_composites, pattern = fixed("spring"))
@@ -213,5 +218,4 @@ for(i in 1:length(years)) {
   rm(spring, summer, spr_satvi, smr_satvi, diff_satvi)
   gc()
 }
-
 
