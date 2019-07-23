@@ -24,8 +24,7 @@ mean_comp_local <- "data/mean_composites"
 
 system(paste0("aws s3 sync ", mean_comp_s3, " ", mean_comp_local))
 
-#### 2. Create Differenced spring/summer NDVI rasters ####
-diff_ndvi_destination <- "s3://earthlab-amahood/wet_dry/derived_raster_data/differenced_indices/ndvi/"
+#create "years" and "mean composites" iterators for looping
 
 mean_composites <- list.files("data/mean_composites", full.names = T)
 
@@ -34,6 +33,9 @@ for(i in 1:length(mean_composites)) {
   years[i] <- substr(mean_composites[i], 25, 28)
 }
 years <- unique(years)
+
+#### 2. Create Differenced spring/summer NDVI rasters ####
+diff_ndvi_destination <- "s3://earthlab-amahood/wet_dry/derived_raster_data/differenced_indices/ndvi/"
 
 for(i in 1:length(years)) {
   spring <- str_subset(mean_composites, pattern = fixed("spring"))
