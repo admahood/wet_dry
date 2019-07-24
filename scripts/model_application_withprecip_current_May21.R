@@ -51,8 +51,7 @@ landsat <- stack(scene_full[1])
 crs <- crs(landsat)
 
 #create naip scene raster object for cropping 
-naip <- raster("data/naip/m_4011703_ne_11_1_20100704.tif") %>% projectRaster(crs = crs, res = 30) #wmuc
-#naip <- raster("data/naip/n_4111761_nw_11_1_20060813.tif") %>% projectRaster(crs = crs, res = 30) #frank
+naip <- raster("data/naip/m_4011703_ne_11_1_20100704.tif") %>% projectRaster(crs = crs, res = 30) #wmuc#naip <- raster("data/naip/n_4111761_nw_11_1_20060813.tif") %>% projectRaster(crs = crs, res = 30) #frank
 #naip <- raster("data/naip/m_4111823_sw_11_1_20100628.tif") %>% projectRaster(crs = crs, res = 30) #kings
 #parallelized model application loop
 foreach(i = scene_full, 
@@ -95,7 +94,7 @@ foreach(i = scene_full,
           system(paste("echo", "veg indices and tassel cap created", i))
           
           #create stack of ls5 data, terrain data, and precip anomaly
-          ls5 <- stack(ls5) 
+          ls5 <- stack(ls5, 
                        ter, 
                        precip)
           

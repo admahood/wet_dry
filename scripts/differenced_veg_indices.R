@@ -48,9 +48,12 @@ for(i in 1:length(years)) {
   names(summer) <- c("sr_band1","sr_band2","sr_band3","sr_band4","sr_band5","sr_band7")
   
   spr_ndvi <- get_ndvi(band3 = spring$sr_band3, band4 = spring$sr_band4)
+  spr_ndvi[spr_ndvi > 1 | spr_ndvi < -1] <- NA
   smr_ndvi <- get_ndvi(band3 = summer$sr_band3, band4 = summer$sr_band4)
+  smr_ndvi[smr_ndvi > 1 | smr_ndvi < -1] <- NA
   
   diff_ndvi = spr_ndvi - smr_ndvi
+  
   
   filename <- paste0("data/diff_ndvi/diff_ndvi_", years[i], ".tif")
   filename_short <- paste0("diff_ndvi_", years[i], ".tif")
@@ -80,7 +83,9 @@ for(i in 1:length(years)) {
   names(summer) <- c("sr_band1","sr_band2","sr_band3","sr_band4","sr_band5","sr_band7")
   
   spr_savi <- get_savi(band3 = spring$sr_band3, band4 = spring$sr_band4)
+  spr_savi[spr_savi > 1 | spr_savi < -1] <- NA
   smr_savi <- get_savi(band3 = summer$sr_band3, band4 = summer$sr_band4)
+  smr_savi[smr_savi > 1 | smr_savi < -1] <- NA
   
   diff_savi = spr_savi - smr_savi
   
@@ -141,7 +146,9 @@ for(i in 1:length(years)) {
   names(summer) <- c("sr_band1","sr_band2","sr_band3","sr_band4","sr_band5","sr_band7")
   
   spr_ndsvi <- get_ndsvi(band3 = spring$sr_band3, band5 = spring$sr_band5)
+  spr_ndsvi[spr_ndsvi > 1 | spr_ndsvi < -1] <- NA
   smr_ndsvi <- get_ndsvi(band3 = summer$sr_band3, band5 = summer$sr_band5)
+  smr_ndsvi[smr_ndsvi > 1 | smr_ndsvi < -1] <- NA
   
   diff_ndsvi = spr_ndsvi - smr_ndsvi
   
@@ -174,7 +181,9 @@ for(i in 1:length(years)) {
   names(summer) <- c("sr_band1","sr_band2","sr_band3","sr_band4","sr_band5","sr_band7")
   
   spr_evi <- get_evi(band1 = spring$sr_band1, band3 = spring$sr_band3, band4 = spring$sr_band4)
+  spr_evi[spr_evi > 2 | spr_evi < -2] <- NA
   smr_evi <- get_evi(band1 = summer$sr_band1, band3 = summer$sr_band3, band4 = summer$sr_band4)
+  smr_evi[smr_evi > 2 | smr_evi < -2] <- NA
   
   diff_evi = spr_evi - smr_evi
   
