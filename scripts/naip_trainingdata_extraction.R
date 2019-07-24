@@ -3,7 +3,7 @@
 #Started: 6/28/19
 #Last Modified: 7/10/19
 
-#1: Load Packages & Set Up
+#### 1: Load Packages & Set Up ####
 libs <- c("raster", "sf", "dplyr", "stringr")
 lapply(libs, library, character.only = TRUE, verbose = FALSE)
 
@@ -24,7 +24,7 @@ system("aws s3 sync s3://earthlab-amahood/data/WRS2_paths/wrs2_asc_desc /home/rs
 system("aws s3 sync s3://earthlab-amahood/data/landfire_esp_rcl /home/rstudio/wet_dry/data/landfire_esp_rcl")
 system("aws s3 sync s3://earthlab-amahood/data/BLM_AIM /home/rstudio/wet_dry/data/BLM_AIM")
 
-#2. create objects and extract path/row combos to each point
+#### 2. create objects and extract path/row combos to each point ####
 
 plot_data <- st_read("data/BLM_AIM/BLM_AIM_20161025.shp")
 
@@ -144,7 +144,7 @@ result <- result[!is.na(result$sr_band1),]
 # 
 # counter = 1
 
-#SKIP THE LOOP BELOW FOR NOW - TRYING TO JUST REMOVE DUPLICATE POINTS INSTEAD OF TAKING MEAN VALUE
+#### 4.1 SKIP THE LOOP IN THIS SECTION FOR NOW - TRYING TO JUST REMOVE DUPLICATE POINTS INSTEAD OF TAKING MEAN VALUE####
 #loop over each objectid and year combo (unique to one time series point) and collapse duplicate points into one 
 for (i in 1:length(objectid_vec)) { 
   
@@ -231,7 +231,7 @@ for(i in 1:nrow(gbd)) {
 
 # attach annual precip anomaly to gb training data 
 gbd <- dplyr::mutate(gbd, precip_anomaly = precip_anomaly_vec) %>% dplyr::select(-year_factor)
-#### 5. TERRAIN EXTRACTION ####
+#### 6. TERRAIN EXTRACTION ####
 system("aws s3 sync s3://earthlab-amahood/data/terrain_2 /home/rstudio/wet_dry/data/terrain_2")
 
 df <- gbd
@@ -244,7 +244,7 @@ df$tri <- raster::extract(raster("data/terrain_2/TRI.tif"), df)
 df$roughness <- raster::extract(raster("data/terrain_2/roughness.tif"), df)
 df$flowdir <- raster::extract(raster("data/terrain_2/flowdir.tif"), df)
 
-#### 6. VEG INDICES AND TASSELLED CAP VARIABLE CALCULATION ####
+#### 7. VEG INDICES AND TASSELLED CAP VARIABLE CALCULATION ####
 
 df$ndvi <- get_ndvi(df$sr_band3,df$sr_band4)
 df$evi <- get_evi(df$sr_band1, df$sr_band3, df$sr_band4)
@@ -255,13 +255,13 @@ df$greenness <- green7(df$sr_band1,df$sr_band2,df$sr_band3,df$sr_band4,df$sr_ban
 df$brightness <- bright7(df$sr_band1,df$sr_band2,df$sr_band3,df$sr_band4,df$sr_band5,df$sr_band7)
 df$wetness <- wet7(df$sr_band1,df$sr_band2,df$sr_band3,df$sr_band4,df$sr_band5,df$sr_band7)
 
-#### 7. Saving extracted points and pushing to s3 bucket ####
+#### 8. Saving extracted points and pushing to s3 bucket ####
 
 st_write(df, dsn = "data/gbd_plots_manual_naip_test_2006_humboldt_Jul10.gpkg")
 system("aws s3 cp data/gbd_plots_manual_naip_test_2006_humboldt_Jul10.gpkg s3://earthlab-amahood/data/training_plots_timeseries/gbd_plots_manual_naip_test_2006_humbdolt_Jul10.gpkg")
 
 
-#### 8. Changing Point Labels for different years based on fire history ####
+#### 9. Changing Point Labels for different years based on fire history ####
 
 #download manually created NAIP point data from s3
 system("aws s3 sync s3://earthlab-amahood/data/naip_trainingdata data/plot_data")

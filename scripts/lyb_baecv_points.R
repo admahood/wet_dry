@@ -27,16 +27,16 @@ system("aws s3 sync s3://earthlab-amahood/data/naip_trainingdata data/plot_data/
 
 #create path object for point data
 
-# if using blm aim data use this 
+# if using BLM-AIM data use this 
 gpkg_file <- "data/plot_data/plots_with_landsat.gpkg"
 
-#if using naip manual points use this 
+#if using NAIP manual points use this 
 gpkg_file <- "data/plot_data/humboldt_nv013_spb_finalpoints.shp"
 
 #grab crs of baecv rasters
 baecv_crs <- "+proj=aea +lat_1=29.5 +lat_2=45.5 +lat_0=23 +lon_0=-96 +x_0=0 +y_0=0 +datum=NAD83 +units=m +no_defs +ellps=GRS80 +towgs84=0,0,0 "
 
-#blm_aim data prep
+#### BLM - AIM data prep ####
 #load point data, remove already extracted band values, reproject to match baecv raster crs, and add a year variable which isnt a factor
 dd <-st_read(gpkg_file) %>%
   dplyr::select(-sr_band1,
@@ -57,7 +57,7 @@ dd <-st_read(gpkg_file) %>%
     dplyr::mutate(plot_year = as.numeric(as.character(dd$year))) %>%
   st_transform(st_crs(baecv_crs))
 
-#naip-manual training data data prep 
+#### NAIP-manual training data data prep ####
 dd <- st_read(gpkg_file) %>% mutate(plot_year = 2010,
                                     OBJECTID = rownames(dd))
 
@@ -69,6 +69,8 @@ y_max <- max(dd$plot_year)
 corz <- detectCores() /2
 registerDoParallel(corz)
 
+
+#### attaching last year burned (lyb) to NAIP plots ####
 #create empty list to store results
 results <- list()
 #iterator
@@ -127,7 +129,7 @@ lyb_filename <- "lyb_gb_naip_humboldt_sbp_plots.gpkg"
 st_write(final, lyb_filename)
 system("aws s3 cp lyb_gb_naip_humboldt_sbp_plots.gpkg s3://earthlab-amahood/data/naip_trainingdata/lyb_gb_naip_humboldt_sbp_points.gpkg")
 
-#### attaching lyb info to gbd plots ####
+#### attaching lyb to BLM AIM plots ####
 
 #FOR BLM DATA get original blm plot data and remove extracted band values
 gbd <- st_read(gpkg_file) %>%
