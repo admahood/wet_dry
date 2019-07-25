@@ -39,8 +39,10 @@ years <- c()
 year_season <- c()
 stks <- list()
 
+#list already completed mean composite rasters
 mc_files_done <- system("aws s3 ls s3://earthlab-amahood/wet_dry/derived_raster_data/mean_composites/", intern = T)
 
+#grab year/season of already completed mc rasters to compare against when looping over new files
 year_season_done <- c()
 for(i in 1:length(mc_files_done)) {
   year_season_done[i] <- substr(mc_files_done[i], 35, 44)
@@ -64,13 +66,18 @@ for(i in 1:length(tar_files)){
   #combine year and season to identify image and store in vector
   year_season_single <- paste0(years[i], season)
   
+  #create logical vector to check for matches in the list of already completed year/seasons
   already_done_check <- grepl(year_season_single, year_season_done)
   
+  #condense logical vector; if any completed year/seasons match, then already_done_check is TRUE
   already_done_check <- any(already_done_check)
   
+  #if the file is already done, print message telling us so and move on to next iteration
   if(already_done_check == TRUE) {
     year_season[i] <- NA
     print(paste0(year_season_single, " mean composite already created"))
+    
+    #if the mean composite is not already created, then create it 
   } else {
   year_season[i] <- year_season_single
     
@@ -134,6 +141,8 @@ for(b in 1:6){
   
   #subset raster stacks (stks) for particular year/season combo
   ys_stks <- stks[names(stks) == ys]
+  
+  #remove NULL values introduced into list by coercion in the first untarring and stacking loop 
   ys_stks <- Filter(Negate(is.null), ys_stks)
     
   #loop over subset of landsat stacks and grab all rasters for a particular band
