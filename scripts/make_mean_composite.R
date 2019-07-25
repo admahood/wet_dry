@@ -29,7 +29,7 @@ dir.create("data/mean_composites")
 #pull data from s3
 system(paste0("aws s3 sync ", ls_ard_path_s3, " ", ls_ard_path_local))
 
-#### 2. Untarring Scenes, stacking .tif bands, and creating mean composite imagery ####
+a#### 2. Untarring Scenes, stacking .tif bands, and creating mean composite imagery ####
 
 #list .tar files in folder 
 tar_files <- list.files(ls_ard_path_local, pattern = ".tar", full.names = TRUE)
@@ -115,7 +115,7 @@ names(stks) <- year_season
 
 
 #grab unique years/seasons present in raster stacks
-year_season_unique <- unique(year_season)
+year_season_unique <- unique(year_season[!is.na(year_season)])
 
 #create empty list object to store mean composites for each band
 calcd_list <- list()
@@ -136,6 +136,7 @@ for(b in 1:6){
   
   #subset raster stacks (stks) for particular year/season combo
   ys_stks <- stks[names(stks) == ys]
+  ys_stks <- Filter(Negate(is.null), ys_stks)
     
   #loop over subset of landsat stacks and grab all rasters for a particular band
     for(i in 1:length(ys_stks)){
@@ -173,4 +174,5 @@ for(b in 1:6){
   system(paste0("aws s3 cp ", filename, " ", "s3://earthlab-amahood/wet_dry/derived_raster_data", "mean_composites/", filename_short))
   
 }
+
 
