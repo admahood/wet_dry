@@ -39,6 +39,15 @@ years <- c()
 year_season <- c()
 stks <- list()
 
+mc_files_done <- system("aws s3 ls s3://earthlab-amahood/wet_dry/derived_raster_data/mean_composites/", intern = T)
+
+year_season_done <- c()
+for(i in 1:length(mc_files_done)) {
+  year_season_done[i] <- substr(mc_files_done[i], 35, 44)
+}
+
+
+
 #loop over tar file list, untar, stack bands together, store in a list (stks)
 for(i in 1:length(tar_files)){
   
@@ -54,6 +63,14 @@ for(i in 1:length(tar_files)){
   
   #combine year and season to identify image and store in vector
   year_season[i] <- paste0(years[i], season)
+  
+  already_done_check <- grepl(year_season[i], year_season_done)
+  
+  already_done_check <- any(already_done_check)
+  
+  if(already_done_check == TRUE) {
+    print(paste0(year_season[i], " mean composite already created"))
+  } else {
   
   #create path to store untarred files
   scrap_path_i <- file.path(scrap_path, i)
@@ -86,7 +103,9 @@ for(i in 1:length(tar_files)){
   
   #progress check 
   print(i)
+  }
 }
+  
 
 #change names of raster stacks in list to simpler format (comment this out when we start to work with multiple tiles)
 names(stks) <- year_season
@@ -150,3 +169,4 @@ for(b in 1:6){
   system(paste0("aws s3 cp ", filename, " ", "s3://earthlab-amahood/wet_dry/derived_raster_data", "mean_composites/", filename_short))
   
 }
+
