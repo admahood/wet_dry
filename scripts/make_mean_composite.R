@@ -62,16 +62,18 @@ for(i in 1:length(tar_files)){
   }
   
   #combine year and season to identify image and store in vector
-  year_season[i] <- paste0(years[i], season)
+  year_season_single <- paste0(years[i], season)
   
-  already_done_check <- grepl(year_season[i], year_season_done)
+  already_done_check <- grepl(year_season_single, year_season_done)
   
   already_done_check <- any(already_done_check)
   
   if(already_done_check == TRUE) {
-    print(paste0(year_season[i], " mean composite already created"))
+    year_season[i] <- NA
+    print(paste0(year_season_single, " mean composite already created"))
   } else {
-  
+  year_season[i] <- year_season_single
+    
   #create path to store untarred files
   scrap_path_i <- file.path(scrap_path, i)
   dir.create(scrap_path_i)
@@ -109,6 +111,8 @@ for(i in 1:length(tar_files)){
 
 #change names of raster stacks in list to simpler format (comment this out when we start to work with multiple tiles)
 names(stks) <- year_season
+
+
 
 #grab unique years/seasons present in raster stacks
 year_season_unique <- unique(year_season)
