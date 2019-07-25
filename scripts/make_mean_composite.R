@@ -112,8 +112,6 @@ for(i in 1:length(tar_files)){
 #change names of raster stacks in list to simpler format (comment this out when we start to work with multiple tiles)
 names(stks) <- year_season
 
-
-
 #grab unique years/seasons present in raster stacks
 year_season_unique <- unique(year_season[!is.na(year_season)])
 
