@@ -111,7 +111,6 @@ trainprism <- list()
 folders <- list.files("data/precip_annual/PRISM_annual_precip_training", full.names = T)
 for (i in 1:length(folders)) {
   prism_oneyr <- raster(list.files(folders[i], pattern = "\\.bil$", full.names = T))
-  #prism_oneyr <- projectRaster(prism_oneyr, crs = crs2, res = 30)
   prism_oneyr <- crop(prism_oneyr, great_basin)
   prism_oneyr <- projectRaster(prism_oneyr, crs = crs2, res = 30)
   trainprism[i] <- prism_oneyr

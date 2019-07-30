@@ -1,7 +1,7 @@
 #Title: Manual Training Data Raster Extraction to Points
 #Author(s): Dylan Murphy
 #Started: 6/28/19
-#Last Modified: 7/10/19
+#Last Modified: 7/30/19
 
 #### 1: Load Packages & Set Up ####
 libs <- c("raster", "sf", "dplyr", "stringr")
@@ -11,7 +11,7 @@ lapply(libs, library, character.only = TRUE, verbose = FALSE)
 source("/home/rstudio/wet_dry/scripts/functions.R")
 
 #paths 
-landsat_s3 <- "s3://earthlab-amahood/data/landsat_5and7_pixel_replaced_Jun3/"
+landsat_s3 <- "s3://earthlab-amahood/wet_dry/input_raster_data/landsat_5and7_pixel_replaced_Jun3/"
 landsat_local <- "data/landsat_5and7_pixel_replaced_Jun3/" 
 dir.create("data/scrap", showWarnings = FALSE)
 exdir <- "data/scrap/"
@@ -19,10 +19,10 @@ exdir <- "data/scrap/"
 #s3 syncs
 dir.create("data/training_points/")
 
-system("aws s3 sync s3://earthlab-amahood/data/naip_trainingdata/ /home/rstudio/wet_dry/data/training_points")
-system("aws s3 sync s3://earthlab-amahood/data/WRS2_paths/wrs2_asc_desc /home/rstudio/wet_dry/data/WRS2_paths/wrs2_asc_desc")
-system("aws s3 sync s3://earthlab-amahood/data/landfire_esp_rcl /home/rstudio/wet_dry/data/landfire_esp_rcl")
-system("aws s3 sync s3://earthlab-amahood/data/BLM_AIM /home/rstudio/wet_dry/data/BLM_AIM")
+system("aws s3 sync s3://earthlab-amahood/wet_dry/input_vector_data/manual_training_points/ /home/rstudio/wet_dry/data/training_points")
+system("aws s3 sync s3://earthlab-amahood/wet_dry/input_vector_data/wrs2_asc_desc /home/rstudio/wet_dry/data/WRS2_paths/wrs2_asc_desc")
+system("aws s3 sync s3://earthlab-amahood/wet_dry/input_raster_data/landfire_esp_rcl /home/rstudio/wet_dry/data/landfire_esp_rcl")
+system("aws s3 sync s3://earthlab-amahood/wet_dry/input_vector_data/BLM_AIM /home/rstudio/wet_dry/data/BLM_AIM")
 
 #### 2. create objects and extract path/row combos to each point ####
 
@@ -32,7 +32,9 @@ plot_data <- st_read("data/BLM_AIM/BLM_AIM_20161025.shp")
 esp_mask <- raster("data/landfire_esp_rcl/clipped_binary.tif")
 
 
-gb_plots <- st_read("data/training_points/humboldt_nv013_spb_finalpoints_2006.gpkg") %>% st_transform(as.character(crs(esp_mask))) %>% mutate(ID = row_number())
+gb_plots <- st_read("data/training_points/spatially_balanced_points_ard_phenology/ard_pheno_sbp_points_final_Jul29.shp") %>% 
+  st_transform(as.character(crs(esp_mask))) %>% mutate(ID = row_number(),
+                                                       Year = 2010)
 
 
 
@@ -205,16 +207,16 @@ for (i in 1:length(objectid_vec)) {
 }
 
 #### 5. PRECIP ANOMALY EXTRACTION ####
-system("aws s3 cp s3://earthlab-amahood/data/training_plots_timeseries/gb_plots_timeseries_w_landsat_noprecip_Jun13.gpkg data/gb_plots_timeseries_w_landsat_noprecip_Jun13.gpkg")
+
 
 #change year in path to year of interest for extraction 
-system("aws s3 cp s3://earthlab-amahood/data/PRISM_precip_annual/greatbasin_trimmed_anomaly_training/precip_anomaly_train2006.tif data/precip_annual/greatbasin_trimmed_anomaly_training/")
+system("aws s3 cp s3://earthlab-amahood/wet_dry/derived_raster_data/PRISM_precip_anomaly/greatbasin_trimmed_anomaly_training/precip_anomaly_train2006.tif data/precip_annual/greatbasin_trimmed_anomaly_training/")
 
-result2 <- result2 %>% mutate(year_factor = as.numeric(as.factor(Year)))
+result2 <- result %>% mutate(year_factor = as.numeric(as.factor(Year)))
 gbd <- result2
 
 training_anomaly_paths <- list.files("data/precip_annual/greatbasin_trimmed_anomaly_training", full.names = T)
-training_anomaly_paths <- training_anomaly_paths[c(5:6)]
+#training_anomaly_paths <- training_anomaly_paths[c(5:6)]
 training_anomaly <- list()
 
 for(i in 1:length(training_anomaly_paths)) {
@@ -232,7 +234,7 @@ for(i in 1:nrow(gbd)) {
 # attach annual precip anomaly to gb training data 
 gbd <- dplyr::mutate(gbd, precip_anomaly = precip_anomaly_vec) %>% dplyr::select(-year_factor)
 #### 6. TERRAIN EXTRACTION ####
-system("aws s3 sync s3://earthlab-amahood/data/terrain_2 /home/rstudio/wet_dry/data/terrain_2")
+system("aws s3 sync s3://earthlab-amahood/wet_dry/input_raster_data/terrain_2 /home/rstudio/wet_dry/data/terrain_2")
 
 df <- gbd
 
@@ -257,11 +259,94 @@ df$wetness <- wet7(df$sr_band1,df$sr_band2,df$sr_band3,df$sr_band4,df$sr_band5,d
 
 #### 8. Saving extracted points and pushing to s3 bucket ####
 
-st_write(df, dsn = "data/gbd_plots_manual_naip_test_2006_humboldt_Jul10.gpkg")
-system("aws s3 cp data/gbd_plots_manual_naip_test_2006_humboldt_Jul10.gpkg s3://earthlab-amahood/data/training_plots_timeseries/gbd_plots_manual_naip_test_2006_humbdolt_Jul10.gpkg")
+st_write(df, dsn = "data/gbd_manual_points_2010_ard_phenology_Jul30.gpkg")
+system("aws s3 cp data/gbd_manual_points_2010_ard_phenology_Jul30.gpkg s3://earthlab-amahood/wet_dry/derived_vector_data/manual_training_points_variables_extracted/ard_pheno_spatially_balanced_points/gbd_manual_points_2010_ard_phenology_Jul30.gpkg")
 
+#### 9. Extracting Differenced Veg. Indices (Phenology Variables) ####
 
-#### 9. Changing Point Labels for different years based on fire history ####
+#use old blm data for grabbing longlat crs string
+plot_data <- st_read("data/BLM_AIM/BLM_AIM_20161025.shp") 
+
+#download manual landsat ARD extent NAIP training points from amazon s3 bucket
+system("aws s3 cp s3://earthlab-amahood/wet_dry/derived_vector_data/manual_training_points_variables_extracted/ard_pheno_spatially_balanced_points/gbd_manual_points_2010_ard_phenology_Jul30.gpkg data/training_points/gbd_manual_points_2010_ard_phenology_Jul30.gpkg")
+
+#create directory to store differenced veg index rasters
+dir.create("data/diff_indices")
+
+#download differenced veg indices from amazon s3 bucket
+s3_differenced_path <- "s3://earthlab-amahood/wet_dry/derived_raster_data/differenced_indices"
+system(paste0("aws s3 sync ", s3_differenced_path, " ", "data/diff_indices"))
+
+#load in labelled training points w/ other variables extracted
+gb_diff <- st_read("data/training_points/gbd_manual_points_2010_ard_phenology_Jul30.gpkg")
+
+#list folders with differenced veg indices
+diff_folders <- list.files("data/diff_indices", full.names = T)
+
+#create empty vector to store differenced index names for changing names later on
+diff_index_names <- c()
+
+#create vector of differenced index variable names for renaming variables later
+for(i in 1:length(diff_folders)) {
+diff_index_names[i] <- paste0("diff_", substr(diff_folders[i], 19, 30))
+}
+
+#grab years present in training data
+target_years <- unique(gb_diff$Year)
+
+#set counter equal to one 
+counter <- 1
+
+#loop over years present in training data to match with target differenced veg indices
+for(j in 1:length(target_years)) {
+  #subset training points for a specific year
+  gb_diff_subset <- gb_diff[gb_diff$Year == target_years[j],]
+  
+  #loop over each differenced index, select target year, and extract to points 
+  for(i in 1:length(diff_folders)) {
+    #list raster files present in particular differenced index folder (same diff index, different years)
+    diff_index_files <- list.files(diff_folders[i], full.names = T)
+    
+    #grab differenced index raster filename for target year
+    diff_index_target <- str_subset(diff_index_files, pattern = fixed(target_years[j]))
+    
+    #load in differenced index as raster object
+    diff_index <- raster(diff_index_target)
+    
+    #set name of raster object using previously created names vector
+    names(diff_index) <- diff_index_names[i]
+    
+    #extract differenced veg index raster values to subset of training points
+    gb_diff_subset <- raster::extract(diff_index, gb_diff_subset, sp = T)
+    
+    #transform subset of training points to lat long and sf object
+    gb_diff_subset <- st_transform(st_as_sf(gb_diff_subset),crs = st_crs(plot_data))
+    
+    #put subsets of training data for specific years back together into one data frame
+      #if counter = 1 (first year present in training data), create new dataframe object
+      #if counter = 2 (other years present in training data), attach subset to dataframe from first iteration of loop 
+    if(counter == 1){
+      result_diff <- gb_diff_subset
+    }else{
+      result_diff <- rbind(result, gb_diff_subset)
+    }
+  }
+#advance counter 
+counter <- counter + 1
+}
+
+#paths for saving locally and uploading to s3
+finished_points_local_filename <- "gbd_manual_points_2010_ard_phenology_extracted_Jul30.gpkg"
+finished_points_local_path <- "data/gbd_manual_points_2010_ard_phenology_extracted_Jul30.gpkg"
+finished_points_s3_path <- "s3://earthlab-amahood/wet_dry/derived_vector_data/manual_training_points_variables_extracted/ard_pheno_spatially_balanced_points/"
+
+#save to local disk
+st_write(result_diff, dsn = finished_points_local_path)
+
+#upload to amazon s3 bucket
+system(paste0("aws s3 cp ", finished_points_local_path, " ", finished_points_s3_path, finished_points_local_filename))
+
+#### 10. Changing manually created Point Labels for different years based on fire history ####
 
 #download manually created NAIP point data from s3
 system("aws s3 sync s3://earthlab-amahood/data/naip_trainingdata data/plot_data")
