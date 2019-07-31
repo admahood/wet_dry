@@ -18,7 +18,7 @@ rasterOptions(tmpdir=tmpd)
 s3_ls_path <- "s3://earthlab-amahood/data/ls5_mucc"
 local_ls_path <- "data/ls5_mucc"
 #terrain paths 
-s3_terrain <- "s3://earthlab-amahood/data/terrain_2"
+s3_terrain <- "s3://earthlab-amahood/wet_dry/input_raster_data/terrain_2"
 local_terrain <- "data/terrain_reproj_full"
 #precip anomaly raster paths (cropped to NAIP scene already)
 s3_precip <- "s3://earthlab-amahood/data/PRISM_precip_annual/naip_trimmed_annual_precip_anomaly"
@@ -30,7 +30,7 @@ system(paste0("aws s3 sync ", s3_terrain, " ", local_terrain))
 system(paste0("aws s3 sync ", s3_precip, " ", local_precip))
 
 #s3 syncs cont. (masks)
-system("aws s3 sync s3://earthlab-amahood/data/landfire_esp_rcl/ data/esp_binary")
+system("aws s3 sync s3://earthlab-amahood/wet_dry/input_raster_data/landfire_esp_rcl/ data/esp_binary")
 system("aws s3 sync s3://earthlab-amahood/data/landfire_urban_ag_water_mask/ data/urban_ag_mask")
 
 #s3 syncs cont. (naip)

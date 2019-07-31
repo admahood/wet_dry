@@ -1,5 +1,5 @@
 #Script Title: randomForest model training with precipitation anomaly data & two methods of class labelling
-#Date Last Edited: 6/13/19
+#Date Last Edited: 7/31/19
 #Author(s): Dylan Murphy
 
 #### 1: Load Packages/Source scripts/set seed
@@ -11,9 +11,10 @@ source("scripts/functions.R")
 set.seed(11)
 
 #### 2: Pull data from s3: Hypergrids (for parameter selection) & Training Data (csv)
+training_s3_path <- "s3://earthlab-amahood/wet_dry/derived_vector_data/manual_training_points_variables_extracted/ard_pheno_spatially_balanced_points"
 
 system("aws s3 sync s3://earthlab-amahood/data/hypergrids_vb data/hypergrids") # Use Oct 16 hg (until new hg run is complete)
-system("aws s3 sync s3://earthlab-amahood/data/training_plots_timeseries data/training_timeseries") # Use May 21 splits (most recent)
+system(paste0("aws s3 sync ", training_s3_path, " data/training_timeseries")) # Use May 21 splits (most recent)
 
 #### 3: Hypergrid parameterization: For now, I am using the parameters used for previous model runs (from best_randomforest_list_script.R)
 ####    the hypergrids will need to be run again to find optimal parameters for models using new training/test data
@@ -30,7 +31,7 @@ parameters <- ensemble_parameters[1,] # selecting just the balanced model for no
 
 #### 4.1: Create Training Data Class Labels - needs to be refined going forward 
 
-gtrain <- st_read("data/training_timeseries/gbd_plots_manual_naip_test_2006_humbdolt_Jul10.gpkg") %>% st_set_geometry(NULL)
+gtrain <- st_read("data/training_timeseries/gbd_manual_points_2010_ard_phenology_extracted_Jul30.gpkg") %>% st_set_geometry(NULL)
 
 #### 4.1.1: old method of training class labelling - based on shrub cover attribute ####
 
@@ -140,7 +141,7 @@ gtrain <- gtrain %>%
   # dplyr::mutate(total_shrubs = SagebrushC) %>% 
   dplyr::select(sr_band1, sr_band2, sr_band3, sr_band4, sr_band5, sr_band7, ndvi, evi, savi, sr, greenness, 
                 brightness, wetness, 
-                total_shrubs, 
+                #total_shrubs, 
                 elevation, slope, aspect, 
                 tpi, tri, roughness, flowdir, 
                 precip_anomaly, Label) %>%
@@ -159,7 +160,7 @@ model2 <- randomForest(binary ~ . ,
                       data = gtrain, 
                       ntree = 2000, 
                       mtry = 10, 
-                      nodesize = parameters$nodesize,
+                      nodesize = 4,
                       na.action = na.exclude
 )
 #### END ####
