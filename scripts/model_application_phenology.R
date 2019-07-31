@@ -1,6 +1,7 @@
-# Title: Random Forest Model Application - GB Land Cover Classification Using Precip Anomaly
-# Author(s): Dylan Murphy
-# Date last modified: 6/14/19
+#Title: Random Forest Model Application LCC Using Differenced Vegetation Index Phenology
+#Author(s): Dylan Murphy
+#Date Created: July 31, 2019
+#Date Last Modified: July 31, 2019
 
 #### 1.1: Setup - Load Packages/Source Scripts
 libs <- c("sf", "tidyverse", "raster", "rgdal", "rgeos", "foreach", "doParallel", "gdalUtils")
@@ -14,7 +15,6 @@ dir.create(tmpd)
 rasterOptions(tmpdir=tmpd)
 
 #### 1.3: Setup - Pull Data from S3
-#landsat paths
 s3_ls_path <- "s3://earthlab-amahood/wet_dry/input_raster_data/ls5_mucc"
 local_ls_path <- "data/ls5_mucc"
 #terrain paths 
@@ -24,13 +24,15 @@ local_terrain <- "data/terrain_reproj_full"
 s3_precip <- "s3://earthlab-amahood/wet_dry/derived_raster_data/PRISM_precip_anomaly/naip_trimmed_annual_precip_anomaly"
 local_precip <- "data/prism/naip_trimmed_annual_precip_anomaly"
 
-
+#differenced vegetation indices paths
+s3_diff <- "s3://earthlab-amahood/wet_dry/derived_raster_data/differenced_indices"
+local_diff <- "data/differenced"
 
 #s3 syncs 
 system(paste0("aws s3 sync ", s3_ls_path, " ", local_ls_path))
 system(paste0("aws s3 sync ", s3_terrain, " ", local_terrain))
 system(paste0("aws s3 sync ", s3_precip, " ", local_precip))
-
+system(paste0("aws s3 sync ", s3_diff, " ", local_diff))
 
 #s3 syncs cont. (masks)
 system("aws s3 sync s3://earthlab-amahood/wet_dry/input_raster_data/landfire_esp_rcl/ data/esp_binary")
@@ -42,6 +44,15 @@ system("aws s3 sync s3://earthlab-amahood/input_raster_data/naip data/naip")
 #grab filenames for ls5 stacks 
 scene <- list.files("data/ls5_mucc")
 scene_full <- list.files("data/ls5_mucc", full.names = T)
+
+# IMPORTANT: subset landsat data to just 2010  for now (since we don't have differenced indices created for other years yet)
+scene_full <- scene_full[23]
+
+#list differenced veg index files
+diff_files <- list.files("data/differenced/2006", full.names = T)
+
+#reproject differenced indices (outside of loop for now)
+diff_indices <- stack(diff_files) %>% projectRaster(crs = crs, res = 30)
 
 #### 1.4: Setup - Parallelization
 cores <- detectCores(all.tests = FALSE, logical = TRUE)
@@ -57,10 +68,11 @@ crs <- crs(landsat)
 naip <- raster("data/naip/m_4011703_ne_11_1_20100704.tif") %>% projectRaster(crs = crs, res = 30) #wmuc
 #naip <- raster("data/naip/n_4111761_nw_11_1_20060813.tif") %>% projectRaster(crs = crs, res = 30) #frank
 #naip <- raster("data/naip/m_4111823_sw_11_1_20100628.tif") %>% projectRaster(crs = crs, res = 30) #kings
+
 #parallelized model application loop
 foreach(i = scene_full, 
         .packages = 'raster') %dopar% {         
-         
+          
           #grab file name without directories for filename creation later 
           file = substr(i, 15, 36) 
           
@@ -97,10 +109,16 @@ foreach(i = scene_full,
           ls5$satvi <- get_satvi(ls5$sr_band3, ls5$sr_band5, ls5$sr_band7)
           system(paste("echo", "veg indices and tassel cap created", i))
           
+          
+          #crop/reproject differenced indices
+          diff_indices <- diff_indices %>% crop(naip) %>% resample(ls5)
+          
           #create stack of ls5 data, terrain data, and precip anomaly
           ls5 <- stack(ls5, 
                        ter, 
-                       precip)
+                       precip,
+                       diff_indices
+                       )
           
           #create esp mask and match projection/extent
           esp_mask <- raster("data/esp_binary/clipped_binary.tif")
@@ -128,8 +146,10 @@ foreach(i = scene_full,
                           "ndsvi", "satvi", 
                           "flowdir", "folded_aspect", "elevation",
                           "roughness", "slope", "tpi", "tri", 
-                          "precip_anomaly"
-                          )
+                          "precip_anomaly",
+                          "diff_evi", "diff_ndsvi", "diff_ndvi", "diff_satvi",
+                          "diff_savi", "diff_sr"
+          )
           
           #progress check for stack creation
           system(paste("echo", "stack created"))
@@ -139,11 +159,11 @@ foreach(i = scene_full,
           gc() 
           
           #make filename - change "frank"/"wmuc"/"kings" depending on naip scene used for extent
-          filenamet <- paste0("data/results/", "ard_points_orig_variables", "_wmuc_", year, "_Jul31", ".tif") 
+          filenamet <- paste0("data/results/", "ard_points_orig_variables_and_differenced", "_wmuc_", year, "_Jul31", ".tif") 
           system(paste("echo", "filename created", i))
           
           #apply the RF model to raster stack and create "ls5_classed", an annual predicted sage/cheat raster!
-          ls5_classed <- raster::predict(ls5, model2, inf.rm = T, na.rm = T) #apply model of choice from list to stack and make predictions
+          ls5_classed <- raster::predict(ls5, model3, inf.rm = T, na.rm = T) #apply model of choice from list to stack and make predictions
           
           #progress check
           system(paste("echo", "model applied"))
@@ -152,122 +172,7 @@ foreach(i = scene_full,
           #save resulting land cover rasters and upload to s3
           writeRaster(ls5_classed, filename = filenamet, format = "GTiff", overwrite = T) 
           system(paste("echo", "file saved to disk"))
-          system(paste0("aws s3 cp ", filenamet, " s3://earthlab-amahood/wet_dry/model_results/summer19_model_results/original_variables/ard_points_allvars_Jul31/wmuc/", substr(filenamet, 14, 150)))
+          system(paste0("aws s3 cp ", filenamet, " s3://earthlab-amahood/wet_dry/model_results/summer19_model_results/differenced_variables/ard_points_allvars_and_diffs_Jul31/wmuc/", substr(filenamet, 14, 150)))
           system(paste("echo", "aws sync done"))
           
         }
-
-#### Extracting pixel counts to data table and quickly viewing through plots ####
-
-#list results raster files
-dir.create("data/results")
-#change path below to desired model results folder on s3
-system("aws s3 sync s3://earthlab-amahood/wet_dry/model_results/summer19_model_results/ data/results")
-
-#change "kings"/"frank"/"wmuc" to select results for a specific naip scene 
-all_years_files <- list.files("data/results/wmuc", pattern = "\\.tif$", full.names = T)
-all_years_stack <- stack(all_years_files)
-
-results_list <- list()
-
-
-for(i in 1:length(all_years_files)) {
-  results  <- raster(all_years_files[i])
-  #results <- raster::extend(results, total_na)
-  #results <- crop(results, total_na)
-  results_list[i] <- results
-}
-#grab each years predicted values and store in vector form
-df2 <- rbind( 
-  r1984 = as.vector(table(values(results_list[[1]])))
-  , r1985 = as.vector(table(values(results_list[[2]])))
-  , r1986 = as.vector(table(values(results_list[[3]])))
-  , r1987 = as.vector(table(values(results_list[[4]])))
-  , r1988 = as.vector(table(values(results_list[[5]])))
-  , r1989 = as.vector(table(values(results_list[[6]])))
-  , r1990 = as.vector(table(values(results_list[[7]])))
-  , r1991 = as.vector(table(values(results_list[[8]])))
-  , r1992 = as.vector(table(values(results_list[[9]])))
-  , r1993 = as.vector(table(values(results_list[[10]])))
-  , r1994 = as.vector(table(values(results_list[[11]])))
-  , r1995 = as.vector(table(values(results_list[[12]])))
-  , r1996 = as.vector(table(values(results_list[[13]])))
-  , r1997 = as.vector(table(values(results_list[[14]])))
-  , r1998 = as.vector(table(values(results_list[[15]])))
-  , r1999 = as.vector(table(values(results_list[[16]])))
-  , r2000 = as.vector(table(values(results_list[[17]])))
-  , r2001 = as.vector(table(values(results_list[[18]])))
-  , r2002 = as.vector(table(values(results_list[[19]])))
-  , r2003 = as.vector(table(values(results_list[[20]])))
-  , r2004 = as.vector(table(values(results_list[[21]])))
-  , r2005 = as.vector(table(values(results_list[[22]])))
-  , r2006 = as.vector(table(values(results_list[[23]])))
-  , r2007 = as.vector(table(values(results_list[[24]])))
-  , r2008 = as.vector(table(values(results_list[[25]])))
-  , r2009 = as.vector(table(values(results_list[[26]])))
-  , r2010 = as.vector(table(values(results_list[[27]])))
-  , r2011 = as.vector(table(values(results_list[[28]])))
-)
-#turn vectors into data frame
-df2 <- as_data_frame(df2)
-
-#name the class total columns
-names(df2) <- c("grass", "shrub", "mixed")
-
-#create additional class total variables (e.g. percentages of total study area, etc)
-
-df2 <- df2 %>% mutate(year = c(1984:2011),
-                      total_pixels = as.numeric(grass + shrub + mixed),
-                      percent_grass = as.numeric((grass / total_pixels) * 100),
-                      percent_shrub = as.numeric((shrub / total_pixels) * 100),
-                      percent_mixed = as.numeric((mixed/total_pixels) * 100), 
-                      shrubvgrass = as.numeric(shrub/grass))
-
-#plot class totals over time using ggplot - switch "grass" to "shrub" or vice versa to look at each class
-
-ggplot(data=df2) + 
-  aes(x = df2$year) + 
-  geom_point(aes(y=df2$percent_mixed), color = 'darkgreen') + 
-  geom_smooth(aes(y=df2$percent_mixed), color = 'darkgreen', method = "lm") +
-  xlab("year") +
-  ylab("Sagebrush total pixels")
-
-#### Animating Results for quick viewing - not working yet ####
-anim_libs <- c("gganimate","gifski")
-lapply(anim_libs, install.packages, character.only = TRUE, verbose = FALSE)
-lapply(anim_libs, library, character.only = TRUE, verbose = FALSE)
-
-lcc_rasters <- list.files("data/results/", pattern = "\\.tif$", full.names = T)
-
-lcc_stack <- stack(lcc_rasters)
-
-years=1984:2011
-ts_df=list()
-
-for (i in 1:length(years)) {
-  rrr<- raster(lcc_rasters[i]) 
-  rr <- as.data.frame(rrr, xy = TRUE)
-  names(rr) <- c("x","y", "Prediction")
-  nn <- lcc_rasters[i]
-  rr$year=as.numeric(years[i])
-  ts_df[[i]]<-rr
-}
-
-ts_df<-do.call("rbind",ts_df)
-
-anim<-ggplot(ts_df, aes(x=x,y=y,fill=as.numeric(Prediction)))+
-  geom_raster() +
-  theme_void() +
-  scale_fill_viridis_c() +
-  coord_fixed()+
-  labs(title = 'Year: {frame_time}') +
-  transition_time(year)
-
-aa<-gganimate::animate(anim, fps=1, nframes = length(years))
-
-anim_save(aa, filename = "data/gifs/ard_points_allvars_Jul31.gif")
-
-system("aws s3 cp data/gifs/ard_points_allvars_Jul31.gif s3://earthlab-amahood/wet_dry/model_results/summer19_model_results/gifs/ard_points_allvars_Jul31.gif")
-
-
-
