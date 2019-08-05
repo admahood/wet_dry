@@ -1,6 +1,6 @@
 #Title: Last Year Burned Point Extraction 
 #Authors: Adam Mahood and Dylan Murphy
-#Last Modified: 7/10/19
+#Last Modified: 8/5/19
 
 #1. Set up
 #Load Packages
@@ -18,10 +18,10 @@ dir.create(local_scrap)
 
 #pull point data from s3 bucket
 #blm aim points
-system("aws s3 cp s3://earthlab-amahood/data/plots_with_landsat_feb19.gpkg data/plot_data/plots_with_landsat.gpkg")
+system("aws s3 sync s3://earthlab-amahood/wet_dry/input_vector_data/BLM_AIM data/plot_data")
 
 #naip manual points
-system("aws s3 sync s3://earthlab-amahood/data/naip_trainingdata data/plot_data/")
+system("aws s3 sync s3://earthlab-amahood/wet_dry/derived_vector_data/manual_training_points_variables_extracted data/plot_data/")
 
 #2. Data Prep
 
@@ -31,7 +31,7 @@ system("aws s3 sync s3://earthlab-amahood/data/naip_trainingdata data/plot_data/
 gpkg_file <- "data/plot_data/plots_with_landsat.gpkg"
 
 #if using NAIP manual points use this 
-gpkg_file <- "data/plot_data/humboldt_nv013_spb_finalpoints.shp"
+gpkg_file <- "data/plot_data/ard_pheno_spatially_balanced_points/gbd_manual_points_2010_ard_phenology_extracted_Jul30.gpkg"
 
 #grab crs of baecv rasters
 baecv_crs <- "+proj=aea +lat_1=29.5 +lat_2=45.5 +lat_0=23 +lon_0=-96 +x_0=0 +y_0=0 +datum=NAD83 +units=m +no_defs +ellps=GRS80 +towgs84=0,0,0 "
@@ -119,15 +119,20 @@ final <- final %>% dplyr::filter(burned > 0,
   group_by(OBJECTID) %>%
   summarise(lyb = max(burn_year)) 
 
+final_geom <- st_geometry(final)
+dd_geom <- st_geometry(dd)
+
 final1 <- st_drop_geometry(final)
 dd1 <- st_drop_geometry(dd)
 
 final <- merge(dd1, final1, by = 'OBJECTID', all.x = T)
 
-lyb_filename <- "lyb_gb_naip_humboldt_sbp_plots.gpkg"
+st_geometry(final) <- dd_geom
+
+lyb_filename <- "data/manual_ard_005007_phenology_points_2010_vars_and_lyb.gpkg"
 #save and upload results to s3
 st_write(final, lyb_filename)
-system("aws s3 cp lyb_gb_naip_humboldt_sbp_plots.gpkg s3://earthlab-amahood/data/naip_trainingdata/lyb_gb_naip_humboldt_sbp_points.gpkg")
+system(paste0("aws s3 cp ", lyb_filename, " ", "s3://earthlab-amahood/wet_dry/derived_vector_data/manual_training_points_lyb_extracted/manual_ard_005007_phenology_points_2010_vars_and_lyb.gpkg"))
 
 #### attaching lyb to BLM AIM plots ####
 

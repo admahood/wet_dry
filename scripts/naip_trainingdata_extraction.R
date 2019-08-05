@@ -349,16 +349,15 @@ system(paste0("aws s3 cp ", finished_points_local_path, " ", finished_points_s3_
 #### 10. Changing manually created Point Labels for different years based on fire history ####
 
 #download manually created NAIP point data from s3
-system("aws s3 sync s3://earthlab-amahood/data/naip_trainingdata data/plot_data")
+system("aws s3 sync s3://earthlab-amahood/wet_dry/derived_vector_data/manual_training_points_lyb_extracted /home/rstudio/wet_dry/data/training_points")
 
 #read in original (2010) NAIP training data w/ lyb attached
-naip_points <- st_read("data/plot_data/naip_nv013_humboldt_points_w_lyb_July10.gpkg") %>% mutate(plot_year = 2010)
+naip_points <- st_read("data/training_points/manual_ard_005007_phenology_points_2010_vars_and_lyb.gpkg") %>% mutate(plot_year = 2010)
 
 #create new object to modify for a new year of labelling (change year in "mutate" to year desired for modeling/labelling)
 new_naip_points <- naip_points %>% mutate(plot_year = 2006) %>% 
   filter(plot_year != lyb | is.na(lyb)) #removing points which burned in the year of interest and keeping those that did not burn
 
-new_labels_vec <- c()
 
 #loop through each point and determine whether a steady state can be assumed for the year of choice 
 # (because sagebrush takes a long time to establish, even if it burned in between the target year and 
@@ -370,11 +369,14 @@ for(i in 1:nrow(new_naip_points)) {
   }
 }
 
+#remove previously extracted variables from original year 
+new_naip_points <- new_naip_points %>% mutate(Year = plot_year) %>% dplyr::select(OBJECTID, Label, Year, lyb)
+
 #create filename for new points (change year to match year of interest)
-new_year_naip_filename <- "data/humboldt_nv013_spb_finalpoints_2006.gpkg"
+new_year_naip_filename <- "data/manual_ard_005007_phenology_points_2006_no_vars.gpkg"
 
 st_write(new_naip_points, new_year_naip_filename)
 
-system(paste0("aws s3 cp ", new_year_naip_filename, " s3://earthlab-amahood/data/naip_trainingdata/", substr(new_year_naip_filename, 6, 100)))
+system(paste0("aws s3 cp ", new_year_naip_filename, " s3://earthlab-amahood/wet_dry/input_vector_data/manual_training_points/spatially_balanced_points_ard_phenology/spb_points_ard_w_lyb_novars/", substr(new_year_naip_filename, 6, 100)))
 
        
