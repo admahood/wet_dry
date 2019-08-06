@@ -6,6 +6,8 @@ RUN apt-get update \
     awscli \
     cargo \
     htop 
+  && rm -rf /var/lib/apt/lists/*
+
     
 RUN install2.r --error \
   assertthat \
