@@ -1,5 +1,5 @@
 #Script Title: randomForest model training with precipitation anomaly data & two methods of class labelling
-#Date Last Edited: 7/31/19
+#Date Last Edited: 8/6/19
 #Author(s): Dylan Murphy
 
 #### 1: Load Packages/Source scripts/set seed
@@ -10,7 +10,7 @@ lapply(libs, library, character.only = TRUE, verbose = FALSE)
 source("scripts/functions.R")
 set.seed(11)
 
-#### 2: Pull data from s3: Hypergrids (for parameter selection) & Training Data (csv)
+#### 2: Pull data from s3: Hypergrids (for parameter selection) & Training Data 
 training_s3_path <- "s3://earthlab-amahood/wet_dry/derived_vector_data/manual_training_points_variables_extracted/ard_pheno_spatially_balanced_points"
 
 system("aws s3 sync s3://earthlab-amahood/data/hypergrids_vb data/hypergrids") # Use Oct 16 hg (until new hg run is complete)
@@ -31,7 +31,7 @@ parameters <- ensemble_parameters[1,] # selecting just the balanced model for no
 
 #### 4.1: Create Training Data Class Labels - needs to be refined going forward 
 
-gtrain <- st_read("data/training_timeseries/gbd_manual_points_2010_ard_phenology_extracted_Jul30.gpkg") %>% st_set_geometry(NULL)
+gtrain1 <- st_read("data/training_timeseries/gbd_manual_points_2010_ard_phenology_extracted_Jul30.gpkg") %>% st_set_geometry(NULL)
 
 #### 4.1.1: old method of training class labelling - based on shrub cover attribute ####
 

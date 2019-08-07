@@ -1,7 +1,7 @@
 #Title: Manual Training Data Raster Extraction to Points
 #Author(s): Dylan Murphy
 #Started: 6/28/19
-#Last Modified: 7/30/19
+#Last Modified: 8/6/19
 
 #### 1: Load Packages & Set Up ####
 libs <- c("raster", "sf", "dplyr", "stringr")
@@ -32,9 +32,9 @@ plot_data <- st_read("data/BLM_AIM/BLM_AIM_20161025.shp")
 esp_mask <- raster("data/landfire_esp_rcl/clipped_binary.tif")
 
 
-gb_plots <- st_read("data/training_points/spatially_balanced_points_ard_phenology/ard_pheno_sbp_points_final_Jul29.shp") %>% 
+gb_plots <- st_read("data/training_points/spatially_balanced_points_ard_phenology/spb_points_ard_w_lyb_novars/manual_ard_005007_phenology_points_2006_no_vars.gpkg") %>% 
   st_transform(as.character(crs(esp_mask))) %>% mutate(ID = row_number(),
-                                                       Year = 2010)
+                                                       Year = 2006)
 
 
 
@@ -45,7 +45,7 @@ scenes <- st_transform(scenes, as.character(crs(esp_mask)))
 scenes <- scenes[scenes$ROW<100,]
 
 #extract pathrow combos to points
-gb_plots <- st_intersection(gb_plots,scenes[,9:10])
+gb_plots <- st_intersection(gb_plots,scenes[,9:10]) %>% arrange(ID)
 gb_plots$path_row <- as.character(paste0("0",gb_plots$PATH,"0",gb_plots$ROW)) 
 
 #remove points that lie in more than one scene (duplicated points from st_intersection)
@@ -138,7 +138,7 @@ for(i in 1:length(years)){
 # result <- result %>% mutate(duplicated = duplicate_vec)  <- these are commented out for now because I am trying out just removing the duplicated points before extraction
   
 #removing NA values (points along the outer edge of landsat scene)
-result <- result[!is.na(result$sr_band1),]
+result <- result[!is.na(result$sr_band1),] %>% arrange(ID)
 
 
 
@@ -146,7 +146,7 @@ result <- result[!is.na(result$sr_band1),]
 # 
 # counter = 1
 
-#### 4.1 SKIP THE LOOP IN THIS SECTION FOR NOW - TRYING TO JUST REMOVE DUPLICATE POINTS INSTEAD OF TAKING MEAN VALUE####
+#### 4.1 SKIP THE LOOP IN THIS SECTION FOR NOW (8/6) - TRYING TO JUST REMOVE DUPLICATE POINTS INSTEAD OF TAKING MEAN VALUE####
 #loop over each objectid and year combo (unique to one time series point) and collapse duplicate points into one 
 for (i in 1:length(objectid_vec)) { 
   
@@ -210,7 +210,7 @@ for (i in 1:length(objectid_vec)) {
 
 
 #change year in path to year of interest for extraction 
-system("aws s3 cp s3://earthlab-amahood/wet_dry/derived_raster_data/PRISM_precip_anomaly/greatbasin_trimmed_anomaly_training/precip_anomaly_train2006.tif data/precip_annual/greatbasin_trimmed_anomaly_training/")
+system("aws s3 cp s3://earthlab-amahood/wet_dry/derived_raster_data/PRISM_precip_anomaly/greatbasin_trimmed_anomaly_training/precip_anomaly_train2010.tif data/precip_annual/greatbasin_trimmed_anomaly_training/")
 
 result2 <- result %>% mutate(year_factor = as.numeric(as.factor(Year)))
 gbd <- result2
@@ -259,8 +259,8 @@ df$wetness <- wet7(df$sr_band1,df$sr_band2,df$sr_band3,df$sr_band4,df$sr_band5,d
 
 #### 8. Saving extracted points and pushing to s3 bucket ####
 
-st_write(df, dsn = "data/gbd_manual_points_2010_ard_phenology_Jul30.gpkg")
-system("aws s3 cp data/gbd_manual_points_2010_ard_phenology_Jul30.gpkg s3://earthlab-amahood/wet_dry/derived_vector_data/manual_training_points_variables_extracted/ard_pheno_spatially_balanced_points/gbd_manual_points_2010_ard_phenology_Jul30.gpkg")
+st_write(df, dsn = "data/gbd_manual_points_2006_ard_phenology_Aug6.gpkg")
+system("aws s3 cp data/gbd_manual_points_2006_ard_phenology_Aug6.gpkg s3://earthlab-amahood/wet_dry/derived_vector_data/manual_training_points_variables_extracted/ard_pheno_spatially_balanced_points/gbd_manual_points_2006_ard_phenology_Aug6.gpkg")
 
 #### 9. Extracting Differenced Veg. Indices (Phenology Variables) ####
 
@@ -278,7 +278,7 @@ s3_differenced_path <- "s3://earthlab-amahood/wet_dry/derived_raster_data/differ
 system(paste0("aws s3 sync ", s3_differenced_path, " ", "data/diff_indices"))
 
 #load in labelled training points w/ other variables extracted
-gb_diff <- st_read("data/training_points/gbd_manual_points_2010_ard_phenology_Jul30.gpkg")
+gb_diff <- st_read("data/training_points/gbd_manual_points_2006_ard_phenology_Aug6.gpkg")
 
 #list folders with differenced veg indices
 diff_folders <- list.files("data/diff_indices", full.names = T)
@@ -336,8 +336,8 @@ counter <- counter + 1
 }
 
 #paths for saving locally and uploading to s3
-finished_points_local_filename <- "gbd_manual_points_2010_ard_phenology_extracted_Jul30.gpkg"
-finished_points_local_path <- "data/gbd_manual_points_2010_ard_phenology_extracted_Jul30.gpkg"
+finished_points_local_filename <- "gbd_manual_points_2006_ard_phenology_extracted_Aug6.gpkg"
+finished_points_local_path <- "data/gbd_manual_points_2006_ard_phenology_extracted_Aug6.gpkg"
 finished_points_s3_path <- "s3://earthlab-amahood/wet_dry/derived_vector_data/manual_training_points_variables_extracted/ard_pheno_spatially_balanced_points/"
 
 #save to local disk

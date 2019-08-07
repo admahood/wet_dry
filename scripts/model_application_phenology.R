@@ -159,11 +159,11 @@ foreach(i = scene_full,
           gc() 
           
           #make filename - change "frank"/"wmuc"/"kings" depending on naip scene used for extent
-          filenamet <- paste0("data/results/", "ard_points_orig_variables_and_differenced", "_wmuc_", year, "_Jul31", ".tif") 
+          filenamet <- paste0("data/results/", "ard_multiyear_points_orig_variables_and_differenced", "_wmuc_", year, "_Aug6", ".tif") 
           system(paste("echo", "filename created", i))
           
           #apply the RF model to raster stack and create "ls5_classed", an annual predicted sage/cheat raster!
-          ls5_classed <- raster::predict(ls5, model3, inf.rm = T, na.rm = T) #apply model of choice from list to stack and make predictions
+          ls5_classed <- raster::predict(ls5, model2, inf.rm = T, na.rm = T) #apply model of choice from list to stack and make predictions
           
           #progress check
           system(paste("echo", "model applied"))
@@ -172,7 +172,7 @@ foreach(i = scene_full,
           #save resulting land cover rasters and upload to s3
           writeRaster(ls5_classed, filename = filenamet, format = "GTiff", overwrite = T) 
           system(paste("echo", "file saved to disk"))
-          system(paste0("aws s3 cp ", filenamet, " s3://earthlab-amahood/wet_dry/model_results/summer19_model_results/differenced_variables/ard_points_allvars_and_diffs_Jul31/wmuc/", substr(filenamet, 14, 150)))
+          system(paste0("aws s3 cp ", filenamet, " s3://earthlab-amahood/wet_dry/model_results/summer19_model_results/differenced_variables/ard_multiyear_points_allvars_and_diffs_aug6/wmuc/", substr(filenamet, 14, 150)))
           system(paste("echo", "aws sync done"))
           
         }

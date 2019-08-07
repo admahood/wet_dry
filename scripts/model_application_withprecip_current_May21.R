@@ -37,7 +37,7 @@ system("aws s3 sync s3://earthlab-amahood/wet_dry/input_raster_data/landfire_esp
 system("aws s3 sync s3://earthlab-amahood/wet_dry/input_raster_data/landfire_urban_ag_water_mask/ data/urban_ag_mask")
 
 #s3 syncs cont. (naip)
-system("aws s3 sync s3://earthlab-amahood/input_raster_data/naip data/naip")
+system("aws s3 sync s3://earthlab-amahood/wet_dry/input_raster_data/naip/ data/naip")
 
 #grab filenames for ls5 stacks 
 scene <- list.files("data/ls5_mucc")
