@@ -1,5 +1,5 @@
 #Script Title: randomForest model training with precipitation anomaly data & two methods of class labelling
-#Date Last Edited: 8/6/19
+#Date Last Edited: 8/7/19
 #Author(s): Dylan Murphy
 
 #### 1: Load Packages/Source scripts/set seed
@@ -13,25 +13,23 @@ set.seed(11)
 #### 2: Pull data from s3: Hypergrids (for parameter selection) & Training Data 
 training_s3_path <- "s3://earthlab-amahood/wet_dry/derived_vector_data/manual_training_points_variables_extracted/ard_pheno_spatially_balanced_points"
 
-system("aws s3 sync s3://earthlab-amahood/data/hypergrids_vb data/hypergrids") # Use Oct 16 hg (until new hg run is complete)
+
 system(paste0("aws s3 sync ", training_s3_path, " data/training_timeseries")) # Use May 21 splits (most recent)
 
-#### 3: Hypergrid parameterization: For now, I am using the parameters used for previous model runs (from best_randomforest_list_script.R)
-####    the hypergrids will need to be run again to find optimal parameters for models using new training/test data
+#### 3. Hypergrid paramaterization - when we run new hypergrids the parameter selection will go here ####
 
-hypergrid <- read.csv("data/hypergrids/hgOct_16_2018.csv") %>% arrange(desc(balanced_accuracy))
+#### : 4. Model Training - Just for one model right now (sc = 14), but can be changed to create model ensemble group
 
-best_hyper <- hypergrid[c(1:5, 7, 10, 13, 16, 17, 19, 20, 41, 49, 51),] %>% arrange(desc(balanced_accuracy))
+#### 4.1: Create Training Data 
 
-ensemble_parameters <- best_hyper[c(12, 8, 11),]
+#2010 points
+gtrain1 <- st_read("data/training_timeseries/gbd_manual_points_2010_ard_phenology_extracted_Jul30.gpkg") %>% st_set_geometry(NULL) %>% select(-InclProb)
 
-parameters <- ensemble_parameters[1,] # selecting just the balanced model for now
+#2006 points
+gtrain2 <- st_read("data/training_timeseries/gbd_manual_points_2006_ard_phenology_extracted_Aug6.gpkg") %>% st_set_geometry(NULL) %>% dplyr::select(-OBJECTID, -lyb)
 
-#### 4: Model Training - Just for one model right now (sc = 14), but can be changed to create model ensemble group
-
-#### 4.1: Create Training Data Class Labels - needs to be refined going forward 
-
-gtrain1 <- st_read("data/training_timeseries/gbd_manual_points_2010_ard_phenology_extracted_Jul30.gpkg") %>% st_set_geometry(NULL)
+#combine 2010 and 2006 points
+gtrain <- rbind(gtrain1, gtrain2)
 
 #### 4.1.1: old method of training class labelling - based on shrub cover attribute ####
 

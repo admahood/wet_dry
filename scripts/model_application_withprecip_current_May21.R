@@ -1,6 +1,6 @@
 # Title: Random Forest Model Application - GB Land Cover Classification Using Precip Anomaly
 # Author(s): Dylan Murphy
-# Date last modified: 6/14/19
+# Date last modified: 8/7/19
 
 #### 1.1: Setup - Load Packages/Source Scripts
 libs <- c("sf", "tidyverse", "raster", "rgdal", "rgeos", "foreach", "doParallel", "gdalUtils")
@@ -237,15 +237,15 @@ anim_libs <- c("gganimate","gifski")
 lapply(anim_libs, install.packages, character.only = TRUE, verbose = FALSE)
 lapply(anim_libs, library, character.only = TRUE, verbose = FALSE)
 
-lcc_rasters <- list.files("data/results/", pattern = "\\.tif$", full.names = T)
+lcc_rasters <- list.files("data/results", pattern = "\\.tif$", full.names = T)
 
 lcc_stack <- stack(lcc_rasters)
 
-years=1984:2011
+years=2006:2010
 ts_df=list()
 
 for (i in 1:length(years)) {
-  rrr<- raster(lcc_rasters[i]) 
+  rrr <- raster(lcc_rasters[i])
   rr <- as.data.frame(rrr, xy = TRUE)
   names(rr) <- c("x","y", "Prediction")
   nn <- lcc_rasters[i]

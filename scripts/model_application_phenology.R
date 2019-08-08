@@ -1,7 +1,7 @@
 #Title: Random Forest Model Application LCC Using Differenced Vegetation Index Phenology
 #Author(s): Dylan Murphy
 #Date Created: July 31, 2019
-#Date Last Modified: July 31, 2019
+#Date Last Modified: Aug 7, 2019
 
 #### 1.1: Setup - Load Packages/Source Scripts
 libs <- c("sf", "tidyverse", "raster", "rgdal", "rgeos", "foreach", "doParallel", "gdalUtils")
@@ -39,20 +39,31 @@ system("aws s3 sync s3://earthlab-amahood/wet_dry/input_raster_data/landfire_esp
 system("aws s3 sync s3://earthlab-amahood/wet_dry/input_raster_data/landfire_urban_ag_water_mask/ data/urban_ag_mask")
 
 #s3 syncs cont. (naip)
-system("aws s3 sync s3://earthlab-amahood/input_raster_data/naip data/naip")
+system("aws s3 sync s3://earthlab-amahood/wet_dry/input_raster_data/naip data/naip")
 
 #grab filenames for ls5 stacks 
 scene <- list.files("data/ls5_mucc")
 scene_full <- list.files("data/ls5_mucc", full.names = T)
 
-# IMPORTANT: subset landsat data to just 2010  for now (since we don't have differenced indices created for other years yet)
-scene_full <- scene_full[23]
+# IMPORTANT: subset landsat data to just the years we have differenced indices for now 
+scene_full <- scene_full[23:27]
 
 #list differenced veg index files
-diff_files <- list.files("data/differenced/2006", full.names = T)
+diff_folders <- list.files("data/differenced/", full.names = T)
+
+counter <- 1
+for(i in 1:length(diff_folders)) {
+  diff_files <- list.files(diff_folders[i], full.names = T)
+  if(counter == 1) {
+    diff_files_full <- diff_files 
+  } else {
+    diff_files_full <- c(diff_files_full, diff_files)
+  }
+  counter = counter + 1
+}
 
 #reproject differenced indices (outside of loop for now)
-diff_indices <- stack(diff_files) %>% projectRaster(crs = crs, res = 30)
+diff_indices <- stack(diff_files_full) %>% projectRaster(crs = crs, res = 30)
 
 #### 1.4: Setup - Parallelization
 cores <- detectCores(all.tests = FALSE, logical = TRUE)
@@ -66,7 +77,7 @@ crs <- crs(landsat)
 
 #create naip scene raster object for cropping 
 naip <- raster("data/naip/m_4011703_ne_11_1_20100704.tif") %>% projectRaster(crs = crs, res = 30) #wmuc
-#naip <- raster("data/naip/n_4111761_nw_11_1_20060813.tif") %>% projectRaster(crs = crs, res = 30) #frank
+naip <- raster("data/naip/n_4111761_nw_11_1_20060813.tif") %>% projectRaster(crs = crs, res = 30) #frank
 #naip <- raster("data/naip/m_4111823_sw_11_1_20100628.tif") %>% projectRaster(crs = crs, res = 30) #kings
 
 #parallelized model application loop
@@ -95,7 +106,7 @@ foreach(i = scene_full,
           system(paste("echo", "stack created and cropped", i))
           
           #grab precip anomaly for a particular year - change "frank"/"wmuc"/"kings" in both folder and filename depending on which you want to use
-          precip <- raster(paste0("data/prism/naip_trimmed_annual_precip_anomaly/wmuc/precip_anomaly_trimmed_wmuc", year, ".tif")) %>% resample(ls5)
+          precip <- raster(paste0("data/prism/naip_trimmed_annual_precip_anomaly/frank/precip_anomaly_trimmed_frank_", year, ".tif")) %>% resample(ls5)
           
           # create additional index variables - make sure all the names of this stack match the names that go into the model 
           ls5$wetness <- wet5(ls5$sr_band1,ls5$sr_band2,ls5$sr_band3,ls5$sr_band4,ls5$sr_band5,ls5$sr_band7)
@@ -109,6 +120,10 @@ foreach(i = scene_full,
           ls5$satvi <- get_satvi(ls5$sr_band3, ls5$sr_band5, ls5$sr_band7)
           system(paste("echo", "veg indices and tassel cap created", i))
           
+          diff_target <- str_subset(diff_files_full, pattern = fixed(year))
+          
+          
+          diff_indices <- stack(diff_target) %>% projectRaster(crs = crs, res = 30)
           
           #crop/reproject differenced indices
           diff_indices <- diff_indices %>% crop(naip) %>% resample(ls5)
@@ -159,7 +174,7 @@ foreach(i = scene_full,
           gc() 
           
           #make filename - change "frank"/"wmuc"/"kings" depending on naip scene used for extent
-          filenamet <- paste0("data/results/", "ard_multiyear_points_orig_variables_and_differenced", "_wmuc_", year, "_Aug6", ".tif") 
+          filenamet <- paste0("data/results/", "ard_2006_points_orig_variables_and_differenced", "_frank_", year, "_Aug8", ".tif") 
           system(paste("echo", "filename created", i))
           
           #apply the RF model to raster stack and create "ls5_classed", an annual predicted sage/cheat raster!
@@ -172,7 +187,7 @@ foreach(i = scene_full,
           #save resulting land cover rasters and upload to s3
           writeRaster(ls5_classed, filename = filenamet, format = "GTiff", overwrite = T) 
           system(paste("echo", "file saved to disk"))
-          system(paste0("aws s3 cp ", filenamet, " s3://earthlab-amahood/wet_dry/model_results/summer19_model_results/differenced_variables/ard_multiyear_points_allvars_and_diffs_aug6/wmuc/", substr(filenamet, 14, 150)))
+          system(paste0("aws s3 cp ", filenamet, " s3://earthlab-amahood/wet_dry/model_results/summer19_model_results/differenced_variables/ard_2006_points_allvars_and_diffs_aug8/frank/", substr(filenamet, 14, 150)))
           system(paste("echo", "aws sync done"))
           
         }
