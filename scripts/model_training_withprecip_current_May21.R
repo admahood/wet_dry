@@ -155,16 +155,16 @@ gtrain <- gtrain %>%
 #### 4.1.4: landsat ARD extent training data with differenced veg indices (already labelled) ####
 gtrain <- gtrain %>% 
   # dplyr::mutate(total_shrubs = SagebrushC) %>% 
-  dplyr::select(sr_band1, sr_band2, sr_band3, sr_band4, sr_band5, sr_band7, ndvi, evi, savi, sr, greenness, 
-                brightness, wetness, 
+  dplyr::select(#sr_band1, sr_band2, sr_band3, sr_band4, sr_band5, sr_band7, ndvi, evi, savi, sr, greenness, 
+                #brightness, wetness, 
                 #total_shrubs, 
                 elevation, slope, aspect, 
                 tpi, tri, roughness, flowdir, 
-                precip_anomaly, 
+                #precip_anomaly, 
                 diff_evi, diff_ndsvi, diff_savi, diff_ndvi, diff_satvi, diff_sr,
                 Label) %>%
-  dplyr::mutate(ndsvi = get_ndsvi(band3 = gtrain$sr_band3, band5 = gtrain$sr_band5),
-                satvi = get_satvi(band3 = gtrain$sr_band3, band5 = gtrain$sr_band5, band7 = gtrain$sr_band7, L = 0.5),
+  dplyr::mutate(#ndsvi = get_ndsvi(band3 = gtrain$sr_band3, band5 = gtrain$sr_band5),
+                #satvi = get_satvi(band3 = gtrain$sr_band3, band5 = gtrain$sr_band5, band7 = gtrain$sr_band7, L = 0.5),
                 folded_aspect = get_folded_aspect(aspect = gtrain$aspect),
                 binary = Label
                 #binary = as.factor(ifelse(total_shrubs < parameters$sc, "Grass", "Shrub"))
