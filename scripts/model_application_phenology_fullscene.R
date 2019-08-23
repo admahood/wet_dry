@@ -66,7 +66,7 @@ for(i in 1:length(diff_folders)) {
 diff_indices <- stack(diff_files_full) %>% projectRaster(crs = crs, res = 30)
 
 #### 1.4: Setup - Parallelization
-cores <- detectCores(all.tests = FALSE, logical = TRUE)
+cores <- detectCores(all.tests = FALSE, logical = TRUE) / 2
 registerDoParallel(cores)
 
 #### 2. Model Application Loop (Parallelized) ####

@@ -23,7 +23,7 @@ system(paste0("aws s3 sync ", training_s3_path, " data/training_timeseries")) # 
 #### 4.1: Create Training Data 
 
 #2010 points
-gtrain1 <- st_read("data/training_timeseries/gbd_manual_points_2010_ard_phenology_extracted_Jul30.gpkg") %>% st_set_geometry(NULL) %>% select(-InclProb)
+gtrain1 <- st_read("data/training_timeseries/gbd_manual_points_2010_ard_phenology_extracted_Jul30.gpkg") %>% st_set_geometry(NULL) %>% dplyr::select(-InclProb)
 
 #2006 points
 gtrain2 <- st_read("data/training_timeseries/gbd_manual_points_2006_ard_phenology_extracted_Aug6.gpkg") %>% st_set_geometry(NULL) %>% dplyr::select(-OBJECTID, -lyb)
