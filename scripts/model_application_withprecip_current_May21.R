@@ -165,7 +165,7 @@ dir.create("data/results")
 system("aws s3 sync s3://earthlab-amahood/wet_dry/model_results/summer19_model_results/ data/results")
 
 #change "kings"/"frank"/"wmuc" to select results for a specific naip scene 
-all_years_files <- list.files("data/results/wmuc", pattern = "\\.tif$", full.names = T)
+all_years_files <- list.files("data/results/differenced_variables/ard_full_scene_justdiffs_Aug21", pattern = "\\.tif$", full.names = T)
 all_years_stack <- stack(all_years_files)
 
 results_list <- list()
