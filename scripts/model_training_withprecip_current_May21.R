@@ -25,11 +25,20 @@ system(paste0("aws s3 sync ", training_s3_path, " data/training_timeseries")) # 
 #2010 points
 gtrain1 <- st_read("data/training_timeseries/gbd_manual_points_2010_ard_phenology_extracted_Jul30.gpkg") %>% st_set_geometry(NULL) %>% dplyr::select(-InclProb)
 
+#2009 points
+gtrain2 <- st_read("data/training_timeseries/gbd_manual_points_2009_ard_phenology_extracted_Aug28.gpkg") %>% st_set_geometry(NULL) %>% dplyr::select(-OBJECTID, -lyb)
+
+#2008 points
+gtrain3 <- st_read("data/training_timeseries/gbd_manual_points_2008_ard_phenology_extracted_Aug28.gpkg") %>% st_set_geometry(NULL) %>% dplyr::select(-OBJECTID, -lyb)
+
+#2007 points
+gtrain4 <- st_read("data/training_timeseries/gbd_manual_points_2007_ard_phenology_extracted_Aug28.gpkg") %>% st_set_geometry(NULL) %>% dplyr::select(-OBJECTID, -lyb)
+
 #2006 points
-gtrain2 <- st_read("data/training_timeseries/gbd_manual_points_2006_ard_phenology_extracted_Aug6.gpkg") %>% st_set_geometry(NULL) %>% dplyr::select(-OBJECTID, -lyb)
+gtrain5 <- st_read("data/training_timeseries/gbd_manual_points_2006_ard_phenology_extracted_Aug6.gpkg") %>% st_set_geometry(NULL) %>% dplyr::select(-OBJECTID, -lyb)
 
 #combine 2010 and 2006 points
-gtrain <- rbind(gtrain1, gtrain2)
+gtrain <- rbind(gtrain1, gtrain2, gtrain3, gtrain4, gtrain5)
 
 #### 4.1.1: old method of training class labelling - based on shrub cover attribute ####
 
