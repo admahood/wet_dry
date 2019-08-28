@@ -32,9 +32,9 @@ plot_data <- st_read("data/BLM_AIM/BLM_AIM_20161025.shp")
 esp_mask <- raster("data/landfire_esp_rcl/clipped_binary.tif")
 
 
-gb_plots <- st_read("data/training_points/spatially_balanced_points_ard_phenology/spb_points_ard_w_lyb_novars/manual_ard_005007_phenology_points_2006_no_vars.gpkg") %>% 
+gb_plots <- st_read("data/training_points/spatially_balanced_points_ard_phenology/spb_points_ard_w_lyb_novars/manual_ard_005007_phenology_points_2008_no_vars.gpkg") %>% 
   st_transform(as.character(crs(esp_mask))) %>% mutate(ID = row_number(),
-                                                       Year = 2006)
+                                                       Year = 2008)
 
 
 
@@ -210,7 +210,7 @@ for (i in 1:length(objectid_vec)) {
 
 
 #change year in path to year of interest for extraction 
-system("aws s3 cp s3://earthlab-amahood/wet_dry/derived_raster_data/PRISM_precip_anomaly/greatbasin_trimmed_anomaly_training/precip_anomaly_train2010.tif data/precip_annual/greatbasin_trimmed_anomaly_training/")
+system("aws s3 cp s3://earthlab-amahood/wet_dry/derived_raster_data/PRISM_precip_anomaly/greatbasin_trimmed_anomaly_training/precip_anomaly_train2008.tif data/precip_annual/greatbasin_trimmed_anomaly_training/")
 
 result2 <- result %>% mutate(year_factor = as.numeric(as.factor(Year)))
 gbd <- result2
@@ -259,8 +259,8 @@ df$wetness <- wet7(df$sr_band1,df$sr_band2,df$sr_band3,df$sr_band4,df$sr_band5,d
 
 #### 8. Saving extracted points and pushing to s3 bucket ####
 
-st_write(df, dsn = "data/gbd_manual_points_2006_ard_phenology_Aug6.gpkg")
-system("aws s3 cp data/gbd_manual_points_2006_ard_phenology_Aug6.gpkg s3://earthlab-amahood/wet_dry/derived_vector_data/manual_training_points_variables_extracted/ard_pheno_spatially_balanced_points/gbd_manual_points_2006_ard_phenology_Aug6.gpkg")
+st_write(df, dsn = "data/gbd_manual_points_2008_ard_phenology_Aug28.gpkg")
+system("aws s3 cp data/gbd_manual_points_2008_ard_phenology_Aug28.gpkg s3://earthlab-amahood/wet_dry/derived_vector_data/manual_training_points_variables_extracted/ard_pheno_spatially_balanced_points/gbd_manual_points_2008_ard_phenology_Aug28.gpkg")
 
 #### 9. Extracting Differenced Veg. Indices (Phenology Variables) ####
 
@@ -268,7 +268,7 @@ system("aws s3 cp data/gbd_manual_points_2006_ard_phenology_Aug6.gpkg s3://earth
 plot_data <- st_read("data/BLM_AIM/BLM_AIM_20161025.shp") 
 
 #download manual landsat ARD extent NAIP training points from amazon s3 bucket
-system("aws s3 cp s3://earthlab-amahood/wet_dry/derived_vector_data/manual_training_points_variables_extracted/ard_pheno_spatially_balanced_points/gbd_manual_points_2010_ard_phenology_Jul30.gpkg data/training_points/gbd_manual_points_2010_ard_phenology_Jul30.gpkg")
+system("aws s3 sync s3://earthlab-amahood/wet_dry/derived_vector_data/manual_training_points_variables_extracted/ard_pheno_spatially_balanced_points/ data/training_points/")
 
 #create directory to store differenced veg index rasters
 dir.create("data/diff_indices")
@@ -278,7 +278,7 @@ s3_differenced_path <- "s3://earthlab-amahood/wet_dry/derived_raster_data/differ
 system(paste0("aws s3 sync ", s3_differenced_path, " ", "data/diff_indices"))
 
 #load in labelled training points w/ other variables extracted
-gb_diff <- st_read("data/training_points/gbd_manual_points_2006_ard_phenology_Aug6.gpkg")
+gb_diff <- st_read("data/training_points/gbd_manual_points_2009_ard_phenology_Aug28.gpkg")
 
 #list folders with differenced veg indices
 diff_folders <- list.files("data/diff_indices", full.names = T)
@@ -336,8 +336,8 @@ counter <- counter + 1
 }
 
 #paths for saving locally and uploading to s3
-finished_points_local_filename <- "gbd_manual_points_2006_ard_phenology_extracted_Aug6.gpkg"
-finished_points_local_path <- "data/gbd_manual_points_2006_ard_phenology_extracted_Aug6.gpkg"
+finished_points_local_filename <- "gbd_manual_points_2009_ard_phenology_extracted_Aug28.gpkg"
+finished_points_local_path <- "data/gbd_manual_points_2009_ard_phenology_extracted_Aug28.gpkg"
 finished_points_s3_path <- "s3://earthlab-amahood/wet_dry/derived_vector_data/manual_training_points_variables_extracted/ard_pheno_spatially_balanced_points/"
 
 #save to local disk
@@ -355,7 +355,7 @@ system("aws s3 sync s3://earthlab-amahood/wet_dry/derived_vector_data/manual_tra
 naip_points <- st_read("data/training_points/manual_ard_005007_phenology_points_2010_vars_and_lyb.gpkg") %>% mutate(plot_year = 2010)
 
 #create new object to modify for a new year of labelling (change year in "mutate" to year desired for modeling/labelling)
-new_naip_points <- naip_points %>% mutate(plot_year = 2006) %>% 
+new_naip_points <- naip_points %>% mutate(plot_year = 2009) %>% 
   filter(plot_year != lyb | is.na(lyb)) #removing points which burned in the year of interest and keeping those that did not burn
 
 
@@ -363,8 +363,9 @@ new_naip_points <- naip_points %>% mutate(plot_year = 2006) %>%
 # (because sagebrush takes a long time to establish, even if it burned in between the target year and 
 #the year of original labelling (2010) I assume it was sagebrush in the target year)
 
+#remove points labelled grass which burned after the target year - cannot assume they were grass prior to burning
 for(i in 1:nrow(new_naip_points)) {
-  if(isTRUE(new_naip_points[i,]$lyb > 2006 & new_naip_points[i,]$Label == "grass")) {
+  if(isTRUE(new_naip_points[i,]$lyb > 2009 & new_naip_points[i,]$Label == "grass")) {
   new_naip_points <- new_naip_points[-i,]
   }
 }
@@ -373,7 +374,7 @@ for(i in 1:nrow(new_naip_points)) {
 new_naip_points <- new_naip_points %>% mutate(Year = plot_year) %>% dplyr::select(OBJECTID, Label, Year, lyb)
 
 #create filename for new points (change year to match year of interest)
-new_year_naip_filename <- "data/manual_ard_005007_phenology_points_2006_no_vars.gpkg"
+new_year_naip_filename <- "data/manual_ard_005007_phenology_points_2009_no_vars.gpkg"
 
 st_write(new_naip_points, new_year_naip_filename)
 
