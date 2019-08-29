@@ -32,7 +32,7 @@ mround <- function(x,base){
   base*round(x/base) 
 } 
 
-#2. Convert ARD scene to binary checkerboard
+#### 2. Convert ARD scene to binary checkerboard ####
 x <- raster("data/landsat/mc_2010summer.tif", band = 1)
 
 x.val <- values(x)
@@ -63,10 +63,10 @@ for(i in 1:length(x.val)){
   }
 values(x) <- x.new_val
 
-#3. Mask to sagebrush biophysical zone using ESP Binary Raster
+####3. Mask to sagebrush biophysical zone using ESP Binary Raster & push to s3 ####
 mask <- raster("data/mask/clipped_binary.tif") %>% projectRaster(crs = crs(x))
 
 z <- mask(x, mask)
 
-writeRaster(x, filename = "data/ls5_ard_grid.tif" format = "GTiff", overwrite = T)
+writeRaster(x, filename = "data/ls5_ard_grid.tif", format = "GTiff", overwrite = T)
 system("aws s3 cp data/ls5_ard_grid.tif s3://earthlab-amahood/wet_dry/derived_raster_data/ls5_grid/ls5_ard_grid.tif")
