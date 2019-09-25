@@ -1,7 +1,7 @@
 #Title: Manual Training Data Raster Extraction to Points
 #Author(s): Dylan Murphy
 #Started: 6/28/19
-#Last Modified: 8/6/19
+#Last Modified: 9/25/19
 
 #### 1: Load Packages & Set Up ####
 libs <- c("raster", "sf", "dplyr", "stringr")
@@ -32,9 +32,9 @@ plot_data <- st_read("data/BLM_AIM/BLM_AIM_20161025.shp")
 esp_mask <- raster("data/landfire_esp_rcl/clipped_binary.tif")
 
 
-gb_plots <- st_read("data/training_points/spatially_balanced_points_ard_phenology/spb_points_ard_w_lyb_novars/manual_ard_005007_phenology_points_2008_no_vars.gpkg") %>% 
+gb_plots <- st_read("data/training_points/spatially_balanced_points_ard_phenology/ard_pheno_3class_points_final_Sep25.shp") %>% 
   st_transform(as.character(crs(esp_mask))) %>% mutate(ID = row_number(),
-                                                       Year = 2008)
+                                                       Year = 2010)
 
 
 
@@ -210,7 +210,7 @@ for (i in 1:length(objectid_vec)) {
 
 
 #change year in path to year of interest for extraction 
-system("aws s3 cp s3://earthlab-amahood/wet_dry/derived_raster_data/PRISM_precip_anomaly/greatbasin_trimmed_anomaly_training/precip_anomaly_train2008.tif data/precip_annual/greatbasin_trimmed_anomaly_training/")
+system("aws s3 cp s3://earthlab-amahood/wet_dry/derived_raster_data/PRISM_precip_anomaly/greatbasin_trimmed_anomaly_training/precip_anomaly_train2010.tif data/precip_annual/greatbasin_trimmed_anomaly_training/")
 
 result2 <- result %>% mutate(year_factor = as.numeric(as.factor(Year)))
 gbd <- result2
@@ -257,10 +257,10 @@ df$greenness <- green7(df$sr_band1,df$sr_band2,df$sr_band3,df$sr_band4,df$sr_ban
 df$brightness <- bright7(df$sr_band1,df$sr_band2,df$sr_band3,df$sr_band4,df$sr_band5,df$sr_band7)
 df$wetness <- wet7(df$sr_band1,df$sr_band2,df$sr_band3,df$sr_band4,df$sr_band5,df$sr_band7)
 
-#### 8. Saving extracted points and pushing to s3 bucket ####
+#### 8. Saving points with extracted variables (except for differenced indices) and pushing to s3 bucket ####
 
-st_write(df, dsn = "data/gbd_manual_points_2008_ard_phenology_Aug28.gpkg")
-system("aws s3 cp data/gbd_manual_points_2008_ard_phenology_Aug28.gpkg s3://earthlab-amahood/wet_dry/derived_vector_data/manual_training_points_variables_extracted/ard_pheno_spatially_balanced_points/gbd_manual_points_2008_ard_phenology_Aug28.gpkg")
+st_write(df, dsn = "data/gbd_manual_points_3class_2010_ard_phenology_Sep25.gpkg")
+system("aws s3 cp data/gbd_manual_points_3class_2010_ard_phenology_Sep25.gpkg s3://earthlab-amahood/wet_dry/derived_vector_data/manual_training_points_variables_extracted/ard_pheno_spatially_balanced_points/gbd_manual_points_3class_2010_ard_phenology_Sep25.gpkg")
 
 #### 9. Extracting Differenced Veg. Indices (Phenology Variables) ####
 
@@ -278,7 +278,7 @@ s3_differenced_path <- "s3://earthlab-amahood/wet_dry/derived_raster_data/differ
 system(paste0("aws s3 sync ", s3_differenced_path, " ", "data/diff_indices"))
 
 #load in labelled training points w/ other variables extracted
-gb_diff <- st_read("data/training_points/gbd_manual_points_2009_ard_phenology_Aug28.gpkg")
+gb_diff <- st_read("data/training_points/gbd_manual_points_3class_2010_ard_phenology_Sep25.gpkg")
 
 #list folders with differenced veg indices
 diff_folders <- list.files("data/diff_indices", full.names = T)
@@ -335,15 +335,16 @@ for(j in 1:length(target_years)) {
 counter <- counter + 1
 }
 
+result_diff <- result_diff %>% dplyr::mutate(Label = df$Label)
 #paths for saving locally and uploading to s3
-finished_points_local_filename <- "gbd_manual_points_2009_ard_phenology_extracted_Aug28.gpkg"
-finished_points_local_path <- "data/gbd_manual_points_2009_ard_phenology_extracted_Aug28.gpkg"
+finished_points_local_filename <- "gbd_manual_points_3class_2010_ard_phenology_extracted_Sep25.gpkg"
+finished_points_local_path <- "data/gbd_manual_points_3class_2010_ard_phenology_extracted_Sep25.gpkg"
 finished_points_s3_path <- "s3://earthlab-amahood/wet_dry/derived_vector_data/manual_training_points_variables_extracted/ard_pheno_spatially_balanced_points/"
 
 #save to local disk
 st_write(result_diff, dsn = finished_points_local_path)
 
-#upload to amazon s3 bucket
+#upload naip points with ALL variables (including differenced indices) to amazon s3 bucket
 system(paste0("aws s3 cp ", finished_points_local_path, " ", finished_points_s3_path, finished_points_local_filename))
 
 #### 10. Changing manually created Point Labels for different years based on fire history ####

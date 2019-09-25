@@ -1,5 +1,5 @@
 #Script Title: randomForest model training with precipitation anomaly data & two methods of class labelling
-#Date Last Edited: 8/7/19
+#Date Last Edited: 9/25/19
 #Author(s): Dylan Murphy
 
 #### 1: Load Packages/Source scripts/set seed
@@ -22,6 +22,7 @@ system(paste0("aws s3 sync ", training_s3_path, " data/training_timeseries")) # 
 
 #### 4.1: Create Training Data 
 
+  #TWO CLASSES:
 #2010 points
 gtrain1 <- st_read("data/training_timeseries/gbd_manual_points_2010_ard_phenology_extracted_Jul30.gpkg") %>% st_set_geometry(NULL) %>% dplyr::select(-InclProb)
 
@@ -39,6 +40,11 @@ gtrain5 <- st_read("data/training_timeseries/gbd_manual_points_2006_ard_phenolog
 
 #combine 2010 and 2006 points
 gtrain <- rbind(gtrain1, gtrain2, gtrain3, gtrain4, gtrain5)
+
+
+  #THREE CLASSES: 
+#ARD 3-CLASS (GRASS, SHRUB, MIXED) TRAINING DATA (With labels from NAIP)
+gtrain <- st_read("data/training_timeseries/gbd_manual_points_3class_2010_ard_phenology_extracted_Sep25.gpkg") %>% st_set_geometry(NULL)
 
 #### 4.1.1: old method of training class labelling - based on shrub cover attribute ####
 
