@@ -265,9 +265,9 @@ anim<-ggplot(ts_df, aes(x=x,y=y,fill=as.numeric(Prediction)))+
 
 aa<-gganimate::animate(anim, fps=1, nframes = length(years))
 
-anim_save(aa, filename = "data/gifs/ard_points_allvars_Jul31.gif")
+anim_save(aa, filename = "data/gifs/ard_points_allvars_3class_Sep26_wmuc.gif")
 
-system("aws s3 cp data/gifs/ard_points_allvars_Jul31.gif s3://earthlab-amahood/wet_dry/model_results/summer19_model_results/gifs/ard_points_allvars_Jul31.gif")
+system("aws s3 cp data/gifs/ard_points_allvars_3class_Sep26_wmuc.gif s3://earthlab-amahood/wet_dry/model_results/summer19_model_results/gifs/ard_points_allvars_3class_wmuc_Sep26.gif")
 
 
 

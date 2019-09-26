@@ -45,7 +45,7 @@ system("aws s3 sync s3://earthlab-amahood/wet_dry/input_raster_data/naip data/na
 scene <- list.files("data/ls5_mucc")
 scene_full <- list.files("data/ls5_mucc", full.names = T)
 
-# IMPORTANT: subset landsat data to just the years we have differenced indices for now 
+# IMPORTANT: subset landsat data to just the years in which we have differenced indices for now 
 scene_full <- scene_full[23:27]
 
 #list differenced veg index files
@@ -62,6 +62,10 @@ for(i in 1:length(diff_folders)) {
   counter = counter + 1
 }
 
+#get landsat crs
+landsat <- stack(scene_full[1])
+crs <- crs(landsat)
+
 #reproject differenced indices (outside of loop for now)
 diff_indices <- stack(diff_files_full) %>% projectRaster(crs = crs, res = 30)
 
@@ -70,10 +74,6 @@ cores <- detectCores(all.tests = FALSE, logical = TRUE)
 registerDoParallel(cores)
 
 #### 2. Model Application Loop (Parallelized) ####
-
-#get landsat crs
-landsat <- stack(scene_full[1])
-crs <- crs(landsat)
 
 #create naip scene raster object for cropping 
 naip <- raster("data/naip/m_4011703_ne_11_1_20100704.tif") %>% projectRaster(crs = crs, res = 30) #wmuc
@@ -129,9 +129,9 @@ foreach(i = scene_full,
           diff_indices <- diff_indices %>% crop(naip) %>% resample(ls5)
           
           #create stack of ls5 data, terrain data, and precip anomaly
-          ls5 <- stack(#ls5, 
+          ls5 <- stack(ls5, 
                        ter, 
-                       #precip,
+                       precip,
                        diff_indices
                        )
           
@@ -155,13 +155,13 @@ foreach(i = scene_full,
           
           # names to match exactly with training data that goes into model. 
           # The order matters for these
-          names(ls5) <- c(#"sr_band1", "sr_band2", "sr_band3", "sr_band4", 
-                          #"sr_band5", "sr_band7", "wetness", "brightness", 
-                          #"greenness",  "ndvi", "savi", "sr", "evi",
-                          #"ndsvi", "satvi", 
+          names(ls5) <- c("sr_band1", "sr_band2", "sr_band3", "sr_band4", 
+                          "sr_band5", "sr_band7", "wetness", "brightness", 
+                          "greenness",  "ndvi", "savi", "sr", "evi",
+                          "ndsvi", "satvi", 
                           "flowdir", "folded_aspect", "elevation",
                           "roughness", "slope", "tpi", "tri", 
-                          #"precip_anomaly",
+                          "precip_anomaly",
                           "diff_evi", "diff_ndsvi", "diff_ndvi", "diff_satvi",
                           "diff_savi", "diff_sr"
           )
@@ -174,7 +174,7 @@ foreach(i = scene_full,
           gc() 
           
           #make filename - change "frank"/"wmuc"/"kings" depending on naip scene used for extent
-          filenamet <- paste0("data/results/", "ard_timeseries_points_terrain_and_differenced", "_wmuc_", year, "_Aug28", ".tif") 
+          filenamet <- paste0("data/results/", "ard_timeseries_points_3class_allvars", "_wmuc_", year, "_Sep26", ".tif") 
           system(paste("echo", "filename created", i))
           
           #apply the RF model to raster stack and create "ls5_classed", an annual predicted sage/cheat raster!
@@ -187,7 +187,7 @@ foreach(i = scene_full,
           #save resulting land cover rasters and upload to s3
           writeRaster(ls5_classed, filename = filenamet, format = "GTiff", overwrite = T) 
           system(paste("echo", "file saved to disk"))
-          system(paste0("aws s3 cp ", filenamet, " s3://earthlab-amahood/wet_dry/model_results/summer19_model_results/differenced_variables/ard_timeseries_points_ter_and_diffs_aug28/wmuc/", substr(filenamet, 14, 150)))
+          system(paste0("aws s3 cp ", filenamet, " s3://earthlab-amahood/wet_dry/model_results/summer19_model_results/differenced_variables/ard_timeseries_points_3class_sep26/wmuc/", substr(filenamet, 14, 150)))
           system(paste("echo", "aws sync done"))
           
         }
