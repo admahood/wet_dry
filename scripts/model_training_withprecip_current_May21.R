@@ -167,7 +167,7 @@ gtrain <- gtrain %>%
   dplyr::select(#-total_shrubs, 
     - aspect,
     -Label)
-#### 4.1.4: landsat ARD extent training data with differenced veg indices (already labelled) ####
+#### 4.1.4: USE THIS CODE AS OF SEP 27 landsat ARD extent training data with differenced veg indices (already labelled) ####
 gtrain <- gtrain %>% 
   # dplyr::mutate(total_shrubs = SagebrushC) %>% 
   dplyr::select(sr_band1, sr_band2, sr_band3, sr_band4, sr_band5, sr_band7, ndvi, evi, savi, sr, 

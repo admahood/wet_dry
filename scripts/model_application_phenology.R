@@ -106,7 +106,7 @@ foreach(i = scene_full,
           system(paste("echo", "stack created and cropped", i))
           
           #grab precip anomaly for a particular year - change "frank"/"wmuc"/"kings" in both folder and filename depending on which you want to use
-          precip <- raster(paste0("data/prism/naip_trimmed_annual_precip_anomaly/wmuc/precip_anomaly_trimmed_wmuc", year, ".tif")) %>% resample(ls5)
+          precip <- raster(paste0("data/prism/naip_trimmed_annual_precip_anomaly/frank/precip_anomaly_trimmed_frank_", year, ".tif")) %>% resample(ls5)
           
           # create additional index variables - make sure all the names of this stack match the names that go into the model 
           ls5$wetness <- wet5(ls5$sr_band1,ls5$sr_band2,ls5$sr_band3,ls5$sr_band4,ls5$sr_band5,ls5$sr_band7)
@@ -174,7 +174,7 @@ foreach(i = scene_full,
           gc() 
           
           #make filename - change "frank"/"wmuc"/"kings" depending on naip scene used for extent
-          filenamet <- paste0("data/results/", "ard_timeseries_points_3class_allvars", "_wmuc_", year, "_Sep26", ".tif") 
+          filenamet <- paste0("data/results/", "ard_timeseries_points_3class_allvars", "_frank_", year, "_Sep27", ".tif") 
           system(paste("echo", "filename created", i))
           
           #apply the RF model to raster stack and create "ls5_classed", an annual predicted sage/cheat raster!
@@ -187,7 +187,7 @@ foreach(i = scene_full,
           #save resulting land cover rasters and upload to s3
           writeRaster(ls5_classed, filename = filenamet, format = "GTiff", overwrite = T) 
           system(paste("echo", "file saved to disk"))
-          system(paste0("aws s3 cp ", filenamet, " s3://earthlab-amahood/wet_dry/model_results/summer19_model_results/differenced_variables/ard_timeseries_points_3class_sep26/wmuc/", substr(filenamet, 14, 150)))
+          system(paste0("aws s3 cp ", filenamet, " s3://earthlab-amahood/wet_dry/model_results/summer19_model_results/differenced_variables/ard_timeseries_points_3class_sep26/frank/", substr(filenamet, 14, 150)))
           system(paste("echo", "aws sync done"))
           
         }
