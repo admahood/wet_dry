@@ -120,6 +120,26 @@ get_ndsvi <- function(band3, band5) {
   return(x)
 }
 
+get_ndti <- function(band5, band7) {
+  x = (band5 - band7)/(band5 + band7)
+  return(x)
+}
+
+get_green_ndvi <- function(band4, band2) {
+  x = (band4 - band2)/(band4 + band2)
+  return(x)
+}
+
+get_SLA_index <- function(band3, band4, band7) {
+  x = band4/(band3 + band7)
+  return(x)
+}
+
+get_ndi7 <- function(band4, band7) { 
+  x = (band4 - band7)/(band4+band7)
+  return(x)
+}
+
 get_folded_aspect <- function(aspect) {
   abs(180 - abs(aspect - 225))
 }
