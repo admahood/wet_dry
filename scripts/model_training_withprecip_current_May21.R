@@ -1,5 +1,5 @@
 #Script Title: randomForest model training with precipitation anomaly data & two methods of class labelling
-#Date Last Edited: 9/25/19
+#Date Last Edited: 10/10/19
 #Author(s): Dylan Murphy
 
 #### 1: Load Packages/Source scripts/set seed
@@ -24,7 +24,7 @@ system(paste0("aws s3 sync ", training_s3_path, " data/training_timeseries")) # 
 
   #TWO CLASSES:
 #2010 points
-gtrain1 <- st_read("data/training_timeseries/gbd_manual_points_2010_ard_phenology_extracted_Jul30.gpkg") %>% st_set_geometry(NULL) %>% dplyr::select(-InclProb)
+gtrain1 <- st_read("data/training_timeseries/manual_points_2class_2010_ard_phenology_all_variables_extracted_Oct9.gpkg") %>% st_set_geometry(NULL) %>% dplyr::select(-InclProb)
 
 #2009 points
 gtrain2 <- st_read("data/training_timeseries/gbd_manual_points_2009_ard_phenology_extracted_Aug28.gpkg") %>% st_set_geometry(NULL) %>% dplyr::select(-OBJECTID, -lyb)
@@ -44,7 +44,7 @@ gtrain <- rbind(gtrain1, gtrain2, gtrain3, gtrain4, gtrain5)
 
   #THREE CLASSES: 
 #ARD 3-CLASS (GRASS, SHRUB, MIXED) TRAINING DATA (With labels from NAIP)
-gtrain <- st_read("data/training_timeseries/gbd_manual_points_3class_2010_ard_phenology_extracted_Sep25.gpkg") %>% st_set_geometry(NULL)
+gtrain <- st_read("data/training_timeseries/manual_points_3class_2010_ard_phenology_all_variables_extracted_Oct9.gpkg") %>% st_set_geometry(NULL)
 
 #### 4.1.1: old method of training class labelling - based on shrub cover attribute ####
 
@@ -170,16 +170,20 @@ gtrain <- gtrain %>%
 #### 4.1.4: USE THIS CODE AS OF SEP 27 landsat ARD extent training data with differenced veg indices (already labelled) ####
 gtrain <- gtrain %>% 
   # dplyr::mutate(total_shrubs = SagebrushC) %>% 
-  dplyr::select(sr_band1, sr_band2, sr_band3, sr_band4, sr_band5, sr_band7, ndvi, evi, savi, sr, 
-                greenness, brightness, wetness, 
+  dplyr::select(spring_sr_band1, spring_sr_band2, spring_sr_band3, spring_sr_band4, spring_sr_band5, spring_sr_band7,
+                summer_sr_band1, summer_sr_band2, summer_sr_band3, summer_sr_band4, summer_sr_band5, summer_sr_band7,
+                spring_ndvi, spring_evi, spring_savi, spring_sr, summer_ndvi, summer_evi, summer_savi, summer_sr, 
+                spring_greenness, spring_brightness, spring_wetness, summer_greenness, summer_brightness, summer_wetness,
                 #total_shrubs, 
                 elevation, slope, aspect, 
                 tpi, tri, roughness, flowdir, 
                 precip_anomaly, 
                 diff_evi, diff_ndsvi, diff_savi, diff_ndvi, diff_satvi, diff_sr,
                 Label) %>%
-  dplyr::mutate(ndsvi = get_ndsvi(band3 = gtrain$sr_band3, band5 = gtrain$sr_band5),
-                satvi = get_satvi(band3 = gtrain$sr_band3, band5 = gtrain$sr_band5, band7 = gtrain$sr_band7, L = 0.5),
+  dplyr::mutate(spring_ndsvi = get_ndsvi(band3 = gtrain$spring_sr_band3, band5 = gtrain$spring_sr_band5),
+                summer_ndsvi = get_ndsvi(band3 = gtrain$summer_sr_band3, band5 = gtrain$summer_sr_band5),
+                spring_satvi = get_satvi(band3 = gtrain$spring_sr_band3, band5 = gtrain$spring_sr_band5, band7 = gtrain$spring_sr_band7, L = 0.5),
+                summer_satvi = get_satvi(band3 = gtrain$summer_sr_band3, band5 = gtrain$summer_sr_band5, band7 = gtrain$summer_sr_band7, L = 0.5),
                 folded_aspect = get_folded_aspect(aspect = gtrain$aspect),
                 binary = Label
                 #binary = as.factor(ifelse(total_shrubs < parameters$sc, "Grass", "Shrub"))
