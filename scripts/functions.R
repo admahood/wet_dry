@@ -1,7 +1,7 @@
 # functions
 
 # functions --------------------------------------------------------------------
-# TODO: make new functions for landsat 5
+
 
 bright7 <- function(band1,band2,band3,band4,band5,band7) {
   x <- (band1 *0.3561) +
