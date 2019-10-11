@@ -1,5 +1,5 @@
 #Script Title: randomForest model training with precipitation anomaly data & two methods of class labelling
-#Date Last Edited: 10/10/19
+#Date Last Edited: 10/11/19
 #Author(s): Dylan Murphy
 
 #### 1: Load Packages/Source scripts/set seed
@@ -24,7 +24,7 @@ system(paste0("aws s3 sync ", training_s3_path, " data/training_timeseries")) # 
 
   #TWO CLASSES:
 #2010 points
-gtrain1 <- st_read("data/training_timeseries/manual_points_2class_2010_ard_phenology_all_variables_extracted_Oct9.gpkg") %>% st_set_geometry(NULL) %>% dplyr::select(-InclProb)
+gtrain1 <- st_read("data/training_timeseries/manual_points_2class_2010_ard_phenology_all_variables_extracted_Oct11.gpkg") %>% st_set_geometry(NULL) %>% dplyr::select(-InclProb)
 
 #2009 points
 gtrain2 <- st_read("data/training_timeseries/gbd_manual_points_2009_ard_phenology_extracted_Aug28.gpkg") %>% st_set_geometry(NULL) %>% dplyr::select(-OBJECTID, -lyb)
@@ -172,7 +172,8 @@ gtrain <- gtrain %>%
   # dplyr::mutate(total_shrubs = SagebrushC) %>% 
   dplyr::select(spring_sr_band1, spring_sr_band2, spring_sr_band3, spring_sr_band4, spring_sr_band5, spring_sr_band7,
                 summer_sr_band1, summer_sr_band2, summer_sr_band3, summer_sr_band4, summer_sr_band5, summer_sr_band7,
-                spring_ndvi, spring_evi, spring_savi, spring_sr, summer_ndvi, summer_evi, summer_savi, summer_sr, 
+                spring_ndvi, spring_evi, spring_savi, spring_sr, spring_ndti, spring_sla_index, spring_ndi7, spring_green_ndvi, 
+                summer_ndvi, summer_evi, summer_savi, summer_sr, summer_ndti, summer_sla_index, summer_ndi7, summer_green_ndvi,
                 spring_greenness, spring_brightness, spring_wetness, summer_greenness, summer_brightness, summer_wetness,
                 #total_shrubs, 
                 elevation, slope, aspect, 

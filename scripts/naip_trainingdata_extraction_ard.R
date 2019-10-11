@@ -180,7 +180,7 @@ df$spring_evi <- get_evi(df$spring_sr_band1, df$spring_sr_band3, df$spring_sr_ba
 df$spring_savi <- get_savi(df$spring_sr_band3,df$spring_sr_band4)
 df$spring_sr <- get_sr(df$spring_sr_band3,df$spring_sr_band4)
 df$spring_ndti <- get_ndti(band5 = df$spring_sr_band5, band7 = df$spring_sr_band7)
-df$spring_green_ndvi <- get_spring_ndvi(band4 = df$spring_sr_band4, band2 = df$spring_sr_band2)
+df$spring_green_ndvi <- get_green_ndvi(band4 = df$spring_sr_band4, band2 = df$spring_sr_band2)
 df$spring_sla_index <- get_SLA_index(band3 = df$spring_sr_band3, band4 = df$spring_sr_band4, band7 = df$spring_sr_band7)
 df$spring_ndi7 <- get_ndi7(band4 = df$spring_sr_band4, band7 = df$spring_sr_band7)
 
@@ -194,19 +194,15 @@ df$summer_evi <- get_evi(df$summer_sr_band1, df$summer_sr_band3, df$summer_sr_ba
 df$summer_savi <- get_savi(df$summer_sr_band3,df$summer_sr_band4)
 df$summer_sr <- get_sr(df$summer_sr_band3,df$summer_sr_band4)
 df$summer_ndti <- get_ndti(band5 = df$summer_sr_band5, band7 = df$summer_sr_band7)
-df$summer_green_ndvi <- get_summer_ndvi(band4 = df$summer_sr_band4, band2 = df$summer_sr_band2)
+df$summer_green_ndvi <- get_green_ndvi(band4 = df$summer_sr_band4, band2 = df$summer_sr_band2)
 df$summer_sla_index <- get_SLA_index(band3 = df$summer_sr_band3, band4 = df$summer_sr_band4, band7 = df$summer_sr_band7)
 df$summer_ndi7 <- get_ndi7(band4 = df$summer_sr_band4, band7 = df$summer_sr_band7)
 
 df$summer_greenness <- green7(df$summer_sr_band1,df$summer_sr_band2,df$summer_sr_band3,df$summer_sr_band4,df$summer_sr_band5,df$summer_sr_band7)
 df$summer_brightness <- bright7(df$summer_sr_band1,df$summer_sr_band2,df$summer_sr_band3,df$summer_sr_band4,df$summer_sr_band5,df$summer_sr_band7)
 df$summer_wetness <- wet7(df$summer_sr_band1,df$summer_sr_band2,df$summer_sr_band3,df$summer_sr_band4,df$summer_sr_band5,df$summer_sr_band7)
-#### 8. Saving points with extracted variables (except for differenced indices) and pushing to s3 bucket ####
 
-st_write(df, dsn = "data/manual_points_3class_2010_ard_phenology_nodiffs_Oct9.gpkg")
-system("aws s3 cp data/manual_points_3class_2010_ard_phenology_nodiffs_Oct9.gpkg s3://earthlab-amahood/wet_dry/derived_vector_data/manual_training_points_variables_extracted/ard_pheno_spatially_balanced_points/manual_points_3class_2010_ard_phenology_nodiffs_Oct9.gpkg")
-
-#### 9. Extracting Differenced Veg. Indices (Phenology Variables) ####
+#### 8. Extracting Differenced Veg. Indices (Phenology Variables) ####
 
 #use old blm data for grabbing longlat crs string
 plot_data <- st_read("data/BLM_AIM/BLM_AIM_20161025.shp") 
@@ -222,7 +218,7 @@ s3_differenced_path <- "s3://earthlab-amahood/wet_dry/derived_raster_data/differ
 system(paste0("aws s3 sync ", s3_differenced_path, " ", "data/diff_indices"))
 
 #load in labelled training points w/ other variables extracted
-gb_diff <- st_read("data/training_points/manual_points_3class_2010_ard_phenology_nodiffs_Oct9.gpkg")
+gb_diff <- st_read("data/training_points/manual_points_3class_2010_ard_phenology_nodiffs_Oct11.gpkg")
 
 #list folders with differenced veg indices
 diff_folders <- list.files("data/diff_indices", full.names = T)
@@ -281,8 +277,8 @@ counter <- counter + 1
 
 result_diff <- result_diff %>% dplyr::mutate(Label = df$Label)
 #paths for saving locally and uploading to s3
-finished_points_local_filename <- "manual_points_2class_2010_ard_phenology_all_variables_extracted_Oct9.gpkg"
-finished_points_local_path <- "data/manual_points_2class_2010_ard_phenology_all_variables_extracted_Oct9.gpkg"
+finished_points_local_filename <- "manual_points_2class_2010_ard_phenology_all_variables_extracted_Oct11.gpkg"
+finished_points_local_path <- "data/manual_points_2class_2010_ard_phenology_all_variables_extracted_Oct11.gpkg"
 finished_points_s3_path <- "s3://earthlab-amahood/wet_dry/derived_vector_data/manual_training_points_variables_extracted/ard_pheno_spatially_balanced_points/"
 
 #save to local disk
@@ -291,7 +287,7 @@ st_write(result_diff, dsn = finished_points_local_path)
 #upload naip points with ALL variables (including differenced indices) to amazon s3 bucket
 system(paste0("aws s3 cp ", finished_points_local_path, " ", finished_points_s3_path, finished_points_local_filename))
 
-#### 10. Changing manually created Point Labels for different years based on fire history ####
+#### 9. Changing manually created Point Labels for different years based on fire history ####
 
 #download manually created NAIP point data from s3
 system("aws s3 sync s3://earthlab-amahood/wet_dry/derived_vector_data/manual_training_points_lyb_extracted /home/rstudio/wet_dry/data/training_points")
