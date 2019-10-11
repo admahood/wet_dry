@@ -207,9 +207,6 @@ df$summer_wetness <- wet7(df$summer_sr_band1,df$summer_sr_band2,df$summer_sr_ban
 #use old blm data for grabbing longlat crs string
 plot_data <- st_read("data/BLM_AIM/BLM_AIM_20161025.shp") 
 
-#download manual landsat ARD extent NAIP training points from amazon s3 bucket
-system("aws s3 sync s3://earthlab-amahood/wet_dry/derived_vector_data/manual_training_points_variables_extracted/ard_pheno_spatially_balanced_points/ data/training_points/")
-
 #create directory to store differenced veg index rasters
 dir.create("data/diff_indices")
 
@@ -218,7 +215,7 @@ s3_differenced_path <- "s3://earthlab-amahood/wet_dry/derived_raster_data/differ
 system(paste0("aws s3 sync ", s3_differenced_path, " ", "data/diff_indices"))
 
 #load in labelled training points w/ other variables extracted
-gb_diff <- st_read("data/training_points/manual_points_3class_2010_ard_phenology_nodiffs_Oct11.gpkg")
+gb_diff <- df
 
 #list folders with differenced veg indices
 diff_folders <- list.files("data/diff_indices", full.names = T)
@@ -277,8 +274,8 @@ counter <- counter + 1
 
 result_diff <- result_diff %>% dplyr::mutate(Label = df$Label)
 #paths for saving locally and uploading to s3
-finished_points_local_filename <- "manual_points_2class_2010_ard_phenology_all_variables_extracted_Oct11.gpkg"
-finished_points_local_path <- "data/manual_points_2class_2010_ard_phenology_all_variables_extracted_Oct11.gpkg"
+finished_points_local_filename <- "manual_points_2class_2010_ard_phenology_all_variables_extracted_w_new_diff_indices_Oct11.gpkg"
+finished_points_local_path <- "data/manual_points_2class_2010_ard_phenology_all_variables_extracted_w_new_diff_indices_Oct11.gpkg"
 finished_points_s3_path <- "s3://earthlab-amahood/wet_dry/derived_vector_data/manual_training_points_variables_extracted/ard_pheno_spatially_balanced_points/"
 
 #save to local disk

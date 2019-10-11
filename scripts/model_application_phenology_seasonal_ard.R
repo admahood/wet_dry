@@ -121,7 +121,7 @@ foreach(i = spring_scenes,
           system(paste("echo", "stack created and cropped", year))
           
           #grab precip anomaly for a particular year - change "frank"/"wmuc"/"kings" in both folder and filename depending on which you want to use
-          precip <- raster(paste0("data/prism/naip_trimmed_annual_precip_anomaly/frank/precip_anomaly_trimmed_frank_", year, ".tif")) %>% projectRaster(crs = crs) %>% resample(ard)
+          precip <- raster(paste0("data/prism/naip_trimmed_annual_precip_anomaly/wmuc/precip_anomaly_trimmed_wmuc", year, ".tif")) %>% projectRaster(crs = crs) %>% resample(ard)
           
           #progress check
           system(paste("echo", "precip grabbed", year))
@@ -165,7 +165,7 @@ foreach(i = spring_scenes,
                        diff_indices)
           
           #progress check
-          system(paste("echo", "ard, precip, terrain stacked together", year))
+          system(paste("echo", "ard, precip, terrain, differenced indices stacked together", year))
           
           #create esp mask and match projection/extent
           esp_mask <- raster("data/esp_binary/clipped_binary.tif")
@@ -200,8 +200,9 @@ foreach(i = spring_scenes,
                           "flowdir", "folded_aspect", "elevation",
                           "roughness", "slope", "tpi", "tri", 
                           "precip_anomaly",
-                          "diff_evi", "diff_ndsvi", "diff_ndvi", "diff_satvi",
-                          "diff_savi", "diff_sr"
+                          "diff_evi", "diff_green_ndvi", "diff_ndi7", "diff_ndsvi", 
+                          "diff_ndti", "diff_ndvi", "diff_satvi",
+                          "diff_savi", "diff_sla_index", "diff_sr"
           )
           
           #progress check for stack creation
@@ -212,7 +213,7 @@ foreach(i = spring_scenes,
           gc() 
           
           #make filename - change "frank"/"wmuc"/"kings" depending on naip scene used for extent
-          filenamet <- paste0("data/results/", "005007_2class_spring_summer_allvars", "_frank_", year, "_Oct10", ".tif") 
+          filenamet <- paste0("data/results/", "005007_2class_new_indices", "_wmuc_", year, "_Oct11", ".tif") 
           system(paste("echo", "filename created", year))
           
           #apply the RF model to raster stack and create "ls5_classed", an annual predicted sage/cheat raster!
@@ -225,7 +226,7 @@ foreach(i = spring_scenes,
           #save resulting land cover rasters and upload to s3
           writeRaster(ls5_classed, filename = filenamet, format = "GTiff", overwrite = T) 
           system(paste("echo", "file saved to disk"))
-          system(paste0("aws s3 cp ", filenamet, " s3://earthlab-amahood/wet_dry/model_results/summer19_model_results/differenced_variables/2class_ard_spring_summer_allvars_Oct10/frank/", substr(filenamet, 14, 150)))
+          system(paste0("aws s3 cp ", filenamet, " s3://earthlab-amahood/wet_dry/model_results/summer19_model_results/differenced_variables/2class_new_indices_Oct11/wmuc/", substr(filenamet, 14, 150)))
           system(paste("echo", "aws sync done"))
           
         }
