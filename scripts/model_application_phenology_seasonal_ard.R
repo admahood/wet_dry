@@ -1,7 +1,7 @@
 #Title: Random Forest Model Application LCC Using Differenced Vegetation Index Phenology
 #Author(s): Dylan Murphy
 #Date Created: July 31, 2019
-#Date Last Modified: Oct 10, 2019
+#Date Last Modified: Oct 15, 2019
 
 #### 1.1: Setup - Load Packages/Source Scripts
 libs <- c("sf", "tidyverse", "raster", "rgdal", "rgeos", "foreach", "doParallel", "gdalUtils")
@@ -69,7 +69,7 @@ landsat <- stack(scene_full[1])
 crs <- crs(landsat)
 
 #reproject differenced indices (outside of loop for now)
-diff_indices <- stack(diff_files_full) %>% projectRaster(crs = crs, res = 30)
+#diff_indices <- stack(diff_files_full) %>% projectRaster(crs = crs, res = 30)
 
 #### 1.4: Setup - Parallelization
 cores <- detectCores(all.tests = FALSE, logical = TRUE)
@@ -79,7 +79,7 @@ registerDoParallel(cores)
 
 #create naip scene raster object for cropping 
 naip <- raster("data/naip/m_4011703_ne_11_1_20100704.tif") %>% projectRaster(crs = crs, res = 30) #wmuc
-#naip <- raster("data/naip/n_4111761_nw_11_1_20060813.tif") %>% projectRaster(crs = crs, res = 30) #frank
+naip <- raster("data/naip/n_4111761_nw_11_1_20060813.tif") %>% projectRaster(crs = crs, res = 30) #frank
 #naip <- raster("data/naip/m_4111823_sw_11_1_20100628.tif") %>% projectRaster(crs = crs, res = 30) #kings
 
 #parallelized model application loop
@@ -121,7 +121,7 @@ foreach(i = spring_scenes,
           system(paste("echo", "stack created and cropped", year))
           
           #grab precip anomaly for a particular year - change "frank"/"wmuc"/"kings" in both folder and filename depending on which you want to use
-          precip <- raster(paste0("data/prism/naip_trimmed_annual_precip_anomaly/wmuc/precip_anomaly_trimmed_wmuc", year, ".tif")) %>% projectRaster(crs = crs) %>% resample(ard)
+          precip <- raster(paste0("data/prism/naip_trimmed_annual_precip_anomaly/frank/precip_anomaly_trimmed_frank_", year, ".tif")) %>% projectRaster(crs = crs) %>% resample(ard)
           
           #progress check
           system(paste("echo", "precip grabbed", year))
@@ -137,6 +137,11 @@ foreach(i = spring_scenes,
           ard$spring_evi <- get_evi(ard$spring_sr_band1, ard$spring_sr_band3, ard$spring_sr_band4)
           ard$spring_ndsvi <- get_ndsvi(ard$spring_sr_band3, ard$spring_sr_band5)
           ard$spring_satvi <- get_satvi(ard$spring_sr_band3, ard$spring_sr_band5, ard$spring_sr_band7)
+          ard$spring_ndti <- get_ndti(band5 = ard$spring_sr_band5, band7 = ard$spring_sr_band7)
+          ard$spring_green_ndvi <- get_green_ndvi(band4 = ard$spring_sr_band4, band2 = ard$spring_sr_band2)
+          ard$spring_sla_index <- get_SLA_index(band3 = ard$spring_sr_band3, band4 = ard$spring_sr_band4, band7 = ard$spring_sr_band7)
+          ard$spring_ndi7 <- get_ndi7(band4 = ard$spring_sr_band4, band7 = ard$spring_sr_band7)
+          
             #SUMMER
           ard$summer_wetness <- wet5(ard$summer_sr_band1,ard$summer_sr_band2,ard$summer_sr_band3,ard$summer_sr_band4,ard$summer_sr_band5,ard$summer_sr_band7)
           ard$summer_brightness <- bright5(ard$summer_sr_band1,ard$summer_sr_band2,ard$summer_sr_band3,ard$summer_sr_band4,ard$summer_sr_band5,ard$summer_sr_band7)
@@ -147,6 +152,10 @@ foreach(i = spring_scenes,
           ard$summer_evi <- get_evi(ard$summer_sr_band1, ard$summer_sr_band3, ard$summer_sr_band4)
           ard$summer_ndsvi <- get_ndsvi(ard$summer_sr_band3, ard$summer_sr_band5)
           ard$summer_satvi <- get_satvi(ard$summer_sr_band3, ard$summer_sr_band5, ard$summer_sr_band7)
+          ard$summer_ndti <- get_ndti(band5 = ard$summer_sr_band5, band7 = ard$summer_sr_band7)
+          ard$summer_green_ndvi <- get_green_ndvi(band4 = ard$summer_sr_band4, band2 = ard$summer_sr_band2)
+          ard$summer_sla_index <- get_SLA_index(band3 = ard$summer_sr_band3, band4 = ard$summer_sr_band4, band7 = ard$summer_sr_band7)
+          ard$summer_ndi7 <- get_ndi7(band4 = ard$summer_sr_band4, band7 = ard$summer_sr_band7)
           
           system(paste("echo", "veg indices and tassel cap created", year))
           
@@ -194,9 +203,11 @@ foreach(i = spring_scenes,
                           "spring_wetness", "spring_brightness", 
                           "spring_greenness",  "spring_ndvi", "spring_savi", "spring_sr", "spring_evi",
                           "spring_ndsvi", "spring_satvi", 
+                          "spring_ndti", "spring_green_ndvi", "spring_sla_index", "spring_ndi7",
                           "summer_wetness", "summer_brightness", 
                           "summer_greenness",  "summer_ndvi", "summer_savi", "summer_sr", "summer_evi",
                           "summer_ndsvi", "summer_satvi", 
+                          "summer_ndti", "summer_green_ndvi", "summer_sla_index", "summer_ndi7",
                           "flowdir", "folded_aspect", "elevation",
                           "roughness", "slope", "tpi", "tri", 
                           "precip_anomaly",
@@ -213,7 +224,7 @@ foreach(i = spring_scenes,
           gc() 
           
           #make filename - change "frank"/"wmuc"/"kings" depending on naip scene used for extent
-          filenamet <- paste0("data/results/", "005007_2class_new_indices", "_wmuc_", year, "_Oct11", ".tif") 
+          filenamet <- paste0("data/results/", "005007_2class_new_indices", "_frank_", year, "_Oct15", ".tif") 
           system(paste("echo", "filename created", year))
           
           #apply the RF model to raster stack and create "ls5_classed", an annual predicted sage/cheat raster!
@@ -226,7 +237,7 @@ foreach(i = spring_scenes,
           #save resulting land cover rasters and upload to s3
           writeRaster(ls5_classed, filename = filenamet, format = "GTiff", overwrite = T) 
           system(paste("echo", "file saved to disk"))
-          system(paste0("aws s3 cp ", filenamet, " s3://earthlab-amahood/wet_dry/model_results/summer19_model_results/differenced_variables/2class_new_indices_Oct11/wmuc/", substr(filenamet, 14, 150)))
+          system(paste0("aws s3 cp ", filenamet, " s3://earthlab-amahood/wet_dry/model_results/summer19_model_results/differenced_variables/2class_new_indices_Oct15/frank/", substr(filenamet, 14, 150)))
           system(paste("echo", "aws sync done"))
           
         }
