@@ -13,7 +13,7 @@ library(lubridate)
 #pull data from s3
 system("aws s3 sync s3://earthlab-amahood/wet_dry/input_vector_data/ndvi_timeseries_earthengine/ data/ndvi_ts/")
 
-####2. data exploration and plotting NDVI time series ####
+#### 2. data prep ####
 
 #create point extraction object
 ls_pts <- sf::st_read("data/ndvi_ts/ndvi-sequence_landsat5_dylans-plots.geojson")
@@ -29,16 +29,56 @@ ls_pts <-
                 ) %>% 
   dplyr::arrange(pt_id, date)
 
-pt_id_vec <- c()
-for(i in 1:length(ls_pts$pt_id)) {
-  pt_id_vec[i] <- ls_pts[i,]$pt_id
-  pt_id_vec[i] <- substr(pt_id_vec[i], 19, 21)
+#remove extra zeroes from pt ID
+ls_pts <- ls_pts %>% dplyr::mutate(pt_id = substr(ls_pts$pt_id, 19, 21))
+
+#create julian day variable for averaging max NDVI dates across classes for each year
+ls_pts <- ls_pts %>% dplyr::mutate(julian_day = yday(ls_pts$date))
+
+#### 3. Use NDVI time series to inform peak greenness date ####
+# (for selection of ideal landsat ARD scenes for veg index differencing)
+
+#create "class" and "year" vectors
+classes <- c("grass", "shrub")
+years <- c(1984:2011)
+
+#find date of average NDVI peak for each class & year
+max_ndvi_dates <- data.frame()
+
+main_year_vec <- c()
+main_class_vec <- c()
+main_date_vec <- c()
+
+counter <- 1
+
+for(i in 1:length(classes)) {
+  target_class <- classes[i]
+  class_group <- ls_pts[ls_pts$Label == classes[i],]
+    for(j in 1:length(years)) {
+      year <- years[j]
+      class_year <- class_group[class_group$year == year,]
+      pt_ids <- unique(class_year$pt_id)
+      max_ndvi_date_vec <- c()
+        for(k in 1:length(pt_ids)) {
+          target_pt <- class_year[class_year$pt_id == pt_ids[k],]
+          max_ndvi_pt <- target_pt[target_pt$ndvi_landsat5 == max(target_pt$ndvi_landsat5),]
+          max_ndvi_date_vec[k] <- max_ndvi_pt$julian_day
+          avg_max_ndvi_date <- mean(max_ndvi_date_vec)
+          print(paste0("average max ndvi date found for: ", target_class, " - ", year))
+      }
+      main_date_vec[counter] <- avg_max_ndvi_date
+      main_year_vec[counter] <- year
+      main_class_vec[counter] <- target_class
+      print(paste0("max ndvi date, year, and class added to appropriate vectors: ", target_class, " - ", year))
+      counter <- counter + 1
+}
 }
 
-ls_pts <- ls_pts %>% dplyr::mutate(pt_id = pt_id_vec)
+
+#### 4. PLOTTING ####
 #grab a particular point/year
 ls_pt_test <- ls_pts[ls_pts$year == "2010",]
-ls_pt_test <- ls_pt_test[ls_pt_test$pt_id == "00000000000000000025",]
+ls_pt_test <- ls_pt_test[ls_pt_test$pt_id == "24",]
 
 #plot ndvi values for point/year of interest and fit a curve to them
 ggplot(ls_pt_test, aes(x = date, y = ndvi_landsat5, color = Label)) + 
