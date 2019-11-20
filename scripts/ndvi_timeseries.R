@@ -43,7 +43,6 @@ classes <- c("grass", "shrub")
 years <- c(1984:2011)
 
 #find date of average NDVI peak for each class & year
-max_ndvi_dates <- data.frame()
 
 main_year_vec <- c()
 main_class_vec <- c()
@@ -74,7 +73,11 @@ for(i in 1:length(classes)) {
 }
 }
 
+max_ndvi_df <- data.frame(main_year_vec, main_class_vec, main_date_vec)
 
+max_ndvi_df <- max_ndvi_df %>% 
+  dplyr::mutate(main_date_vec = round(max_ndvi_df$main_date_vec)) %>%
+  dplyr::mutate(date = time_convert(max_ndvi_df$main_date_vec, year = max_ndvi_df$main_year_vec, output = "yyyy-mm-dd"))
 #### 4. PLOTTING ####
 #grab a particular point/year
 ls_pt_test <- ls_pts[ls_pts$year == "2010",]
