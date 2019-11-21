@@ -3,6 +3,9 @@
 #Date created: 11/15/19
 #Date of last modification: 11/15/19
 
+#Notes: Be sure to use the code chunks throughout the script specific to the satellite 
+#       from which the extractions were made throughout the script
+
 #### 1. Set up ####
 
 #load packages
@@ -22,8 +25,11 @@ system("aws s3 sync s3://earthlab-amahood/wet_dry/input_vector_data/ndvi_timeser
 #LANDSAT NDVI TIME SERIES
 ls_pts <- sf::st_read("data/ndvi_ts/ndvi-sequence_landsat5_dylans-plots.geojson")
 
-#MODIS NDVI TIME SERIES
+#MODIS AQUA NDVI TIME SERIES
 ls_pts <- sf::st_read("data/ndvi_ts/ndvi-sequence_modis_aqua_dylans-plots.geojson")
+
+#MODIS TERRA NDVI TIME SERIES
+ls_pts <- sf::st_read("data/ndvi_ts/ndvi-sequence_modis_terra_dylans-plots.geojson")
 
 #### USE THIS FOR LANDSAT EXTRACTIONS####
 
