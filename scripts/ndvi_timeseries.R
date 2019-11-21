@@ -6,9 +6,12 @@
 #### 1. Set up ####
 
 #load packages
+install.packages("eseis")
+
 library(tidyverse)
 library(sf)
 library(lubridate)
+library(eseis)
 
 #pull data from s3
 system("aws s3 sync s3://earthlab-amahood/wet_dry/input_vector_data/ndvi_timeseries_earthengine/ data/ndvi_ts/")
@@ -16,9 +19,16 @@ system("aws s3 sync s3://earthlab-amahood/wet_dry/input_vector_data/ndvi_timeser
 #### 2. data prep ####
 
 #create point extraction object
+
+#LANDSAT
 ls_pts <- sf::st_read("data/ndvi_ts/ndvi-sequence_landsat5_dylans-plots.geojson")
 
+#MODIS
+ls_pts <- sf::st_read("data/ndvi_ts/ndvi-sequence_modis_aqua_dylans-plots.geojson")
+
 #create attributes for date of image, satellite, image id, and point id by separating main ID tag into components
+
+#USE THIS FOR LANDSAT EXTRACTIONS
 ls_pts <- 
   ls_pts %>% 
   tidyr::separate(id, into = c("satellite", "image_id", "date", "pt_id"), sep = "_") %>% 
@@ -28,6 +38,20 @@ ls_pts <-
                 day = day(date)
                 ) %>% 
   dplyr::arrange(pt_id, date)
+
+#USE THIS FOR MODIS
+ls_pts <- 
+  ls_pts %>% 
+  tidyr::separate(id, into = c("year", "month", "day", "pt_id"), sep = "_")
+
+date_vec <- c()
+for(i in 1:length(ls_pts$pt_id)) {
+  date_vec[i] = paste0(ls_pts$year[i], ls_pts$month[i], ls_pts$day[i]) 
+}
+
+ls_pts <- ls_pts %>% dplyr::mutate(date = date_vec) %>% 
+dplyr::mutate(date = ymd(date_vec)) %>%
+dplyr::arrange(pt_id, date)
 
 #remove extra zeroes from pt ID
 ls_pts <- ls_pts %>% dplyr::mutate(pt_id = substr(ls_pts$pt_id, 19, 21))
@@ -78,7 +102,12 @@ max_ndvi_df <- data.frame(main_year_vec, main_class_vec, main_date_vec)
 max_ndvi_df <- max_ndvi_df %>% 
   dplyr::mutate(main_date_vec = round(max_ndvi_df$main_date_vec)) %>%
   dplyr::mutate(date = time_convert(max_ndvi_df$main_date_vec, year = max_ndvi_df$main_year_vec, output = "yyyy-mm-dd"))
+
+names(max_ndvi_df) <- c("year", "class", "max_ndvi_julian", "max_ndvi_date")
 #### 4. PLOTTING ####
+
+# PLOT NDVI VALUES FOR A GIVEN POINT/YEAR #
+
 #grab a particular point/year
 ls_pt_test <- ls_pts[ls_pts$year == "2010",]
 ls_pt_test <- ls_pt_test[ls_pt_test$pt_id == "24",]
@@ -87,3 +116,8 @@ ls_pt_test <- ls_pt_test[ls_pt_test$pt_id == "24",]
 ggplot(ls_pt_test, aes(x = date, y = ndvi_landsat5, color = Label)) + 
   geom_point(alpha = 0.5) + 
   geom_smooth()
+
+# PLOT MEAN DATE OF MAXIMUM NDVI FOR EACH CLASS ACROSS TIME SERIES #
+
+ggplot(max_ndvi_df, aes(x = year, y = max_ndvi_julian, color = class)) +
+  geom_point() 
