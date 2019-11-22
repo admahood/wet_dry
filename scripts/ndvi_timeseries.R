@@ -19,6 +19,7 @@ library(eseis)
 #pull data from s3
 system("aws s3 sync s3://earthlab-amahood/wet_dry/input_vector_data/ndvi_timeseries_earthengine/ data/ndvi_ts/")
 
+dir.create("data/date_of_max_ndvi_csv/")
 #### 2. data prep ####
 
 #create point extraction object
@@ -43,6 +44,12 @@ ls_pts <-
                 day = day(date)
                 ) %>% 
   dplyr::arrange(pt_id, date)
+
+#remove extra zeroes from pt ID
+ls_pts <- ls_pts %>% dplyr::mutate(pt_id = substr(ls_pts$pt_id, 19, 21))
+
+#create julian day variable for averaging max NDVI dates across classes for each year
+ls_pts <- ls_pts %>% dplyr::mutate(julian_day = yday(ls_pts$date))
 
 #### USE THIS FOR MODIS####
 #seperate id attribute into component parts (year, month, day, point ID)
@@ -103,8 +110,8 @@ for(i in 1:length(classes)) {
           max_ndvi_pt <- target_pt[target_pt$ndvi_landsat5 == max(target_pt$ndvi_landsat5),]
           max_ndvi_date_vec[k] <- max_ndvi_pt$julian_day
           avg_max_ndvi_date <- mean(max_ndvi_date_vec)
-          print(paste0("average max ndvi date found for: ", target_class, " - ", year))
-      }
+        }
+      print(paste0("average max ndvi date found for: ", target_class, " - ", year))
       main_date_vec[counter] <- avg_max_ndvi_date
       main_year_vec[counter] <- year
       main_class_vec[counter] <- target_class
@@ -166,11 +173,25 @@ max_ndvi_df <- data.frame(main_year_vec, main_class_vec, main_date_vec)
 
 #round dates to nearest day and add a column with non-julian dates (mm--dd--yyy)
 max_ndvi_df <- max_ndvi_df %>% 
-  dplyr::mutate(main_date_vec = round(max_ndvi_df$main_date_vec)) %>%
+  dplyr::mutate(main_date_vec = round(max_ndvi_df$main_date_vec)) 
+max_ndvi_df <- max_ndvi_df %>%
   dplyr::mutate(date = time_convert(max_ndvi_df$main_date_vec, year = max_ndvi_df$main_year_vec, output = "yyyy-mm-dd"))
 
 #attach more understandable names to each column
 names(max_ndvi_df) <- c("year", "class", "max_ndvi_julian", "max_ndvi_date")
+
+#save landsat time series
+write_csv(max_ndvi_df, path = "data/date_of_max_ndvi_csv/date_of_max_ndvi_landsat.csv")
+
+#save aqua time series
+write_csv(max_ndvi_df, path = "data/date_of_max_ndvi_csv/date_of_max_ndvi_modis_aqua.csv")
+
+#save terra time series
+write_csv(max_ndvi_df, path = "data/date_of_max_ndvi_csv/date_of_max_ndvi_modis_terra.csv")
+
+#push all csv files to s3
+system("aws s3 sync data/date_of_max_ndvi_csv s3://earthlab-amahood/wet_dry/non_spatial_data/date_of_max_ndvi")
+
 #### 4. plotting results ####
 
 # PLOT NDVI VALUES FOR A GIVEN POINT/YEAR #
