@@ -24,38 +24,40 @@ dir.create("data/date_of_max_ndvi_csv/")
 
 #create point extraction object
 #LANDSAT NDVI TIME SERIES
-ls_pts <- sf::st_read("data/ndvi_ts/ndvi-sequence_landsat5_dylans-plots.geojson")
+# ls_pts <- sf::st_read("data/ndvi_ts/ndvi-sequence_landsat5_dylans-plots.geojson")
 
 #MODIS AQUA NDVI TIME SERIES
-ls_pts <- sf::st_read("data/ndvi_ts/ndvi-sequence_modis_aqua_dylans-plots.geojson")
-
-#MODIS TERRA NDVI TIME SERIES
-ls_pts <- sf::st_read("data/ndvi_ts/ndvi-sequence_modis_terra_dylans-plots.geojson")
+# ls_pts <- sf::st_read("data/ndvi_ts/ndvi-sequence_modis_aqua_dylans-plots.geojson")
+# 
+# #MODIS TERRA NDVI TIME SERIES
+# ls_pts <- sf::st_read("data/ndvi_ts/ndvi-sequence_modis_terra_dylans-plots.geojson")
 
 #### USE THIS FOR LANDSAT EXTRACTIONS####
 
 #seperate ID attribute into component parts (satellite, image ID, date, point ID) and arrange by point ID and date
 ls_pts <- 
-  ls_pts %>% 
+  sf::st_read("data/ndvi_ts/ndvi-sequence_landsat5_dylans-plots.geojson") %>% 
   tidyr::separate(id, into = c("satellite", "image_id", "date", "pt_id"), sep = "_") %>% 
   dplyr::mutate(date = ymd(date), 
                 year = year(date), 
                 month = month(date), 
                 day = day(date)
                 ) %>% 
-  dplyr::arrange(pt_id, date)
+  dplyr::arrange(pt_id, date)%>% 
+  dplyr::mutate(pt_id = substr(ls_pts$pt_id, 19, 21))%>%
+  dplyr::mutate(julian_day = yday(ls_pts$date))
 
 #remove extra zeroes from pt ID
-ls_pts <- ls_pts %>% dplyr::mutate(pt_id = substr(ls_pts$pt_id, 19, 21))
-
-#create julian day variable for averaging max NDVI dates across classes for each year
-ls_pts <- ls_pts %>% dplyr::mutate(julian_day = yday(ls_pts$date))
+# ls_pts <- ls_pts %>% dplyr::mutate(pt_id = substr(ls_pts$pt_id, 19, 21))
+# 
+# #create julian day variable for averaging max NDVI dates across classes for each year
+# ls_pts <- ls_pts %>% dplyr::mutate(julian_day = yday(ls_pts$date))
 
 #### USE THIS FOR MODIS####
 #seperate id attribute into component parts (year, month, day, point ID)
-ls_pts <- 
-  ls_pts %>% 
-  tidyr::separate(id, into = c("year", "month", "day", "pt_id"), sep = "_")
+# ls_pts <- 
+#   ls_pts %>% 
+#   tidyr::separate(id, into = c("year", "month", "day", "pt_id"), sep = "_")
 
 #create vector of dates from year, month, day attributes
 date_vec <- c()
@@ -64,9 +66,10 @@ for(i in 1:length(ls_pts$pt_id)) {
 }
 
 #attach full year-month-day attribute to points, format as a date data type, arrange points by ID and date
-ls_pts <- ls_pts %>% dplyr::mutate(date = date_vec) %>% 
-dplyr::mutate(date = ymd(date_vec)) %>%
-dplyr::arrange(pt_id, date)
+ls_pts <- ls_pts %>% 
+  dplyr::mutate(date = date_vec) %>% 
+  dplyr::mutate(date = ymd(date_vec)) %>%
+  dplyr::arrange(pt_id, date)
 
 #remove extra zeroes from pt ID
 ls_pts <- ls_pts %>% dplyr::mutate(pt_id = substr(ls_pts$pt_id, 19, 21))
@@ -209,3 +212,66 @@ ggplot(ls_pt_test, aes(x = date, y = ndvi_landsat5, color = Label)) +
 
 ggplot(max_ndvi_df, aes(x = year, y = max_ndvi_julian, color = class)) +
   geom_point() 
+
+
+#### 5. doing some gam stuff ---------------------------------------------------
+
+ls_pts <- 
+  sf::st_read("data/ndvi_ts/ndvi-sequence_landsat5_dylans-plots.geojson") %>% 
+  tidyr::separate(id, into = c("satellite", "image_id", "date", "pt_id"), sep = "_") %>% 
+  dplyr::mutate(date = ymd(date), 
+                year = year(date), 
+                month = month(date), 
+                day = day(date)
+  ) %>% 
+  dplyr::arrange(pt_id, date)%>% 
+  dplyr::mutate(pt_id = substr(ls_pts$pt_id, 19, 21))%>%
+  dplyr::mutate(julian_day = yday(ls_pts$date))
+
+years<-1984:2011
+peaks <- list()
+for(y in 1:length(years)){
+  grass_slice <- ls_pts %>% 
+    filter(year == years[y], Label == "grass") %>% 
+    st_set_geometry(NULL) %>%
+    mutate(loess = loess(ndvi_landsat5~julian_day, .)%>%predict)
+  
+  shrub_slice <- ls_pts %>% 
+    filter(year == years[y], Label == "shrub")%>% 
+    st_set_geometry(NULL)%>%
+    mutate(loess = loess(ndvi_landsat5~julian_day, .)%>%predict)
+  
+  slice<- rbind(grass_slice, shrub_slice) 
+
+  gmod <- loess(ndvi_landsat5~julian_day, grass_slice)
+  smod <- loess(ndvi_landsat5~julian_day, shrub_slice)
+  
+  x <- data.frame(julian_day = 1:365) %>%
+    mutate(loess_g = predict(gmod, newdata = julian_day),
+           loess_s = predict(smod, newdata = julian_day),
+           difference = loess_g-loess_s) %>%
+    na.omit
+  
+  max_g_day <- x[x$loess_g == max(x$loess_g, na.rm=T),
+                           "julian_day"] %>%
+    unique
+  
+  difference <- x[x$julian_day == max_g_day,"loess_g"] - 
+    x[x$julian_day == max_g_day,"loess_s"]
+  
+  
+
+  peaks[[y]] <- data.frame(
+    max_g_doy = max_g_day,
+    
+    difference_at_peak = difference,
+    max_diff = max(x$difference),
+    year = years[y])
+}
+peaks_df<-do.call("rbind", peaks)
+
+ls_pts <- left_join(ls_pts, peaks_df, by = "year")
+ggplot(ls_pts, aes(x = julian_day, y =ndvi_landsat5, color = Label)) +
+  geom_smooth() +
+  geom_vline(aes(xintercept= max_g_doy))+
+  facet_wrap(~year)
