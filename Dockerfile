@@ -14,6 +14,7 @@ RUN install2.r --error \
   caret \
   caTools \
   doParallel \
+  eseis \
   foreach \
   gdalUtils \
   ggthemes \
