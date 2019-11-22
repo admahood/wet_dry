@@ -1,7 +1,7 @@
 #Title: Using NDVI time series to determine proper dates for veg. index differencing
 #Author(s): Dylan Murphy, Michael Koontz
 #Date created: 11/15/19
-#Date of last modification: 11/15/19
+#Date of last modification: 11/22/19
 
 #Notes: Be sure to use the code chunks throughout the script specific to the satellite 
 #       from which the extractions were made throughout the script
