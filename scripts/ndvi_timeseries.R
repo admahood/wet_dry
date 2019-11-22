@@ -248,22 +248,34 @@ for(y in 1:length(years)){
   
   x <- data.frame(julian_day = 1:365) %>%
     mutate(loess_g = predict(gmod, newdata = julian_day),
+           se_g = predict(gmod, newdata = julian_day,se=T)$se.fit,
            loess_s = predict(smod, newdata = julian_day),
-           difference = loess_g-loess_s) %>%
+           se_s = predict(smod, newdata = julian_day,se=T)$se.fit,
+           difference = loess_g-loess_s,
+           se_overlap = (se_s*2)+loess_s > loess_g-(se_g*2)) %>%
     na.omit
+  
+  
   
   max_g_day <- x[x$loess_g == max(x$loess_g, na.rm=T),
                            "julian_day"] %>%
     unique
   
+  earliest_same <- x %>%
+    filter(julian_day > max_g_day,
+           se_overlap ==TRUE)
+    
+  earliest_same <- min(earliest_same$julian_day)
+  
   difference <- x[x$julian_day == max_g_day,"loess_g"] - 
     x[x$julian_day == max_g_day,"loess_s"]
   
-  
+  # next we want the earliest date where the ndvis are similar
+  # probably need error bars in the x data frame
 
   peaks[[y]] <- data.frame(
     max_g_doy = max_g_day,
-    
+    earliest_same = earliest_same,
     difference_at_peak = difference,
     max_diff = max(x$difference),
     year = years[y])
@@ -274,4 +286,5 @@ ls_pts <- left_join(ls_pts, peaks_df, by = "year")
 ggplot(ls_pts, aes(x = julian_day, y =ndvi_landsat5, color = Label)) +
   geom_smooth() +
   geom_vline(aes(xintercept= max_g_doy))+
+  geom_vline(aes(xintercept = earliest_same), color = "blue")+
   facet_wrap(~year)
