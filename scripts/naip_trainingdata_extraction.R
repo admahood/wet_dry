@@ -31,7 +31,6 @@ plot_data <- st_read("data/BLM_AIM/BLM_AIM_20161025.shp")
 
 esp_mask <- raster("data/landfire_esp_rcl/clipped_binary.tif")
 
-
 gb_plots <- st_read("data/training_points/spatially_balanced_points_ard_phenology/ard_pheno_3class_points_final_Sep25.shp") %>% 
   st_transform(as.character(crs(esp_mask))) %>% mutate(ID = row_number(),
                                                        Year = 2010)

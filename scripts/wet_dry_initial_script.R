@@ -45,7 +45,7 @@ source("/home/rstudio/wet_dry/scripts/functions.R")
 # syntax for s3 is: aws s3 sync <s3 bucket location> <local location>
 
 system("aws s3 sync s3://earthlab-amahood/data/BLM_AIM /home/rstudio/wet_dry/data/BLM_AIM")
-system("aws s3 sync s3://earthlab-amahood/data/ecoregions /home/rstudio/wet_dry/data/ecoregions")
+system("aws s3 sync s3://earthlab-amahood/wet_dry/input_vector_data/ecoregions data/ecoregions")
 system("aws s3 sync s3://earthlab-amahood/data/WRS2_paths/wrs2_asc_desc /home/rstudio/wet_dry/data/WRS2_paths/wrs2_asc_desc")
 system("aws s3 sync s3://earthlab-amahood/data/landfire_esp_rcl /home/rstudio/wet_dry/data/landfire_esp_rcl")
 # if these st_reads don't work, you probably didn't open the project yet
@@ -252,8 +252,10 @@ df$folded_aspect = abs(180 - abs(df$aspect - 225))
 
 # doing the mask thing
 
-system("aws s3 sync s3://earthlab-amahood/data/landfire_esp_rcl /home/rstudio/wet_dry/data/landfire_esp_rcl")
+system("aws s3 sync s3://earthlab-amahood/wet_dry/input_raster_data/landfire_esp_rcl data/landfire_esp_rcl")
 shrub_binary <- raster("data/landfire_esp_rcl/shrub_binary.tif") 
+
+shrub_binary_m <- raster::mask(x=shrub_binary, mask = as(great_basin, "Spatial"), inverse = TRUE)
 
 df$esp_mask <- raster::extract(binary_clip, df)
 
