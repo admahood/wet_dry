@@ -9,8 +9,9 @@
 #### 1. Set up ####
 
 #load packages
-install.packages("eseis")
 
+  #stands for install if not installed
+if (!"eseis" %in% rownames(installed.packages())) install.packages("eseis")
 library(tidyverse)
 library(sf)
 library(lubridate)
@@ -44,8 +45,8 @@ ls_pts <-
                 day = day(date)
                 ) %>% 
   dplyr::arrange(pt_id, date)%>% 
-  dplyr::mutate(pt_id = substr(ls_pts$pt_id, 19, 21))%>%
-  dplyr::mutate(julian_day = yday(ls_pts$date))
+  dplyr::mutate(pt_id = substr(pt_id, 19, 21))%>%
+  dplyr::mutate(julian_day = yday(date))
 
 #remove extra zeroes from pt ID
 # ls_pts <- ls_pts %>% dplyr::mutate(pt_id = substr(ls_pts$pt_id, 19, 21))
@@ -225,8 +226,8 @@ ls_pts <-
                 day = day(date)
   ) %>% 
   dplyr::arrange(pt_id, date)%>% 
-  dplyr::mutate(pt_id = substr(ls_pts$pt_id, 19, 21))%>%
-  dplyr::mutate(julian_day = yday(ls_pts$date))
+  dplyr::mutate(pt_id = substr(pt_id, 19, 21))%>%
+  dplyr::mutate(julian_day = yday(date))
 
 years<-1984:2011
 peaks <- list()
@@ -263,7 +264,7 @@ for(y in 1:length(years)){
   
   earliest_same <- x %>%
     filter(julian_day > max_g_day,
-           se_overlap ==TRUE)
+           difference < 0.03 )
     
   earliest_same <- min(earliest_same$julian_day)
   
@@ -280,7 +281,11 @@ for(y in 1:length(years)){
     max_diff = max(x$difference),
     year = years[y])
 }
-peaks_df<-do.call("rbind", peaks)
+peaks_df<-do.call("rbind", peaks) %>%
+  mutate(es_date = as.Date(paste0(year, earliest_same), "%Y%j"),
+         max_g_date = as.Date(paste0(year, max_g_doy), "%Y%j"))
+
+write_csv(peaks_df, "data/key_dates.csv")
 
 ls_pts <- left_join(ls_pts, peaks_df, by = "year")
 ggplot(ls_pts, aes(x = julian_day, y =ndvi_landsat5, color = Label)) +
