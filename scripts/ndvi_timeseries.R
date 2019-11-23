@@ -256,8 +256,6 @@ for(y in 1:length(years)){
            se_overlap = (se_s*2)+loess_s > loess_g-(se_g*2)) %>%
     na.omit
   
-  
-  
   max_g_day <- x[x$loess_g == max(x$loess_g, na.rm=T),
                            "julian_day"] %>%
     unique
