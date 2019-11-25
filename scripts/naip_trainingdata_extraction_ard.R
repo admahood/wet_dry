@@ -159,7 +159,46 @@ for(i in 1:nrow(gbd)) {
 
 # attach annual precip anomaly to gb training data 
 gbd <- dplyr::mutate(gbd, precip_anomaly = precip_anomaly_vec) %>% dplyr::select(-year_factor)
-#### 6. TERRAIN EXTRACTION ####
+#### 6. ACTUAL PRECIP EXTRACTION ####
+
+#download monthly precip rasters
+system("aws s3 sync s3://earthlab-amahood/wet_dry/input_raster_data/PRISM_precip/PRISM_monthly_precip data/precip")
+
+#create objects and store the folder names and paths of .bil precip rasters
+monthly_precip_folders <- list.files("data/precip", full.names = T)
+monthly_precip_paths <- list.files(monthly_precip_folders, pattern = "\\.bil$", full.names = T)
+monthly_precip_paths <- monthly_precip_paths[2:13]
+
+#create vector of abbreviated month names for variable naming
+month_names <- c("jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec")
+
+#create raster stack object from monthly precip rasters
+monthly_precip_stack <- raster::stack(monthly_precip_paths)
+
+#create vector of variable names for monthly precip
+monthly_precip_names <- c()
+for(i in 1:length(monthly_precip_paths)) {
+  monthly_precip_names[i] <- paste0(month_names[i], "_precip")
+}
+
+#create empty list to store vectors of extracted precip values
+gbd_pts <- list()
+
+#loop over each month's precip raster and extract values at each training point, storing result in list
+for(i in 1:length(monthly_precip_names)) {
+  one_month_precip <- raster::extract(monthly_precip_stack[[i]], gbd)
+  gbd_pts[[i]] <- one_month_precip
+}
+
+#convert list of vectors to data frame and attach respective monthly variable names 
+gbd_pts <- as.data.frame(gbd_pts)
+names(gbd_pts) <- monthly_precip_names
+
+#attach extracted monthly actual precip values to training data
+gbd <- dplyr::bind_cols(gbd, gbd_pts)
+
+gbd$winter_precip <- gbd$oct_precip + gbd$nov_precip + gbd$dec_precip 
+#### 7. TERRAIN EXTRACTION ####
 system("aws s3 sync s3://earthlab-amahood/wet_dry/input_raster_data/terrain_2 /home/rstudio/wet_dry/data/terrain_2")
 
 df <- gbd
@@ -172,7 +211,7 @@ df$tri <- raster::extract(raster("data/terrain_2/TRI.tif"), df)
 df$roughness <- raster::extract(raster("data/terrain_2/roughness.tif"), df)
 df$flowdir <- raster::extract(raster("data/terrain_2/flowdir.tif"), df)
 
-#### 7. VEG INDICES AND TASSELLED CAP VARIABLE CALCULATION ####
+#### 8. VEG INDICES AND TASSELLED CAP VARIABLE CALCULATION ####
 
   #SPRING
 df$spring_ndvi <- get_ndvi(df$spring_sr_band3,df$spring_sr_band4)
@@ -202,7 +241,7 @@ df$summer_greenness <- green7(df$summer_sr_band1,df$summer_sr_band2,df$summer_sr
 df$summer_brightness <- bright7(df$summer_sr_band1,df$summer_sr_band2,df$summer_sr_band3,df$summer_sr_band4,df$summer_sr_band5,df$summer_sr_band7)
 df$summer_wetness <- wet7(df$summer_sr_band1,df$summer_sr_band2,df$summer_sr_band3,df$summer_sr_band4,df$summer_sr_band5,df$summer_sr_band7)
 
-#### 8. Extracting Differenced Veg. Indices (Phenology Variables) ####
+#### 9. Extracting Differenced Veg. Indices (Phenology Variables) ####
 
 #use old blm data for grabbing longlat crs string
 plot_data <- st_read("data/BLM_AIM/BLM_AIM_20161025.shp") 
@@ -284,7 +323,7 @@ st_write(result_diff, dsn = finished_points_local_path)
 #upload naip points with ALL variables (including differenced indices) to amazon s3 bucket
 system(paste0("aws s3 cp ", finished_points_local_path, " ", finished_points_s3_path, finished_points_local_filename))
 
-#### 9. Changing manually created Point Labels for different years based on fire history ####
+#### 10. Changing manually created Point Labels for different years based on fire history ####
 
 #download manually created NAIP point data from s3
 system("aws s3 sync s3://earthlab-amahood/wet_dry/derived_vector_data/manual_training_points_lyb_extracted /home/rstudio/wet_dry/data/training_points")
