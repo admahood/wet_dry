@@ -166,28 +166,44 @@ system("aws s3 sync s3://earthlab-amahood/wet_dry/input_raster_data/PRISM_precip
 
 #create objects and store the folder names and paths of .bil precip rasters
 monthly_precip_folders <- list.files("data/precip", full.names = T)
-monthly_precip_paths <- list.files(monthly_precip_folders, pattern = "\\.bil$", full.names = T)
-monthly_precip_paths <- monthly_precip_paths[2:13]
+monthly_precip_paths <- list()
+
+for(i in 1:length(monthly_precip_folders)) {
+monthly_precip_paths[[i]] <- list.files(monthly_precip_folders[i], pattern = "\\.bil$", full.names = T)
+monthly_precip_paths[[i]] <- monthly_precip_paths[[i]][2:13]
+}
+monthly_precip_paths <- unlist(monthly_precip_paths)
 
 #create vector of abbreviated month names for variable naming
-month_names <- c("jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec")
 
+month_names <- c("jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec")
+same_year_month_names <- c("jan", "feb", "mar", "apr", "may", "jun", "jul", "aug")
+prior_year_month_names <- c("sep", "oct", "nov", "dec")
 #create raster stack object from monthly precip rasters
 monthly_precip_stack <- raster::stack(monthly_precip_paths)
 
 #create vector of variable names for monthly precip
 monthly_precip_names <- c()
-for(i in 1:length(monthly_precip_paths)) {
+for(i in 1:length(month_names)) {
   monthly_precip_names[i] <- paste0(month_names[i], "_precip")
 }
 
 #create empty list to store vectors of extracted precip values
 gbd_pts <- list()
 
-#loop over each month's precip raster and extract values at each training point, storing result in list
+#loop over each month's precip raster and extract values at each training point, storing vector result in list
+year <- 2010
+
 for(i in 1:length(monthly_precip_names)) {
-  one_month_precip <- raster::extract(monthly_precip_stack[[i]], gbd)
-  gbd_pts[[i]] <- one_month_precip
+  if(month_names[i] == "sep") {
+    target_path <- stringr::str_subset(monthly_precip_paths, pattern = fixed(paste0(as.character(year - 1), "0", i)))
+    one_month_precip <- raster(target_path)
+    gbd_pts[[i]] <- raster::extract(one_month_precip, gbd)
+} else if (month_names[i] == c("oct", "nov", "dec")) {
+    target_path <- stringr::str_subset(monthly_precip_paths, pattern = fixed(paste0(as.character(year - 1), i)))
+    one_month_precip <- raster(target_path)
+    gbd_pts[[i]] <- raster::extract(one_month_precip, gbd)
+  }
 }
 
 #convert list of vectors to data frame and attach respective monthly variable names 
