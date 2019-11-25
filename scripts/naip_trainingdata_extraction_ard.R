@@ -199,10 +199,17 @@ for(i in 1:length(monthly_precip_names)) {
     target_path <- stringr::str_subset(monthly_precip_paths, pattern = fixed(paste0(as.character(year - 1), "0", i)))
     one_month_precip <- raster(target_path)
     gbd_pts[[i]] <- raster::extract(one_month_precip, gbd)
-} else if (month_names[i] == c("oct", "nov", "dec")) {
+    print(paste0(target_path, " extracted for ", month_names[i]))
+} else if (month_names[i] == "oct" | month_names[i] == "nov" | month_names[i] == "dec") {
     target_path <- stringr::str_subset(monthly_precip_paths, pattern = fixed(paste0(as.character(year - 1), i)))
     one_month_precip <- raster(target_path)
     gbd_pts[[i]] <- raster::extract(one_month_precip, gbd)
+    print(paste0(target_path, " extracted for ", month_names[i]))
+} else if (month_names[i] == "jan" | month_names[i] =="feb" | month_names[i] == "mar" | month_names[i] == "apr" | month_names[i] == "may" | month_names[i] == "jun" | month_names[i] == "jul" | month_names[i] == "aug") {
+    target_path <- stringr::str_subset(monthly_precip_paths, pattern = fixed(paste0(as.character(year), "0", i)))
+    one_month_precip <- raster(target_path)
+    gbd_pts[[i]] <- raster::extract(one_month_precip, gbd)
+    print(paste0(target_path, " extracted for ", month_names[i]))
   }
 }
 
