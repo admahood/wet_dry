@@ -10,7 +10,6 @@
 
 #load packages
 
-  #stands for install if not installed
 if (!"eseis" %in% rownames(installed.packages())) install.packages("eseis")
 library(tidyverse)
 library(sf)
@@ -25,13 +24,13 @@ dir.create("data/date_of_max_ndvi_csv/")
 
 #create point extraction object
 #LANDSAT NDVI TIME SERIES
-# ls_pts <- sf::st_read("data/ndvi_ts/ndvi-sequence_landsat5_dylans-plots.geojson")
+ls_pts <- sf::st_read("data/ndvi_ts/ndvi-sequence_landsat5_dylans-plots.geojson")
 
 #MODIS AQUA NDVI TIME SERIES
-# ls_pts <- sf::st_read("data/ndvi_ts/ndvi-sequence_modis_aqua_dylans-plots.geojson")
-# 
+ls_pts <- sf::st_read("data/ndvi_ts/ndvi-sequence_modis_aqua_dylans-plots.geojson")
+
 # #MODIS TERRA NDVI TIME SERIES
-# ls_pts <- sf::st_read("data/ndvi_ts/ndvi-sequence_modis_terra_dylans-plots.geojson")
+ls_pts <- sf::st_read("data/ndvi_ts/ndvi-sequence_modis_terra_dylans-plots.geojson")
 
 #### USE THIS FOR LANDSAT EXTRACTIONS####
 
@@ -49,16 +48,15 @@ ls_pts <-
   dplyr::mutate(julian_day = yday(date))
 
 #remove extra zeroes from pt ID
-# ls_pts <- ls_pts %>% dplyr::mutate(pt_id = substr(ls_pts$pt_id, 19, 21))
+ls_pts <- ls_pts %>% dplyr::mutate(pt_id = substr(ls_pts$pt_id, 19, 21))
 # 
 # #create julian day variable for averaging max NDVI dates across classes for each year
-# ls_pts <- ls_pts %>% dplyr::mutate(julian_day = yday(ls_pts$date))
+ls_pts <- ls_pts %>% dplyr::mutate(julian_day = yday(ls_pts$date))
 
 #### USE THIS FOR MODIS####
 #seperate id attribute into component parts (year, month, day, point ID)
-# ls_pts <- 
-#   ls_pts %>% 
-#   tidyr::separate(id, into = c("year", "month", "day", "pt_id"), sep = "_")
+ls_pts <- ls_pts %>% 
+tidyr::separate(id, into = c("year", "month", "day", "pt_id"), sep = "_")
 
 #create vector of dates from year, month, day attributes
 date_vec <- c()
