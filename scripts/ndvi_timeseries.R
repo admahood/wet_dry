@@ -217,6 +217,7 @@ ggplot(max_ndvi_df, aes(x = year, y = max_ndvi_julian, color = class)) +
 
 #### 5. doing some gam stuff ---------------------------------------------------
 
+# reading in the points with landsat ndvi
 ls_pts <- 
   sf::st_read("data/ndvi_ts/ndvi-sequence_landsat5_dylans-plots.geojson") %>% 
   tidyr::separate(id, into = c("satellite", "image_id", "date", "pt_id"), sep = "_") %>% 
@@ -229,49 +230,68 @@ ls_pts <-
   dplyr::mutate(pt_id = substr(pt_id, 19, 21))%>%
   dplyr::mutate(julian_day = yday(date))
 
+
 years<-1984:2011
 peaks <- list()
 for(y in 1:length(years)){
+  
+  # here is where I'm splitting the grass and shrub points and selecting the 
+  # year
   grass_slice <- ls_pts %>% 
     filter(year == years[y], Label == "grass") %>% 
     st_set_geometry(NULL) %>%
+
+    # and here is the gam model (which actually a loess but whatever same basic thing).
+    # I'm using the defaults. there's ways to optimize it to minimize the error
+    # but i didn't do that
     mutate(loess = loess(ndvi_landsat5~julian_day, .)%>%predict)
   
+  # same thing here
   shrub_slice <- ls_pts %>% 
     filter(year == years[y], Label == "shrub")%>% 
     st_set_geometry(NULL)%>%
     mutate(loess = loess(ndvi_landsat5~julian_day, .)%>%predict)
   
+  # putting them back together
   slice<- rbind(grass_slice, shrub_slice) 
-
+  
+  # creating separate model objects for each plot type
   gmod <- loess(ndvi_landsat5~julian_day, grass_slice)
   smod <- loess(ndvi_landsat5~julian_day, shrub_slice)
   
+  # then creating a data frame with each day as one column, and the 
+  # loess predictions plus their standard errors as separate columns
   x <- data.frame(julian_day = 1:365) %>%
     mutate(loess_g = predict(gmod, newdata = julian_day),
            se_g = predict(gmod, newdata = julian_day,se=T)$se.fit,
            loess_s = predict(smod, newdata = julian_day),
            se_s = predict(smod, newdata = julian_day,se=T)$se.fit,
+           
+           # here is where I'm trying to get columns that i can use to maximize or 
+           # minimize difference between shrub and grass
            difference = loess_g-loess_s,
            se_overlap = (se_s*2)+loess_s > loess_g-(se_g*2)) %>%
     na.omit
   
+  # picking out the maximum green grass day
   max_g_day <- x[x$loess_g == max(x$loess_g, na.rm=T),
                            "julian_day"] %>%
     unique
   
+  #picking out the earliest day where the ndvi starts getting close...
+  # this can probably be tweaked more
   earliest_same <- x %>%
     filter(julian_day > max_g_day,
            difference < 0.03 )
     
   earliest_same <- min(earliest_same$julian_day)
   
+  # this is the difference at the max green day, might be useful info
   difference <- x[x$julian_day == max_g_day,"loess_g"] - 
     x[x$julian_day == max_g_day,"loess_s"]
   
-  # next we want the earliest date where the ndvis are similar
-  # probably need error bars in the x data frame
-
+  # here is where i'm putting all the useful info into a data fram to be
+  # rbinded later
   peaks[[y]] <- data.frame(
     max_g_doy = max_g_day,
     earliest_same = earliest_same,
