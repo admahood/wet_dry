@@ -1,7 +1,7 @@
 #Title: Manual Training Data Raster Extraction to Points Using Landsat ARD mean composite band values
 #Author(s): Dylan Murphy
 #Started: 6/28/19
-#Last Modified: 10/9/19
+#Last Modified: 12/5/19
 
 #### 1: Load Packages & Set Up ####
 libs <- c("raster", "sf", "dplyr", "stringr")
@@ -221,7 +221,58 @@ names(gbd_pts) <- monthly_precip_names
 gbd <- dplyr::bind_cols(gbd, gbd_pts)
 
 gbd$winter_precip <- gbd$oct_precip + gbd$nov_precip + gbd$dec_precip 
-#### 7. TERRAIN EXTRACTION ####
+#### 7. CLIMATE VARIABLE Z SCORES EXTRACTION ####
+#download climate z score layers from s3
+system("aws s3 sync s3://earthlab-amahood/wet_dry/input_raster_data/climate_zscores data/climate")
+
+#list all climate zscore files
+zscore_files <- list.files("data/climate", full.names = T)
+
+#create empty vector to store climate variable names for renaming columns later
+var_names <- c()
+#loop over all zscore files and grab variable names
+for(i in 1:length(zscore_files)) {
+var_names[i] <- substr(zscore_files[i], 14, 16)
+}
+
+#grab unique variable names present (could havemade the names manually but this way 
+#we wont have to remember to change anything when we add precip z scores)
+var_names <- unique(var_names)
+
+#create empty vector to store final column names
+zscore_names <- c()
+
+#add "_z" to variable names to create final names
+for(i in 1:length(var_names)) {
+zscore_names[i] <- paste0(var_names[i], "_z") 
+}
+
+#grab years present in training data
+years <- unique(gbd$Year)
+
+#create empty list to store climate z score vectors
+climate_zscore_extracted <- list()
+
+#loop over each year in training data, select relevant climate zscore layers, extract 
+#values to points, and store resulting vectors in a list
+for(i in 1:length(years)) {
+  target_zscore_var_paths <- str_subset(zscore_files, pattern = fixed(years[i]))
+  for(j in 1:length(target_zscore_var_paths)) {
+    zscore_layer <- raster(target_zscore_var_paths[i])
+    climate_zscore_extracted[[j]] <- raster::extract(zscore_layer, gbd)
+  }
+}
+
+#convert list of vectors to a data frame
+climate_zscores <- as.data.frame(climate_zscore_extracted)
+
+#attach appropriate names to climate z score variables (columns in data frame)
+names(climate_zscores) <- zscore_names
+
+#attach new climate z score variables to main training points
+gbd <- dplyr::bind_cols(gbd, climate_zscores)
+
+#### 8. TERRAIN EXTRACTION ####
 system("aws s3 sync s3://earthlab-amahood/wet_dry/input_raster_data/terrain_2 /home/rstudio/wet_dry/data/terrain_2")
 
 df <- gbd
@@ -234,7 +285,7 @@ df$tri <- raster::extract(raster("data/terrain_2/TRI.tif"), df)
 df$roughness <- raster::extract(raster("data/terrain_2/roughness.tif"), df)
 df$flowdir <- raster::extract(raster("data/terrain_2/flowdir.tif"), df)
 
-#### 8. VEG INDICES AND TASSELLED CAP VARIABLE CALCULATION ####
+#### 9. VEG INDICES AND TASSELLED CAP VARIABLE CALCULATION ####
 
   #SPRING
 df$spring_ndvi <- get_ndvi(df$spring_sr_band3,df$spring_sr_band4)
@@ -264,7 +315,7 @@ df$summer_greenness <- green7(df$summer_sr_band1,df$summer_sr_band2,df$summer_sr
 df$summer_brightness <- bright7(df$summer_sr_band1,df$summer_sr_band2,df$summer_sr_band3,df$summer_sr_band4,df$summer_sr_band5,df$summer_sr_band7)
 df$summer_wetness <- wet7(df$summer_sr_band1,df$summer_sr_band2,df$summer_sr_band3,df$summer_sr_band4,df$summer_sr_band5,df$summer_sr_band7)
 
-#### 9. Extracting Differenced Veg. Indices (Phenology Variables) ####
+#### 10. Extracting Differenced Veg. Indices (Phenology Variables) ####
 
 #use old blm data for grabbing longlat crs string
 plot_data <- st_read("data/BLM_AIM/BLM_AIM_20161025.shp") 
@@ -346,7 +397,7 @@ st_write(result_diff, dsn = finished_points_local_path)
 #upload naip points with ALL variables (including differenced indices) to amazon s3 bucket
 system(paste0("aws s3 cp ", finished_points_local_path, " ", finished_points_s3_path, finished_points_local_filename))
 
-#### 10. Changing manually created Point Labels for different years based on fire history ####
+#### 11. Changing manually created Point Labels for different years based on fire history ####
 
 #download manually created NAIP point data from s3
 system("aws s3 sync s3://earthlab-amahood/wet_dry/derived_vector_data/manual_training_points_lyb_extracted /home/rstudio/wet_dry/data/training_points")
