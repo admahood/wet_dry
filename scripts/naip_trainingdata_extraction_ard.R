@@ -220,7 +220,11 @@ names(gbd_pts) <- monthly_precip_names
 #attach extracted monthly actual precip values to training data
 gbd <- dplyr::bind_cols(gbd, gbd_pts)
 
-gbd$winter_precip <- gbd$oct_precip + gbd$nov_precip + gbd$dec_precip 
+gbd$winter_precip <- gbd$dec_precip + gbd$jan_precip + gbd$feb_precip 
+gbd$spring_precip <- gbd$mar_precip + gbd$apr_precip + gbd$may_precip 
+gbd$summer_precip <- gbd$jun_precip + gbd$jul_precip + gbd$aug_precip 
+gbd$fall_precip <- gbd$sep_precip + gbd$oct_precip + gbd$nov_precip 
+
 #### 7. CLIMATE VARIABLE Z SCORES EXTRACTION ####
 #download climate z score layers from s3
 system("aws s3 sync s3://earthlab-amahood/wet_dry/input_raster_data/climate_zscores data/climate")

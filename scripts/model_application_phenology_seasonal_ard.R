@@ -28,6 +28,15 @@ local_precip <- "data/prism/naip_trimmed_annual_precip_anomaly"
 s3_diff <- "s3://earthlab-amahood/wet_dry/derived_raster_data/differenced_indices"
 local_diff <- "data/differenced"
 
+#climate zscore paths: 
+s3_zscore <- 
+local_zscore <- 
+
+#actual precip paths: 
+s3_monthly_precip <- 
+local_monthly_precip <- 
+
+
 #s3 syncs 
 system(paste0("aws s3 sync ", s3_ls_path, " ", local_ls_path))
 system(paste0("aws s3 sync ", s3_terrain, " ", local_terrain))
