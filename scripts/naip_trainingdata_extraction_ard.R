@@ -38,9 +38,9 @@ plot_data <- st_read("data/BLM_AIM/BLM_AIM_20161025.shp")
 esp_mask <- raster("data/landfire_esp_rcl/clipped_binary.tif")
 
 
-gb_plots <- st_read("data/training_points/spatially_balanced_points_ard_phenology/ard_pheno_3class_points_final_Sep25.shp") %>% 
+gb_plots <- st_read("data/training_timeseries/gbd_manual_points_2006_ard_phenology_extracted_Aug6.gpkg") %>% 
   st_transform(as.character(crs(esp_mask))) %>% mutate(ID = row_number(),
-                                                       Year = 2010)
+                                                       Year = 2006)
 
 
 
@@ -75,6 +75,16 @@ for(l in 1:length(ls_files_list)) {
 kounter = 1 #set counter to 1 at beginning of loop 
 
 #### 3. LANDSAT ARD BAND EXTRACTION (SPRING & SUMMER BAND VALUES) ####
+
+#TEMPORARY CODE FOR MAKING NEW TRAINING POINT TIME SERIES (REMOVE OLD NON-SEASONAL BAND VALUES)
+gb_plots <- st_read("data/training_timeseries/gbd_manual_points_2006_ard_phenology_extracted_Aug6.gpkg") %>% 
+  st_transform(as.character(crs(esp_mask))) %>% mutate(ID = row_number(),
+                                                       Year = 2006) #change year to target year
+
+gb_plots <- gb_plots %>% dplyr::select(-sr_band1, -sr_band2, -sr_band3, -sr_band4,
+                                       -sr_band5, -sr_band7, -ndvi, -evi, -savi, - sr,
+                                       -greenness, -brightness, -wetness)
+
 #Loop over each year and path/row combo and extract band values to points
 for(i in 1:length(years)){ 
   
@@ -160,6 +170,7 @@ for(i in 1:nrow(gbd)) {
 # attach annual precip anomaly to gb training data 
 gbd <- dplyr::mutate(gbd, precip_anomaly = precip_anomaly_vec) %>% dplyr::select(-year_factor)
 #### 6. ACTUAL PRECIP EXTRACTION ####
+gbd <- result
 
 #download monthly precip rasters
 system("aws s3 sync s3://earthlab-amahood/wet_dry/input_raster_data/PRISM_precip/PRISM_monthly_precip data/precip")
@@ -192,7 +203,7 @@ for(i in 1:length(month_names)) {
 gbd_pts <- list()
 
 #loop over each month's precip raster and extract values at each training point, storing vector result in list
-year <- 2010
+year <- 2006
 
 for(i in 1:length(monthly_precip_names)) {
   if(month_names[i] == "sep") {
