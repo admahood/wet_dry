@@ -145,7 +145,7 @@ for (i in 1:length(folders)) {
 }
 }
 
-system("aws s3 sync data/precip/monthly_resampled_precip_cropped s3://earthlab-amahood/wet_dry/input_raster_data/PRISM_precip/monthly_precip_resample/cropped")
+system("aws s3 sync data/precip/monthly_resampled_cropped s3://earthlab-amahood/wet_dry/input_raster_data/PRISM_precip/monthly_precip_resample/cropped")
 #### 5: ( All steps starting wth "5" ARE NO LONGER USED but will be useful if we ever need to go back to blm aim data ####
 ####TRAINING DATA (2011-2015) PRECIP ANOMALY EXTRACTION ####
 #load in training data to attach precip anomaly
