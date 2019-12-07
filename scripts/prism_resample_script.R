@@ -113,7 +113,7 @@ dir.create("data/precip/monthly_resampled_cropped/frank")
 ls5 <- stack(list.files("data/ls5", full.names = T))
 
 #### Naip scene for trimming
-naip <- raster("data/naip/m_4011703_ne_11_1_20100704.tif") #wmuc scene - switch path to one from below to make new naip crops
+naip <- raster("data/naip/m_4111823_sw_11_1_20100628.tif") #wmuc scene - switch path to one from below to make new naip crops
 
 #other naip scene paths
 # "data/naip/m_4011703_ne_11_1_20100704.tif" #wmuc
@@ -124,7 +124,8 @@ naip <- raster("data/naip/m_4011703_ne_11_1_20100704.tif") #wmuc scene - switch 
 ls5 <- stack(list.files("data/ls5", full.names = T))
 
 #create naip name object for filename creation (change this depending on which scene you are using) 
-naip_name <- "wmuc" #"kings" #"frank"
+naip_name <- "kings" 
+  #"wmuc" "kings" #"frank"
 
 #grab folder filenames (each folder is one year of monthly precip rasters)
 folders <- list.files("data/precip/PRISM_monthly_precip", full.names = T)
@@ -134,7 +135,7 @@ for (i in 1:length(folders)) {
   prism_oneyr <- list.files(folders[i], pattern = "\\.bil$", full.names = T)
   prism_oneyr <- prism_oneyr[-1]
   for(j in 1:length(prism_oneyr)) {
-  filename <- paste0("data/precip/monthly_resampled_cropped/", naip_name, "/precip_", substr(prism_oneyr[j], 93, 98), ".tif")
+  filename <- paste0("data/precip/monthly_resampled_cropped/", naip_name, "/precip_", naip_name, "_", substr(prism_oneyr[j], 93, 98), ".tif")
   prism_1month <- raster(prism_oneyr[j])
   prism_1month <- projectRaster(prism_1month, ls5, res = 30)
   print(paste0(names(prism_1month), " resampled"))
