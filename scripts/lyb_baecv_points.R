@@ -1,6 +1,6 @@
 #Title: Last Year Burned Point Extraction 
 #Authors: Adam Mahood and Dylan Murphy
-#Last Modified: 8/5/19
+#Last Modified: 12/10/19
 
 #1. Set up
 #Load Packages
@@ -31,7 +31,7 @@ system("aws s3 sync s3://earthlab-amahood/wet_dry/derived_vector_data/manual_tra
 gpkg_file <- "data/plot_data/plots_with_landsat.gpkg"
 
 #if using NAIP manual points use this 
-gpkg_file <- "data/plot_data/ard_pheno_spatially_balanced_points/gbd_manual_points_2010_ard_phenology_extracted_Jul30.gpkg"
+gpkg_file <- "data/plot_data/ard_pheno_spatially_balanced_points/manual_points_2class_2010_ard_phenology_all_variables_extracted_w_zscores_Dec5.gpkg"
 
 #grab crs of baecv rasters
 baecv_crs <- "+proj=aea +lat_1=29.5 +lat_2=45.5 +lat_0=23 +lon_0=-96 +x_0=0 +y_0=0 +datum=NAD83 +units=m +no_defs +ellps=GRS80 +towgs84=0,0,0 "
@@ -59,7 +59,8 @@ dd <-st_read(gpkg_file) %>%
 
 #### NAIP-manual training data data prep ####
 dd <- st_read(gpkg_file) %>% mutate(plot_year = 2010,
-                                    OBJECTID = rownames(dd))
+                                    OBJECTID = rownames(dd)) %>%
+  st_transform(st_crs(baecv_crs))
 
 #Grab most recent year in point dataset
 y_max <- max(dd$plot_year)
@@ -129,10 +130,10 @@ final <- merge(dd1, final1, by = 'OBJECTID', all.x = T)
 
 st_geometry(final) <- dd_geom
 
-lyb_filename <- "data/manual_ard_005007_phenology_points_2010_vars_and_lyb.gpkg"
+lyb_filename <- "data/manual_ard_points_2010_new_vars_and_lyb_Dec10.gpkg"
 #save and upload results to s3
 st_write(final, lyb_filename)
-system(paste0("aws s3 cp ", lyb_filename, " ", "s3://earthlab-amahood/wet_dry/derived_vector_data/manual_training_points_lyb_extracted/manual_ard_005007_phenology_points_2010_vars_and_lyb.gpkg"))
+system(paste0("aws s3 cp ", lyb_filename, " ", "s3://earthlab-amahood/wet_dry/derived_vector_data/manual_training_points_lyb_extracted/manual_ard_points_2010_new_vars_and_lyb_Dec10.gpkg"))
 
 #### attaching lyb to BLM AIM plots ####
 
