@@ -180,6 +180,7 @@ for(i in 1:length(monthly_folders)) {
     spring_precip <- spring_precip[[1]] + spring_precip[[2]] + spring_precip[[3]]
     
     writeRaster(spring_precip, paste0(spring_dest, spring_filename))
+    print(paste0(naip_name, " spring ", year, " precip saved"))
     
     #summer
     summer_dest <- "data/precip/seasonal_precip/summer/"
@@ -189,7 +190,8 @@ for(i in 1:length(monthly_folders)) {
     summer_precip <- summer_precip[[1]] + summer_precip[[2]] + summer_precip[[3]]
     
     writeRaster(summer_precip, paste0(summer_dest, summer_filename))
-    
+    print(paste0(naip_name, " summer ", year, " precip saved"))
+   
     #fall
     fall_dest <- "data/precip/seasonal_precip/fall/"
     fall_filename <- paste0("precip_", naip_name,  "_", year, "_fall.tif")
@@ -198,6 +200,7 @@ for(i in 1:length(monthly_folders)) {
     fall_precip <- fall_precip[[1]] + fall_precip[[2]] + fall_precip[[3]]
     
     writeRaster(fall_precip, paste0(fall_dest, fall_filename))
+    print(paste0(naip_name, " fall ", year, " precip saved"))
     
     #winter
     winter_dest <- "data/precip/seasonal_precip/winter/"
@@ -208,9 +211,12 @@ for(i in 1:length(monthly_folders)) {
     winter_precip <- winter_precip[[1]] + winter_precip[[2]] + winter_precip[[3]]
     
     writeRaster(winter_precip, paste0(winter_dest, winter_filename))
-    
+    print(paste0(naup_name, " winter ", year, " precip saved"))
   }
 }
+
+system("aws s3 sync data/precip/seasonal_precip s3://earthlab-amahood/wet_dry/input_raster_data/PRISM_precip/PRISM_seasonal_precip")
+
 
 #### 6: ( All steps starting wth "6" ARE NO LONGER USED but will be useful if we ever need to go back to blm aim data ####
 ####TRAINING DATA (2011-2015) PRECIP ANOMALY EXTRACTION ####
