@@ -113,7 +113,7 @@ dir.create("data/precip/monthly_resampled_cropped/frank")
 ls5 <- stack(list.files("data/ls5", full.names = T))
 
 #### Naip scene for trimming
-naip <- raster("data/naip/m_4111823_sw_11_1_20100628.tif") #wmuc scene - switch path to one from below to make new naip crops
+naip <- raster("data/naip/n_4111761_nw_11_1_20060813.tif") #wmuc scene - switch path to one from below to make new naip crops
 
 #other naip scene paths
 # "data/naip/m_4011703_ne_11_1_20100704.tif" #wmuc
@@ -124,7 +124,7 @@ naip <- raster("data/naip/m_4111823_sw_11_1_20100628.tif") #wmuc scene - switch 
 ls5 <- stack(list.files("data/ls5", full.names = T))
 
 #create naip name object for filename creation (change this depending on which scene you are using) 
-naip_name <- "kings" 
+naip_name <- "frank" 
   #"wmuc" "kings" #"frank"
 
 #grab folder filenames (each folder is one year of monthly precip rasters)
