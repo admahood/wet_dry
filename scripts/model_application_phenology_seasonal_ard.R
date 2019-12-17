@@ -1,7 +1,7 @@
 #Title: Random Forest Model Application LCC Using Differenced Vegetation Index Phenology
 #Author(s): Dylan Murphy
 #Date Created: July 31, 2019
-#Date Last Modified: Oct 15, 2019
+#Date Last Modified: Dec 17, 2019
 
 #### 1.1: Setup - Load Packages/Source Scripts
 libs <- c("sf", "tidyverse", "raster", "rgdal", "rgeos", "foreach", "doParallel", "gdalUtils")
@@ -32,16 +32,22 @@ local_diff <- "data/differenced"
 s3_zscore <- 
 local_zscore <- 
 
-#actual precip paths: 
-s3_monthly_precip <- 
-local_monthly_precip <- 
+#actual precip paths (monthly, cropped): 
+s3_monthly_precip <- "s3://earthlab-amahood/wet_dry/input_raster_data/PRISM_precip/monthly_precip_resample"
+local_monthly_precip <- "data/prism/monthly_precip"
 
-
+#actual precip paths (seasonal, cropped): 
+s3_seasonal_precip <- "s3://earthlab-amahood/wet_dry/input_raster_data/PRISM_precip/PRISM_seasonal_precip"
+local_seasonal_precip <- "data/prism/seasonal_precip"
+  
+  
 #s3 syncs 
 system(paste0("aws s3 sync ", s3_ls_path, " ", local_ls_path))
 system(paste0("aws s3 sync ", s3_terrain, " ", local_terrain))
 system(paste0("aws s3 sync ", s3_precip, " ", local_precip))
 system(paste0("aws s3 sync ", s3_diff, " ", local_diff))
+system(paste0("aws s3 sync ", s3_monthly_precip, " ", local_monthly_precip))
+system(paste0("aws s3 sync ", s3_seasonal_precip, " ", local_seasonal_precip))
 
 #s3 syncs cont. (masks)
 system("aws s3 sync s3://earthlab-amahood/wet_dry/input_raster_data/landfire_esp_rcl/ data/esp_binary")
@@ -53,8 +59,6 @@ system("aws s3 sync s3://earthlab-amahood/wet_dry/input_raster_data/naip data/na
 #grab filenames for ls5 stacks 
 scene <- list.files("data/mean_composites")
 scene_full <- list.files("data/mean_composites", full.names = T)
-
-
 
 spring_scenes <- str_subset(scene_full, pattern = fixed("spring"))
 summer_scenes <- str_subset(scene_full, pattern = fixed("summer"))
@@ -73,6 +77,11 @@ for(i in 1:length(diff_folders)) {
   counter = counter + 1
 }
 
+#get folder locations for monthly and seasonal actual precip rasters
+monthly_precip_folders <- list.files("data/prism/monthly_precip/cropped", full.names = T)
+
+seasonal_precip_folders <- list.files("data/prism/seasonal_precip", full.names = T)
+
 #get landsat crs
 landsat <- stack(scene_full[1])
 crs <- crs(landsat)
@@ -90,6 +99,11 @@ registerDoParallel(cores)
 naip <- raster("data/naip/m_4011703_ne_11_1_20100704.tif") %>% projectRaster(crs = crs, res = 30) #wmuc
 naip <- raster("data/naip/n_4111761_nw_11_1_20060813.tif") %>% projectRaster(crs = crs, res = 30) #frank
 #naip <- raster("data/naip/m_4111823_sw_11_1_20100628.tif") %>% projectRaster(crs = crs, res = 30) #kings
+
+#create object to store name of naip scene being modeled while testing model results
+#change to "wmuc", "frank", or "kings"
+naip_name <- "wmuc"
+
 
 #parallelized model application loop
 foreach(i = spring_scenes, 
@@ -130,11 +144,24 @@ foreach(i = spring_scenes,
           system(paste("echo", "stack created and cropped", year))
           
           #grab precip anomaly for a particular year - change "frank"/"wmuc"/"kings" in both folder and filename depending on which you want to use
-          precip <- raster(paste0("data/prism/naip_trimmed_annual_precip_anomaly/frank/precip_anomaly_trimmed_frank_", year, ".tif")) %>% projectRaster(crs = crs) %>% resample(ard)
+          precip_anom <- raster(paste0("data/prism/naip_trimmed_annual_precip_anomaly/", naip_name, "/precip_anomaly_trimmed_frank_", year, ".tif")) %>% projectRaster(crs = crs) %>% resample(ard)
           
           #progress check
-          system(paste("echo", "precip grabbed", year))
+          system(paste("echo", "precip anom grabbed", year))
           
+          #grab actual precip variables (monthly & seasonal)
+          monthly_precip_folder <- str_subset(monthly_precip_folders, pattern = fixed(naip_name))
+          monthly_precip_files <- list.files(monthly_precip_folder, full.names = T)
+          
+          monthly_precip_targets_sameyear <- str_subset(monthly_precip_files, pattern = fixed(as.character(year)))
+          monthly_precip_targets_sameyear <- monthly_precip_targets_sameyear[1:8] #subset to jan-aug
+          monthly_precip_sameyear <- stack(monthly_precip_targets_sameyear) %>% projectRaster(crs = crs) %>% resample(naip)
+          
+          monthly_precip_targets_prioryear <- str_subset(monthly_precip_files, pattern = fixed(as.character(year - 1)))
+          monthly_precip_targets_prioryear <- monthly_precip_targets_prioryear[9:12] #subset to sept-dec
+          monthly_precip_prioryear <- stack(monthly_precip_targets_prioryear) %>% projectRaster(crs = crs) %>% resample(naip)
+          
+          monthly_precip <- stack(monthly_precip_sameyear, monthly_precip_prioryear)
           # create additional index variables - make sure all the names of this stack match the names that go into the model 
             #SPRING
           ard$spring_wetness <- wet5(ard$spring_sr_band1,ard$spring_sr_band2,ard$spring_sr_band3,ard$spring_sr_band4,ard$spring_sr_band5,ard$spring_sr_band7)
@@ -179,7 +206,7 @@ foreach(i = spring_scenes,
           #create stack of ls5 data, terrain data, and precip anomaly
           ard <- stack(ard, 
                        ter, 
-                       precip,
+                       precip_anom,
                        diff_indices)
           
           #progress check
@@ -233,7 +260,7 @@ foreach(i = spring_scenes,
           gc() 
           
           #make filename - change "frank"/"wmuc"/"kings" depending on naip scene used for extent
-          filenamet <- paste0("data/results/", "005007_2class_new_indices", "_frank_", year, "_Oct15", ".tif") 
+          filenamet <- paste0("data/results/", "005007_2class_climate_vars_", naip_name, "_", year, "_Dec17", ".tif") 
           system(paste("echo", "filename created", year))
           
           #apply the RF model to raster stack and create "ls5_classed", an annual predicted sage/cheat raster!
@@ -246,7 +273,7 @@ foreach(i = spring_scenes,
           #save resulting land cover rasters and upload to s3
           writeRaster(ls5_classed, filename = filenamet, format = "GTiff", overwrite = T) 
           system(paste("echo", "file saved to disk"))
-          system(paste0("aws s3 cp ", filenamet, " s3://earthlab-amahood/wet_dry/model_results/summer19_model_results/differenced_variables/2class_new_indices_Oct15/frank/", substr(filenamet, 14, 150)))
+          system(paste0("aws s3 cp ", filenamet, " s3://earthlab-amahood/wet_dry/model_results/summer19_model_results/differenced_variables/2class_climate_vars_Dec17/", naip_name, "/", substr(filenamet, 14, 150)))
           system(paste("echo", "aws sync done"))
           
         }
