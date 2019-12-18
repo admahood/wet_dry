@@ -183,7 +183,7 @@ gtrain <- gtrain %>%
                 jan_precip, feb_precip, mar_precip, apr_precip, may_precip,
                 jun_precip, jul_precip, aug_precip, sep_precip, oct_precip, nov_precip, dec_precip,
                 winter_precip, spring_precip, summer_precip, fall_precip,
-                aet_z, def_z, tmn_z,
+                #aet_z, def_z, tmn_z,
                 Label) %>%
   dplyr::mutate(spring_ndsvi = get_ndsvi(band3 = gtrain$spring_sr_band3, band5 = gtrain$spring_sr_band5),
                 summer_ndsvi = get_ndsvi(band3 = gtrain$summer_sr_band3, band5 = gtrain$summer_sr_band5),
