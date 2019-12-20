@@ -30,6 +30,10 @@ system("aws s3 sync s3://earthlab-amahood/wet_dry/input_vector_data/wrs2_asc_des
 system("aws s3 sync s3://earthlab-amahood/wet_dry/input_raster_data/landfire_esp_rcl /home/rstudio/wet_dry/data/landfire_esp_rcl")
 system("aws s3 sync s3://earthlab-amahood/wet_dry/input_vector_data/BLM_AIM /home/rstudio/wet_dry/data/BLM_AIM")
 
+#ONLY SYNC THE BELOW DATA IF ADDING VARIABLES TO POINTS W/VARIABLES ALREADY EXTRACTED - USE
+#ABOVE SYNCS IF CREATING ENTIRELY NEW POINTS
+  #system("aws s3 sync s3://earthlab-amahood/wet_dry/derived_vector_data/manual_training_points_variables_extracted/ /home/rstudio/wet_dry/data/training_points_w_vars")
+
 #### 2. create objects and extract path/row combos to each point ####
 
 plot_data <- st_read("data/BLM_AIM/BLM_AIM_20161025.shp")
@@ -415,10 +419,10 @@ system(paste0("aws s3 cp ", finished_points_local_path, " ", finished_points_s3_
 #### 11. Changing manually created Point Labels for different years based on fire history ####
 
 #download manually created NAIP point data from s3
-system("aws s3 sync s3://earthlab-amahood/wet_dry/derived_vector_data/manual_training_points_lyb_extracted /home/rstudio/wet_dry/data/training_points")
+system("aws s3 sync s3://earthlab-amahood/wet_dry/derived_vector_data/Dec_19_training_time_series_climate_vars/ /home/rstudio/wet_dry/data/training_points")
 
 #read in original (2010) NAIP training data w/ lyb attached
-naip_points <- st_read("data/training_points/manual_ard_005007_phenology_points_2010_vars_and_lyb.gpkg") %>% mutate(plot_year = 2010)
+naip_points <- st_read("data/training_points/ard_manual_points_2010_climate_vars_lyb_Dec20.gpkg") %>% mutate(plot_year = 2010) %>% arrange(ID) 
 
 #create new object to modify for a new year of labelling (change year in "mutate" to year desired for modeling/labelling)
 new_naip_points <- naip_points %>% mutate(plot_year = 2009) %>% 
@@ -440,7 +444,7 @@ for(i in 1:nrow(new_naip_points)) {
 new_naip_points <- new_naip_points %>% mutate(Year = plot_year) %>% dplyr::select(OBJECTID, Label, Year, lyb)
 
 #create filename for new points (change year to match year of interest)
-new_year_naip_filename <- "data/manual_ard_005007_phenology_points_2009_no_vars.gpkg"
+new_year_naip_filename <- "data/manual_ard_005007_climare_vars_points_2009_no_vars.gpkg"
 
 st_write(new_naip_points, new_year_naip_filename)
 
