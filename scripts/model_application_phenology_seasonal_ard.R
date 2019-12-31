@@ -17,9 +17,11 @@ rasterOptions(tmpdir=tmpd)
 #### 1.3: Setup - Pull Data from S3
 s3_ls_path <- "s3://earthlab-amahood/wet_dry/derived_raster_data/mean_composites"
 local_ls_path <- "data/mean_composites"
+
 #terrain paths 
 s3_terrain <- "s3://earthlab-amahood/wet_dry/input_raster_data/terrain_2"
 local_terrain <- "data/terrain_reproj_full"
+
 #precip anomaly raster paths (cropped to NAIP scene already)
 s3_precip <- "s3://earthlab-amahood/wet_dry/derived_raster_data/PRISM_precip_anomaly/naip_trimmed_annual_precip_anomaly"
 local_precip <- "data/prism/naip_trimmed_annual_precip_anomaly"
@@ -29,8 +31,8 @@ s3_diff <- "s3://earthlab-amahood/wet_dry/derived_raster_data/differenced_indice
 local_diff <- "data/differenced"
 
 #climate zscore paths: 
-s3_zscore <- 
-local_zscore <- 
+s3_zscore <- "s3://earthlab-amahood/wet_dry/input_raster_data/climate_zscores"
+local_zscore <- "data/climate"
 
 #actual precip paths (monthly, cropped): 
 s3_monthly_precip <- "s3://earthlab-amahood/wet_dry/input_raster_data/PRISM_precip/monthly_precip_resample"
@@ -48,6 +50,7 @@ system(paste0("aws s3 sync ", s3_precip, " ", local_precip))
 system(paste0("aws s3 sync ", s3_diff, " ", local_diff))
 system(paste0("aws s3 sync ", s3_monthly_precip, " ", local_monthly_precip))
 system(paste0("aws s3 sync ", s3_seasonal_precip, " ", local_seasonal_precip))
+system(paste0("aws s3 sync ", s3_zscore, " ", local_zscore))
 
 #s3 syncs cont. (masks)
 system("aws s3 sync s3://earthlab-amahood/wet_dry/input_raster_data/landfire_esp_rcl/ data/esp_binary")
@@ -109,45 +112,45 @@ naip_name <- "wmuc"
 foreach(i = spring_scenes, 
         .packages = 'raster') %dopar% {         
           
-          #grab file name without directories for filename creation later 
+      #grab file name without directories for filename creation later 
           file = substr(i, 22, 45) 
           
-          #grab year for particular loop iteration
+      #grab year for particular loop iteration
           year = substr(i, 25, 28)
           
-          #grab start time for progress check 
+      #grab start time for progress check 
           t0 <- Sys.time()
           
-          #crop spring/summer landsat data to naip scene
+      #crop spring/summer landsat data to naip scene
           ard_spring <- stack(str_subset(spring_scenes, pattern = fixed(year))) %>% resample(naip)
           ard_summer <- stack(str_subset(summer_scenes, pattern = fixed(year))) %>% resample(naip)
           
-          #progress check
+      #progress check
           system(paste("echo", "seasonal ard stacked", year))
           
-          #crop terrain data to naip scene
+      #crop terrain data to naip scene
           ter <- stack(list.files(local_terrain, full.names =T)) %>% projectRaster(to = naip)
           
-          #progress check
+      #progress check
           system(paste("echo", "terrain stacked", year))
           
-          #get proper names for landsat bands - important for use in veg indice/tassel cap functions later
+      #get proper names for landsat bands - important for use in veg indice/tassel cap functions later
           names(ard_spring)<- c("spring_sr_band1", "spring_sr_band2","spring_sr_band3", "spring_sr_band4","spring_sr_band5", "spring_sr_band7")
           names(ard_summer)<- c("summer_sr_band1", "summer_sr_band2","summer_sr_band3", "summer_sr_band4","summer_sr_band5", "summer_sr_band7")
           
           ard <- stack(ard_spring, ard_summer)
-          #progress check
+      #progress check
           system(paste("echo", "stack created and cropped", year))
           
-          #grab precip anomaly for a particular year - change "frank"/"wmuc"/"kings" in both folder and filename depending on which you want to use
+      #grab precip anomaly for a particular year - change "frank"/"wmuc"/"kings" in both folder and filename depending on which you want to use
           precip_anom <- raster(paste0("data/prism/naip_trimmed_annual_precip_anomaly/", naip_name, "/precip_anomaly_trimmed_", naip_name, year, ".tif")) %>% projectRaster(crs = crs) %>% resample(ard)
           
-          #progress check
+      #progress check
           system(paste("echo", "precip anom grabbed", year))
           
-          #grab actual precip variables (monthly & seasonal)
+      #grab actual precip variables (monthly & seasonal)
           
-          #MONTHLY
+      #MONTHLY
           monthly_precip_folder <- str_subset(monthly_precip_folders, pattern = fixed(naip_name))
           monthly_precip_files <- list.files(monthly_precip_folder, full.names = T)
           
@@ -161,10 +164,10 @@ foreach(i = spring_scenes,
           
           monthly_precip <- stack(monthly_precip_sameyear, monthly_precip_prioryear)
           
-          #progress check
+      #progress check
           system(paste("echo", "monthly precip grabbed", year))
           
-          #SEASONAL
+      #SEASONAL
           #spring
           spring_precip_files <- list.files(seasonal_precip_folders[2], full.names = T)
           spring_precip <- str_subset(spring_precip_files, pattern = fixed(year)) %>% 
@@ -195,8 +198,28 @@ foreach(i = spring_scenes,
           #progress check
           system(paste("echo", "seasonal precip grabbed", year))
           
-          # create additional index variables - make sure all the names of this stack match the names that go into the model 
-            #SPRING
+       #CLIMATE Z SCORES
+          
+          zscore_files <- list.files("data/climate", full.names = T)
+          
+          zscore_vars <- list()
+            prior_year <- as.numeric(year) - 1
+            target_zscore_paths_sameyear <- str_subset(zscore_files, pattern = fixed(year))
+            target_zscore_paths_prioryear <- str_subset(zscore_files, pattern = fixed(as.character(prior_year)))
+            for(j in 1:length(target_zscore_paths_sameyear)) {
+              zscore_layer_sameyear <- stack(target_zscore_paths_sameyear[j])
+              zscore_layer_prior_year <- stack(target_zscore_paths_prioryear[j])
+              #change the below subsets to grab different months for "water year"
+              zscore_layer_water_year <- stack(zscore_layer_prior_year[[9:12]], zscore_layer_sameyear[[1:3]]) 
+              zscore_layer <- mean(zscore_layer_water_year[[1:7]]) #change if water year months != 7
+              zscore_layer <- zscore_layer %>% projectRaster(to = ard)
+              zscore_vars[[j]] <- zscore_layer
+            }
+          
+          zscore_vars <- stack(zscore_vars)
+          names(zscore_vars) <- c("aet_z", "def_z", "tmn_z")
+      # create additional index variables - make sure all the names of this stack match the names that go into the model 
+      #SPRING
           ard$spring_wetness <- wet5(ard$spring_sr_band1,ard$spring_sr_band2,ard$spring_sr_band3,ard$spring_sr_band4,ard$spring_sr_band5,ard$spring_sr_band7)
           ard$spring_brightness <- bright5(ard$spring_sr_band1,ard$spring_sr_band2,ard$spring_sr_band3,ard$spring_sr_band4,ard$spring_sr_band5,ard$spring_sr_band7)
           ard$spring_greenness <- green5(ard$spring_sr_band1,ard$spring_sr_band2,ard$spring_sr_band3,ard$spring_sr_band4,ard$spring_sr_band5,ard$spring_sr_band7)
@@ -211,7 +234,7 @@ foreach(i = spring_scenes,
           ard$spring_sla_index <- get_SLA_index(band3 = ard$spring_sr_band3, band4 = ard$spring_sr_band4, band7 = ard$spring_sr_band7)
           ard$spring_ndi7 <- get_ndi7(band4 = ard$spring_sr_band4, band7 = ard$spring_sr_band7)
           
-            #SUMMER
+      #SUMMER
           ard$summer_wetness <- wet5(ard$summer_sr_band1,ard$summer_sr_band2,ard$summer_sr_band3,ard$summer_sr_band4,ard$summer_sr_band5,ard$summer_sr_band7)
           ard$summer_brightness <- bright5(ard$summer_sr_band1,ard$summer_sr_band2,ard$summer_sr_band3,ard$summer_sr_band4,ard$summer_sr_band5,ard$summer_sr_band7)
           ard$summer_greenness <- green5(ard$summer_sr_band1,ard$summer_sr_band2,ard$summer_sr_band3,ard$summer_sr_band4,ard$summer_sr_band5,ard$summer_sr_band7)
@@ -233,40 +256,41 @@ foreach(i = spring_scenes,
           
           diff_indices <- stack(diff_target) %>% projectRaster(to = ard)
           
-          #crop/reproject differenced indices
+      #crop/reproject differenced indices
           diff_indices <- diff_indices %>% crop(naip) %>% resample(ard)
           
-          #create stack of ls5 data, terrain data, and precip anomaly
+      #create stack of ls5 data, terrain data, and precip anomaly
           ard <- stack(ard, 
                        ter, 
                        precip_anom,
                        diff_indices,
                        monthly_precip,
-                       seasonal_precip)
+                       seasonal_precip, 
+                       zscore_vars)
           
-          #progress check
+      #progress check
           system(paste("echo", "ard, precip_anom, terrain, differenced indices, monthly and seasonal precip stacked together", year))
           
-          #create esp mask and match projection/extent
+      #create esp mask and match projection/extent
           esp_mask <- raster("data/esp_binary/clipped_binary.tif")
           esp_mask <- projectRaster(esp_mask, ard, res = 30)
           system(paste("echo", "esp mask reprojected", year))
           
-          #create urban_ag mask and match projection/extent
+      #create urban_ag mask and match projection/extent
           urb_mask <- raster("data/urban_ag_mask/lf_msk_rclss1.tif")
           urb_mask <- projectRaster(urb_mask, ard, res = 30)
           system(paste("echo", "urb_ag mask reprojected", year))
           
-          #masking (esp)
+      #masking (esp)
           ard <- mask(ard, esp_mask, maskvalue = 0)
           system(paste("echo", "esp masking done", year))
           
-          #masking (urb_ag_Water)
+      #masking (urb_ag_Water)
           ard <- mask(ard, urb_mask, maskvalue = 1)
           system(paste("echo", "urb ag masking done", year))
           
-          # names to match exactly with training data that goes into model. 
-          # The order matters for these
+      # names to match exactly with training data that goes into model. 
+          # The order matters for these (must match order of layers in stack)
           names(ard) <- c("spring_sr_band1", "spring_sr_band2", "spring_sr_band3", "spring_sr_band4", 
                           "spring_sr_band5", "spring_sr_band7", 
                           "summer_sr_band1", "summer_sr_band2", "summer_sr_band3", "summer_sr_band4", 
@@ -287,28 +311,29 @@ foreach(i = spring_scenes,
                           "diff_savi", "diff_sla_index", "diff_sr", 
                           "jan_precip", "feb_precip", "mar_precip", "apr_precip", "may_precip",
                           "jun_precip", "jul_precip", "aug_precip", "sep_precip", "oct_precip", "nov_precip", "dec_precip",
-                          "winter_precip", "spring_precip", "summer_precip", "fall_precip"
+                          "winter_precip", "spring_precip", "summer_precip", "fall_precip",
+                          "aet_z", "def_z", "tmn_z"
           )
           
-          #progress check for stack creation
+      #progress check for stack creation
           system(paste("echo", "full stack created and names set", year))
           print(Sys.time()-t0)
           
-          #for saving memory
+      #for saving memory
           gc() 
           
-          #make filename - change "frank"/"wmuc"/"kings" depending on naip scene used for extent
+      #make filename - change "frank"/"wmuc"/"kings" depending on naip scene used for extent
           filenamet <- paste0("data/results/", "005007_2class_climate_vars_", naip_name, "_", year, "_Dec18", ".tif") 
           system(paste("echo", "filename created", year))
           
-          #apply the RF model to raster stack and create "ls5_classed", an annual predicted sage/cheat raster!
+      #apply the RF model to raster stack and create "ls5_classed", an annual predicted sage/cheat raster!
           ls5_classed <- raster::predict(ard, model2, inf.rm = T, na.rm = T) #apply model of choice from list to stack and make predictions
           
-          #progress check
+      #progress check
           system(paste("echo", "model applied"))
           print(Sys.time()-t0) 
           
-          #save resulting land cover rasters and upload to s3
+      #save resulting land cover rasters and upload to s3
           writeRaster(ls5_classed, filename = filenamet, format = "GTiff", overwrite = T) 
           system(paste("echo", "file saved to disk"))
           system(paste0("aws s3 cp ", filenamet, " s3://earthlab-amahood/wet_dry/model_results/summer19_model_results/differenced_variables/2class_climate_vars_Dec18/", naip_name, "/", substr(filenamet, 14, 150)))

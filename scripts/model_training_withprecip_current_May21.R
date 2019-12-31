@@ -11,7 +11,7 @@ source("scripts/functions.R")
 set.seed(11)
 
 #### 2: Pull data from s3: Hypergrids (for parameter selection) & Training Data 
-training_s3_path <- "s3://earthlab-amahood/wet_dry/derived_vector_data/manual_training_points_variables_extracted/ard_pheno_spatially_balanced_points"
+training_s3_path <- "s3://earthlab-amahood/wet_dry/derived_vector_data/training_time_series_climate_vars"
 
 
 system(paste0("aws s3 sync ", training_s3_path, " data/training_timeseries")) # Use May 21 splits (most recent)
@@ -24,19 +24,19 @@ system(paste0("aws s3 sync ", training_s3_path, " data/training_timeseries")) # 
 
   #TWO CLASSES:
 #2010 points
-gtrain1 <- st_read("data/training_timeseries/manual_points_2class_2010_ard_phenology_all_variables_extracted_w_zscores_Dec5.gpkg") %>% st_set_geometry(NULL) %>% dplyr::select(-InclProb)
+gtrain1 <- st_read("data/training_timeseries/manual_points_2class_2010_ard_new_climate_vars_Dec30.gpkg") %>% st_set_geometry(NULL) %>% dplyr::select(-OBJECTID, -lyb, -PATH, -ROW)
 
 #2009 points
-gtrain2 <- st_read("data/training_timeseries/gbd_manual_points_2009_ard_phenology_extracted_Aug28.gpkg") %>% st_set_geometry(NULL) %>% dplyr::select(-OBJECTID, -lyb)
+gtrain2 <- st_read("data/training_timeseries/manual_points_2class_2009_ard_new_climate_vars_Dec30.gpkg") %>% st_set_geometry(NULL) %>% dplyr::select(-OBJECTID, -lyb, -PATH, -ROW)
 
 #2008 points
-gtrain3 <- st_read("data/training_timeseries/gbd_manual_points_2008_ard_phenology_extracted_Aug28.gpkg") %>% st_set_geometry(NULL) %>% dplyr::select(-OBJECTID, -lyb)
+gtrain3 <- st_read("data/training_timeseries/manual_points_2class_2008_ard_new_climate_vars_Dec30.gpkg") %>% st_set_geometry(NULL) %>% dplyr::select(-OBJECTID, -lyb, -PATH, -ROW)
 
 #2007 points
-gtrain4 <- st_read("data/training_timeseries/gbd_manual_points_2007_ard_phenology_extracted_Aug28.gpkg") %>% st_set_geometry(NULL) %>% dplyr::select(-OBJECTID, -lyb)
+gtrain4 <- st_read("data/training_timeseries/manual_points_2class_2007_ard_new_climate_vars_Dec30.gpkg") %>% st_set_geometry(NULL) %>% dplyr::select(-OBJECTID, -lyb, -PATH, -ROW)
 
 #2006 points
-gtrain5 <- st_read("data/training_timeseries/gbd_manual_points_2006_ard_phenology_extracted_Aug6.gpkg") %>% st_set_geometry(NULL) %>% dplyr::select(-OBJECTID, -lyb)
+gtrain5 <- st_read("data/training_timeseries/manual_points_2class_2006_ard_new_climate_vars_Dec30.gpkg") %>% st_set_geometry(NULL) %>% dplyr::select(-OBJECTID, -lyb, -PATH, -ROW)
 
 #combine 2010 and 2006 points
 gtrain <- rbind(gtrain1, gtrain2, gtrain3, gtrain4, gtrain5)
@@ -175,7 +175,7 @@ gtrain <- gtrain %>%
                 spring_ndvi, spring_evi, spring_savi, spring_sr, spring_ndti, spring_sla_index, spring_ndi7, spring_green_ndvi, 
                 summer_ndvi, summer_evi, summer_savi, summer_sr, summer_ndti, summer_sla_index, summer_ndi7, summer_green_ndvi,
                 spring_greenness, spring_brightness, spring_wetness, summer_greenness, summer_brightness, summer_wetness,
-                #total_shrubs, 
+                total_shrubs, 
                 elevation, slope, aspect, 
                 tpi, tri, roughness, flowdir, 
                 precip_anomaly, 
@@ -183,7 +183,7 @@ gtrain <- gtrain %>%
                 jan_precip, feb_precip, mar_precip, apr_precip, may_precip,
                 jun_precip, jul_precip, aug_precip, sep_precip, oct_precip, nov_precip, dec_precip,
                 winter_precip, spring_precip, summer_precip, fall_precip,
-                #aet_z, def_z, tmn_z,
+                aet_z, def_z, tmn_z,
                 Label) %>%
   dplyr::mutate(spring_ndsvi = get_ndsvi(band3 = gtrain$spring_sr_band3, band5 = gtrain$spring_sr_band5),
                 summer_ndsvi = get_ndsvi(band3 = gtrain$summer_sr_band3, band5 = gtrain$summer_sr_band5),

@@ -47,7 +47,7 @@ gb_plots <- st_read("data/training_timeseries/gbd_manual_points_2006_ard_phenolo
 #then create gb_plots object from "new_naip_points" object
 
 gb_plots <- new_naip_points %>% mutate(ID = row_number(),
-                                       Year = 2010)
+                                       Year = 2008)
 
 #### 2. create objects and extract path/row combos to each point ####
 
@@ -418,9 +418,9 @@ counter <- counter + 1
 
 result_diff <- result_diff %>% dplyr::mutate(Label = df$Label)
 #paths for saving locally and uploading to s3
-finished_points_local_filename <- "manual_points_2class_2010_ard_new_climate_vars_Dec30.gpkg"
-finished_points_local_path <- "data/manual_points_2class_2010_ard_new_climate_vars_Dec30.gpkg"
-finished_points_s3_path <- "s3://earthlab-amahood/wet_dry/derived_vector_data/manual_training_points_variables_extracted/ard_pheno_spatially_balanced_points/"
+finished_points_local_filename <- "manual_points_2class_2008_ard_new_climate_vars_Dec30.gpkg"
+finished_points_local_path <- "data/manual_points_2class_2008_ard_new_climate_vars_Dec30.gpkg"
+finished_points_s3_path <- "s3://earthlab-amahood/wet_dry/derived_vector_data/training_time_series_climate_vars/"
 
 #save to local disk
 st_write(result_diff, dsn = finished_points_local_path)
@@ -434,13 +434,10 @@ system(paste0("aws s3 cp ", finished_points_local_path, " ", finished_points_s3_
 system("aws s3 sync s3://earthlab-amahood/wet_dry/derived_vector_data/training_time_series_climate_vars/ /home/rstudio/wet_dry/data/training_points")
 
 #read in original (2010) NAIP training data w/ lyb attached
-naip_points <- st_read("data/training_points/ard_manual_points_2010_climate_vars_lyb_Dec20.gpkg") %>% mutate(plot_year = 2010) %>% arrange(ID) 
-
-#remove improperly named lyb variable (oops!)
-naip_points <- naip_points %>% dplyr::select(-lyb....lyb_vec)
+naip_points <- st_read("data/training_points/manual_points_2class_2010_ard_new_climate_vars_Dec30.gpkg") %>% mutate(plot_year = 2010) %>% arrange(ID) 
 
 #create new object to modify for a new year of labelling (change year in "mutate" to year desired for modeling/labelling)
-new_naip_points <- naip_points %>% mutate(plot_year = 2007) %>% 
+new_naip_points <- naip_points %>% mutate(plot_year = 2008) %>% 
   filter(plot_year != lyb | is.na(lyb)) #removing points which burned in the year of interest and keeping those that did not burn
 
 
@@ -450,7 +447,7 @@ new_naip_points <- naip_points %>% mutate(plot_year = 2007) %>%
 
 #remove points labelled grass which burned after the target year - cannot assume they were grass prior to burning
 for(i in 1:nrow(new_naip_points)) {
-  if(isTRUE(new_naip_points[i,]$lyb > 2007 & new_naip_points[i,]$Label == "grass")) {
+  if(isTRUE(new_naip_points[i,]$lyb > 2008 & new_naip_points[i,]$Label == "grass")) {
   new_naip_points <- new_naip_points[-i,]
   }
 }
