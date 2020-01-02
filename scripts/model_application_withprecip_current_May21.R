@@ -265,9 +265,9 @@ anim<-ggplot(ts_df, aes(x=x,y=y,fill=as.numeric(Prediction)))+
 
 aa<-gganimate::animate(anim, fps=1, nframes = length(years))
 
-anim_save(aa, filename = "data/ard_actual_precip_2class_frank_Dec18.gif")
+anim_save(aa, filename = "data/ard_climate_zscores_2class_wmuc_Jan2.gif")
 
-system("aws s3 cp data/ard_actual_precip_2class_frank_Dec18.gif s3://earthlab-amahood/wet_dry/model_results/summer19_model_results/gifs/ard_actual_precip_2class_frank_Dec18.gif")
+system("aws s3 cp data/ard_climate_zscores_2class_wmuc_Jan2.gif s3://earthlab-amahood/wet_dry/model_results/summer19_model_results/gifs/ard_climate_zscores_2class_wmuc_Jan2.gif")
 
 
 

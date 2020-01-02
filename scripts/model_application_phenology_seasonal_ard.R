@@ -89,8 +89,8 @@ seasonal_precip_folders <- list.files("data/prism/seasonal_precip", full.names =
 landsat <- stack(scene_full[1])
 crs <- crs(landsat)
 
-#reproject differenced indices (outside of loop for now)
-#diff_indices <- stack(diff_files_full) %>% projectRaster(crs = crs, res = 30)
+#create directory to store model predictions
+dir.create("data/results")
 
 #### 1.4: Setup - Parallelization
 cores <- detectCores(all.tests = FALSE, logical = TRUE)
@@ -105,7 +105,7 @@ naip <- raster("data/naip/m_4011703_ne_11_1_20100704.tif") %>% projectRaster(crs
 
 #create object to store name of naip scene being modeled while testing model results
 #change to "wmuc", "frank", or "kings"
-naip_name <- "wmuc"
+naip_name <- "frank"
 
 
 #parallelized model application loop
@@ -143,7 +143,7 @@ foreach(i = spring_scenes,
           system(paste("echo", "stack created and cropped", year))
           
       #grab precip anomaly for a particular year - change "frank"/"wmuc"/"kings" in both folder and filename depending on which you want to use
-          precip_anom <- raster(paste0("data/prism/naip_trimmed_annual_precip_anomaly/", naip_name, "/precip_anomaly_trimmed_", naip_name, year, ".tif")) %>% projectRaster(crs = crs) %>% resample(ard)
+          precip_anom <- raster(paste0("data/prism/naip_trimmed_annual_precip_anomaly/", naip_name, "/precip_anomaly_trimmed_", naip_name, "_", year, ".tif")) %>% projectRaster(crs = crs) %>% resample(ard)
           
       #progress check
           system(paste("echo", "precip anom grabbed", year))
@@ -218,6 +218,11 @@ foreach(i = spring_scenes,
           
           zscore_vars <- stack(zscore_vars)
           names(zscore_vars) <- c("aet_z", "def_z", "tmn_z")
+          
+      #progress check for stack creation
+          system(paste("echo", "z score rasters for water year created and stacked ", year))
+          print(Sys.time()-t0)
+          
       # create additional index variables - make sure all the names of this stack match the names that go into the model 
       #SPRING
           ard$spring_wetness <- wet5(ard$spring_sr_band1,ard$spring_sr_band2,ard$spring_sr_band3,ard$spring_sr_band4,ard$spring_sr_band5,ard$spring_sr_band7)
@@ -322,8 +327,8 @@ foreach(i = spring_scenes,
       #for saving memory
           gc() 
           
-      #make filename - change "frank"/"wmuc"/"kings" depending on naip scene used for extent
-          filenamet <- paste0("data/results/", "005007_2class_climate_vars_", naip_name, "_", year, "_Dec18", ".tif") 
+      #make filename 
+          filenamet <- paste0("data/results/", "005007_2class_climate_zscores_", naip_name, "_", year, "_Jan2", ".tif") 
           system(paste("echo", "filename created", year))
           
       #apply the RF model to raster stack and create "ls5_classed", an annual predicted sage/cheat raster!
