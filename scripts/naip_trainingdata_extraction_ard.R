@@ -155,31 +155,26 @@ result <- result[!is.na(result$summer_sr_band1),] %>% arrange(ID)
 
 #### 5. PRECIP ANOMALY EXTRACTION ####
 
-
 #change year in path to year of interest for extraction 
 system("aws s3 cp s3://earthlab-amahood/wet_dry/derived_raster_data/PRISM_precip_anomaly/greatbasin_trimmed_anomaly_training/precip_anomaly_train2010.tif data/precip_annual/greatbasin_trimmed_anomaly_training/")
 
-result2 <- result %>% mutate(year_factor = as.numeric(as.factor(Year)))
-gbd <- result2
+gbd <- result
 
 training_anomaly_paths <- list.files("data/precip_annual/greatbasin_trimmed_anomaly_training", full.names = T)
-#training_anomaly_paths <- training_anomaly_paths[c(5:6)]
 training_anomaly <- list()
 
-for(i in 1:length(training_anomaly_paths)) {
-  training_anomaly[i] <- raster(training_anomaly_paths[i])
-}
+precip_anom_raster <- raster(str_subset(training_anomaly_paths, pattern = fixed(as.character(year))))
 
-#### extract precip anomaly to training data points with matching year 
+#### extract precip anomaly to training data points
 precip_anomaly_vec <- c()
-for(i in 1:nrow(gbd)) {
-  precip_year <- as.numeric(gbd[i,]$year_factor)
-  precip_anomaly_vec[i] <- raster::extract(training_anomaly[[precip_year]], gbd[i,])
-}
 
+for(i in 1:nrow(gbd)) {
+  precip_anomaly_vec[i] <- raster::extract(precip_anom_raster, gbd[i,])
+}
 
 # attach annual precip anomaly to gb training data 
-gbd <- dplyr::mutate(gbd, precip_anomaly = precip_anomaly_vec) %>% dplyr::select(-year_factor)
+gbd <- dplyr::mutate(gbd, precip_anomaly = precip_anomaly_vec) 
+
 #### 6. ACTUAL PRECIP EXTRACTION ####
 
 #download monthly precip rasters
@@ -213,7 +208,7 @@ for(i in 1:length(month_names)) {
 gbd_pts <- list()
 
 #loop over each month's precip raster and extract values at each training point, storing vector result in list
-year <- 2009
+year <- unique(gbd$Year)
 
 for(i in 1:length(monthly_precip_names)) {
   if(month_names[i] == "sep") {
@@ -418,8 +413,8 @@ counter <- counter + 1
 
 result_diff <- result_diff %>% dplyr::mutate(Label = df$Label)
 #paths for saving locally and uploading to s3
-finished_points_local_filename <- "manual_points_2class_2008_ard_new_climate_vars_Dec30.gpkg"
-finished_points_local_path <- "data/manual_points_2class_2008_ard_new_climate_vars_Dec30.gpkg"
+finished_points_local_filename <- "manual_points_2class_2010_ard_new_climate_vars_Jan3.gpkg"
+finished_points_local_path <- "data/manual_points_2class_2010_ard_new_climate_vars_Jan3.gpkg"
 finished_points_s3_path <- "s3://earthlab-amahood/wet_dry/derived_vector_data/training_time_series_climate_vars/"
 
 #save to local disk
