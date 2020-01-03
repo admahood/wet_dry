@@ -419,7 +419,7 @@ system(paste0("aws s3 cp ", finished_points_local_path, " ", finished_points_s3_
 #### 11. Changing manually created Point Labels for different years based on fire history ####
  
 #SET YEAR (VERY IMPORTANT)
-ts_year <- 2006
+ts_year <- 2008
 
 #download manually created NAIP point data w/ lyb attached from s3
 system("aws s3 sync s3://earthlab-amahood/wet_dry/derived_vector_data/manual_training_points_lyb_extracted/ /home/rstudio/wet_dry/data/training_points")

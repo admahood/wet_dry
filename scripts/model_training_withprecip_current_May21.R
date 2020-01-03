@@ -24,19 +24,19 @@ system(paste0("aws s3 sync ", training_s3_path, " data/training_timeseries")) # 
 
   #TWO CLASSES:
 #2010 points
-gtrain1 <- st_read("data/training_timeseries/manual_points_2class_2010_ard_new_climate_vars_Dec30.gpkg") %>% st_set_geometry(NULL) %>% dplyr::select(-OBJECTID, -lyb, -PATH, -ROW, -path_row)
+gtrain1 <- st_read("data/training_timeseries/manual_points_2class_2010_ard_new_climate_vars_Jan3.gpkg") %>% st_set_geometry(NULL) %>% dplyr::select(-OBJECTID, -lyb, -path_row)
 
 #2009 points
-gtrain2 <- st_read("data/training_timeseries/manual_points_2class_2009_ard_new_climate_vars_Dec30.gpkg") %>% st_set_geometry(NULL) %>% dplyr::select(-OBJECTID, -lyb, -PATH, -ROW, -path_row)
+gtrain2 <- st_read("data/training_timeseries/manual_points_2class_2009_ard_new_climate_vars_Jan3.gpkg") %>% st_set_geometry(NULL) %>% dplyr::select(-OBJECTID, -lyb, -path_row)
 
 #2008 points
-gtrain3 <- st_read("data/training_timeseries/manual_points_2class_2008_ard_new_climate_vars_Dec30.gpkg") %>% st_set_geometry(NULL) %>% dplyr::select(-OBJECTID, -lyb, -path_row)
+gtrain3 <- st_read("data/training_timeseries/manual_points_2class_2008_ard_new_climate_vars_Jan3.gpkg") %>% st_set_geometry(NULL) %>% dplyr::select(-OBJECTID, -lyb, -path_row)
 
 #2007 points
-gtrain4 <- st_read("data/training_timeseries/manual_points_2class_2007_ard_new_climate_vars_Dec30.gpkg") %>% st_set_geometry(NULL) %>% dplyr::select(-OBJECTID, -lyb, -PATH, -ROW, -path_row)
+gtrain4 <- st_read("data/training_timeseries/manual_points_2class_2007_ard_new_climate_vars_Jan3.gpkg") %>% st_set_geometry(NULL) %>% dplyr::select(-OBJECTID, -lyb, -path_row)
 
 #2006 points
-gtrain5 <- st_read("data/training_timeseries/manual_points_2class_2006_ard_new_climate_vars_Dec30.gpkg") %>% st_set_geometry(NULL) %>% dplyr::select(-OBJECTID, -lyb, -PATH, -ROW, -path_row)
+gtrain5 <- st_read("data/training_timeseries/manual_points_2class_2006_ard_new_climate_vars_Jan3.gpkg") %>% st_set_geometry(NULL) %>% dplyr::select(-OBJECTID, -lyb, -path_row)
 
 #combine 2010 and 2006 points
 gtrain <- rbind(gtrain1, gtrain2, gtrain3, gtrain4, gtrain5)
