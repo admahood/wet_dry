@@ -406,12 +406,12 @@ counter <- counter + 1
 
 result_diff <- result_diff %>% dplyr::mutate(Label = df$Label)
 #paths for saving locally and uploading to s3
-finished_points_local_filename <- "manual_points_2class_2009_ard_new_climate_vars_Jan3.gpkg"
-finished_points_local_path <- "data/manual_points_2class_2019_ard_new_climate_vars_Jan3.gpkg"
+finished_points_local_filename <- paste0("manual_points_2class_", year, "_ard_new_climate_vars_Jan3.gpkg")
+finished_points_local_path <- paste0("data/manual_points_2class_", year, "_ard_new_climate_vars_Jan3.gpkg")
 finished_points_s3_path <- "s3://earthlab-amahood/wet_dry/derived_vector_data/training_time_series_climate_vars/"
 
 #save to local disk
-st_write(result_diff, dsn = finished_points_local_path, )
+st_write(result_diff, dsn = finished_points_local_path)
 
 #upload naip points with ALL variables (including differenced indices) to amazon s3 bucket
 system(paste0("aws s3 cp ", finished_points_local_path, " ", finished_points_s3_path, finished_points_local_filename))
@@ -419,7 +419,7 @@ system(paste0("aws s3 cp ", finished_points_local_path, " ", finished_points_s3_
 #### 11. Changing manually created Point Labels for different years based on fire history ####
  
 #SET YEAR (VERY IMPORTANT)
-ts_year <- 2008
+ts_year <- 2006
 
 #download manually created NAIP point data w/ lyb attached from s3
 system("aws s3 sync s3://earthlab-amahood/wet_dry/derived_vector_data/manual_training_points_lyb_extracted/ /home/rstudio/wet_dry/data/training_points")
