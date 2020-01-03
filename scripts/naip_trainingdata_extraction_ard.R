@@ -41,14 +41,16 @@ system("aws s3 sync s3://earthlab-amahood/wet_dry/input_vector_data/BLM_AIM /hom
 gb_plots <- st_read("data/training_timeseries/gbd_manual_points_2006_ard_phenology_extracted_Aug6.gpkg") %>% 
   st_transform(as.character(crs(esp_mask))) %>% mutate(ID = row_number(),
    
-                                                                                                           Year = 2006)
+
+                                                                                                                                                           Year = 2006)
 #if extracting a new year in a training time series:
 #start with step 11 to change labels based on lyb, change year to target year,
 #then create gb_plots object from "new_naip_points" object
 
 gb_plots <- new_naip_points %>% mutate(ID = row_number(),
-                                       Year = 2008)
-
+                                       Year = ts_year)
+#set year for time series extraction
+year <- unique(gb_plots$Year)
 #### 2. create objects and extract path/row combos to each point ####
 
 plot_data <- st_read("data/BLM_AIM/BLM_AIM_20161025.shp")
@@ -71,7 +73,8 @@ gb_plots <- gb_plots[gb_plots$duplicated == F,]
 
 #grab the years and path row combos needed
 
-years <- unique(gb_plots$Year) # getting the years plots were monitored - 2011-2015
+years <- unique(gb_plots$Year) # getting the years present in training data
+
 path_row_combos <- unique(gb_plots$path_row)
 
 #list available pixel replaced landsat files
@@ -85,15 +88,6 @@ for(l in 1:length(ls_files_list)) {
 kounter = 1 #set counter to 1 at beginning of loop 
 
 #### 3. LANDSAT ARD BAND EXTRACTION (SPRING & SUMMER BAND VALUES) ####
-
-# #TEMPORARY CODE FOR MAKING NEW TRAINING POINT TIME SERIES (REMOVE OLD NON-SEASONAL BAND VALUES)
-# gb_plots <- st_read("data/training_timeseries/gbd_manual_points_2006_ard_phenology_extracted_Aug6.gpkg") %>% 
-#   st_transform(as.character(crs(esp_mask))) %>% mutate(ID = row_number(),
-#                                                        Year = 2006) #change year to target year
-# 
-# gb_plots <- gb_plots %>% dplyr::select(-sr_band1, -sr_band2, -sr_band3, -sr_band4,
-#                                        -sr_band5, -sr_band7, -ndvi, -evi, -savi, - sr,
-#                                        -greenness, -brightness, -wetness)
 
 #Loop over each year (works even if only one year present in training points) 
 #and path/row combo and extract band values to points
@@ -156,14 +150,16 @@ result <- result[!is.na(result$summer_sr_band1),] %>% arrange(ID)
 #### 5. PRECIP ANOMALY EXTRACTION ####
 
 #change year in path to year of interest for extraction 
-system("aws s3 cp s3://earthlab-amahood/wet_dry/derived_raster_data/PRISM_precip_anomaly/greatbasin_trimmed_anomaly_training/precip_anomaly_train2010.tif data/precip_annual/greatbasin_trimmed_anomaly_training/")
+system(paste0("aws s3 cp s3://earthlab-amahood/wet_dry/derived_raster_data/PRISM_precip_anomaly/greatbasin_trimmed_anomaly_training/precip_anomaly_train", year, ".tif", " data/precip_annual/greatbasin_trimmed_anomaly_training/"))
 
 gbd <- result
 
 training_anomaly_paths <- list.files("data/precip_annual/greatbasin_trimmed_anomaly_training", full.names = T)
+training_anomaly_paths <- str_subset(training_anomaly_paths, pattern = fixed(as.character(year)))
+
 training_anomaly <- list()
 
-precip_anom_raster <- raster(str_subset(training_anomaly_paths, pattern = fixed(as.character(year))))
+precip_anom_raster <- raster(training_anomaly_paths)
 
 #### extract precip anomaly to training data points
 precip_anomaly_vec <- c()
@@ -193,10 +189,7 @@ monthly_precip_paths <- unlist(monthly_precip_paths)
 #create vector of abbreviated month names for variable naming
 
 month_names <- c("jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec")
-same_year_month_names <- c("jan", "feb", "mar", "apr", "may", "jun", "jul", "aug")
-prior_year_month_names <- c("sep", "oct", "nov", "dec")
-#create raster stack object from monthly precip rasters
-monthly_precip_stack <- raster::stack(monthly_precip_paths)
+
 
 #create vector of variable names for monthly precip
 monthly_precip_names <- c()
@@ -413,26 +406,37 @@ counter <- counter + 1
 
 result_diff <- result_diff %>% dplyr::mutate(Label = df$Label)
 #paths for saving locally and uploading to s3
-finished_points_local_filename <- "manual_points_2class_2010_ard_new_climate_vars_Jan3.gpkg"
-finished_points_local_path <- "data/manual_points_2class_2010_ard_new_climate_vars_Jan3.gpkg"
+finished_points_local_filename <- "manual_points_2class_2009_ard_new_climate_vars_Jan3.gpkg"
+finished_points_local_path <- "data/manual_points_2class_2019_ard_new_climate_vars_Jan3.gpkg"
 finished_points_s3_path <- "s3://earthlab-amahood/wet_dry/derived_vector_data/training_time_series_climate_vars/"
 
 #save to local disk
-st_write(result_diff, dsn = finished_points_local_path)
+st_write(result_diff, dsn = finished_points_local_path, )
 
 #upload naip points with ALL variables (including differenced indices) to amazon s3 bucket
 system(paste0("aws s3 cp ", finished_points_local_path, " ", finished_points_s3_path, finished_points_local_filename))
 
 #### 11. Changing manually created Point Labels for different years based on fire history ####
+ 
+#SET YEAR (VERY IMPORTANT)
+ts_year <- 2008
 
-#download manually created NAIP point data from s3
-system("aws s3 sync s3://earthlab-amahood/wet_dry/derived_vector_data/training_time_series_climate_vars/ /home/rstudio/wet_dry/data/training_points")
+#download manually created NAIP point data w/ lyb attached from s3
+system("aws s3 sync s3://earthlab-amahood/wet_dry/derived_vector_data/manual_training_points_lyb_extracted/ /home/rstudio/wet_dry/data/training_points")
+
+#download 2010 point data to grab crs and reproject
+system("aws s3 cp s3://earthlab-amahood/wet_dry/derived_vector_data/manual_training_points_variables_extracted/ard_pheno_spatially_balanced_points/manual_points_2class_2010_ard_phenology_all_variables_extracted_w_actual_precip_Nov26.gpkg data/manual_points_2class_2010_ard_phenology_all_variables_extracted_w_actual_precip_Nov26.gpkg")
+
+crs_grab_points <- st_read("data/manual_points_2class_2010_ard_phenology_all_variables_extracted_w_actual_precip_Nov26.gpkg")
+
+ts_crs <- st_crs(crs_grab_points)
 
 #read in original (2010) NAIP training data w/ lyb attached
-naip_points <- st_read("data/training_points/manual_points_2class_2010_ard_new_climate_vars_Dec30.gpkg") %>% mutate(plot_year = 2010) %>% arrange(ID) 
+
+naip_points <- st_read("data/training_points/manual_ard_points_2010_new_vars_and_lyb_Dec10.gpkg") %>% mutate(plot_year = year) %>% st_transform(crs = ts_crs) 
 
 #create new object to modify for a new year of labelling (change year in "mutate" to year desired for modeling/labelling)
-new_naip_points <- naip_points %>% mutate(plot_year = 2008) %>% 
+new_naip_points <- naip_points %>% mutate(plot_year = ts_year) %>% 
   filter(plot_year != lyb | is.na(lyb)) #removing points which burned in the year of interest and keeping those that did not burn
 
 
@@ -442,7 +446,7 @@ new_naip_points <- naip_points %>% mutate(plot_year = 2008) %>%
 
 #remove points labelled grass which burned after the target year - cannot assume they were grass prior to burning
 for(i in 1:nrow(new_naip_points)) {
-  if(isTRUE(new_naip_points[i,]$lyb > 2008 & new_naip_points[i,]$Label == "grass")) {
+  if(isTRUE(new_naip_points[i,]$lyb > ts_year & new_naip_points[i,]$Label == "grass")) {
   new_naip_points <- new_naip_points[-i,]
   }
 }
@@ -451,7 +455,7 @@ for(i in 1:nrow(new_naip_points)) {
 new_naip_points <- new_naip_points %>% mutate(Year = plot_year) %>% dplyr::select(OBJECTID, Label, Year, lyb)
 
 #create filename for relabeled points w/o variables (change year to match year of interest)
-new_year_naip_filename <- "data/manual_ard_005007_climare_vars_points_2009_no_vars.gpkg"
+new_year_naip_filename <- paste0("data/manual_ard_005007_climare_vars_points_", ts_year, "_no_vars.gpkg")
 
 st_write(new_naip_points, new_year_naip_filename)
 
