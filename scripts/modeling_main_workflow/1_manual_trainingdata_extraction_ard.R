@@ -419,7 +419,7 @@ system(paste0("aws s3 cp ", finished_points_local_path, " ", finished_points_s3_
 #### 11. Changing manually created Point Labels for different years based on fire history ####
  
 #SET YEAR (VERY IMPORTANT)
-ts_year <- 2008
+ts_year <- 2006
 
 #download manually created NAIP point data w/ lyb attached from s3
 system("aws s3 sync s3://earthlab-amahood/wet_dry/derived_vector_data/manual_training_points_lyb_extracted/ /home/rstudio/wet_dry/data/training_points")
@@ -433,7 +433,7 @@ ts_crs <- st_crs(crs_grab_points)
 
 #read in original (2010) NAIP training data w/ lyb attached
 
-naip_points <- st_read("data/training_points/manual_ard_points_2010_new_vars_and_lyb_Dec10.gpkg") %>% mutate(plot_year = year) %>% st_transform(crs = ts_crs) 
+naip_points <- st_read("data/training_points/manual_ard_points_2010_new_vars_and_lyb_Dec10.gpkg") %>% mutate(plot_year = ts_year) %>% st_transform(crs = ts_crs) 
 
 #create new object to modify for a new year of labelling (change year in "mutate" to year desired for modeling/labelling)
 new_naip_points <- naip_points %>% mutate(plot_year = ts_year) %>% 

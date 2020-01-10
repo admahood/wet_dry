@@ -14,7 +14,7 @@ lapply(libs, library, character.only = TRUE, verbose = FALSE)
 #Create path objects
 
 ls_ard_path_local <- "data/landsat_ard"
-ls_ard_path_s3 <- "s3://earthlab-amahood/wet_dry/input_raster_data/landsat_ard/"
+ls_ard_path_s3 <- "s3://earthlab-amahood/wet_dry/input_raster_data/landsat_ard_ndvi_informed/"
 
 #create data directory 
 dir.create("data")
@@ -40,7 +40,7 @@ year_season <- c()
 stks <- list()
 
 #list already completed mean composite rasters
-mc_files_done <- system("aws s3 ls s3://earthlab-amahood/wet_dry/derived_raster_data/mean_composites/", intern = T)
+mc_files_done <- system("aws s3 ls s3://earthlab-amahood/wet_dry/derived_raster_data/mean_composites_ndvi/", intern = T)
 
 #grab year/season of already completed mc rasters to compare against when looping over new files
 year_season_done <- c()
@@ -56,7 +56,7 @@ for(i in 1:length(tar_files)){
   #grab year for tar file
   years[i] <- substr(tar_files[i], 33, 36) 
   
-  #grab season for tar file (may/june = spring, july/aug = summer)
+  #grab season for tar file (may/june = spring, july/aug/later = summer)
   if(substr(tar_files[i], 38, 38) < 7) {
     season <- "spring"
   } else {
@@ -117,7 +117,7 @@ for(i in 1:length(tar_files)){
   
 
 #change names of raster stacks in list to simpler format (comment this out when we start to work with multiple tiles)
-names(stks) <- year_season1
+names(stks) <- year_season
 
 #grab unique years/seasons present in raster stacks
 year_season_unique <- unique(year_season[!is.na(year_season)])
