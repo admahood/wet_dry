@@ -57,7 +57,9 @@ for(i in 1:length(tar_files)){
   years[i] <- substr(tar_files[i], 33, 36) 
   
   #grab season for tar file (may/june = spring, july/aug/later = summer)
-  if(substr(tar_files[i], 38, 38) < 7) {
+  if(substr(tar_files[i], 38, 38) == 1 | substr(tar_files[i], 38, 38) == 0) {
+    season <- "summer"
+  } else if(substr(tar_files[i], 38, 38) < 7) {
     season <- "spring"
   } else {
     season <- "summer"
@@ -137,7 +139,7 @@ for(b in 1:6){
   ys <- year_season_unique[y]
   
   #create empty list to store rasters for creation of mean composite image
-  mc<- list()
+  mc <- list()
   
   #subset raster stacks (stks) for particular year/season combo
   ys_stks <- stks[names(stks) == ys]
@@ -171,14 +173,14 @@ for(b in 1:6){
   calcd_stk <- stack(calcd_list)
   
   #create filename objects (with & without full path) for saving/s3 upload
-  filename = paste0("data/mean_composites/", "mc_",year_season_unique[y], ".tif")
-  filename_short = paste0("mc_",year_season_unique[y], ".tif")
+  filename = paste0("data/mean_composites/", "mc_",year_season_unique[y], "_ndvi_ts", ".tif")
+  filename_short = paste0("mc_",year_season_unique[y], "_ndvi_ts", ".tif")
   
   #save mean composite stack to disk
   writeRaster(calcd_stk, filename = filename)
   
   #upload to s3 bucket
-  system(paste0("aws s3 cp ", filename, " ", "s3://earthlab-amahood/wet_dry/derived_raster_data/", "mean_composites/", filename_short))
+  system(paste0("aws s3 cp ", filename, " ", "s3://earthlab-amahood/wet_dry/derived_raster_data/", "mean_composites_ndvi/", filename_short))
   
 }
 

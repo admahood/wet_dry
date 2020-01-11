@@ -16,7 +16,7 @@ source("scripts/functions.R")
 #Path Objects
 dir.create("data")
 
-mean_comp_s3 <- "s3://earthlab-amahood/wet_dry/derived_raster_data/mean_composites"
+mean_comp_s3 <- "s3://earthlab-amahood/wet_dry/derived_raster_data/mean_composites_ndvi"
 mean_comp_local <- "data/mean_composites"
 
 #Pull data from AWS s3 bucket
