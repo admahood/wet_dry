@@ -173,8 +173,8 @@ for(b in 1:6){
   calcd_stk <- stack(calcd_list)
   
   #create filename objects (with & without full path) for saving/s3 upload
-  filename = paste0("data/mean_composites/", "mc_",year_season_unique[y], "_ndvi_ts", ".tif")
-  filename_short = paste0("mc_",year_season_unique[y], "_ndvi_ts", ".tif")
+  filename = paste0("data/mean_composites/", "mc_",year_season_unique[y], "_ndvi_ts_2sat", ".tif")
+  filename_short = paste0("mc_",year_season_unique[y], "_ndvi_ts_2sat", ".tif")
   
   #save mean composite stack to disk
   writeRaster(calcd_stk, filename = filename)
