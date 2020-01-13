@@ -1,7 +1,7 @@
 # Title: Differenced Spring/Summer NDVI & Other Veg. Indices
 # Author(s): Dylan Murphy
 # Date Created: 7/22/19
-# Date Last Modified: 10/11/19
+# Date Last Modified: 1/13/20
 
 #### 1. Set Up ####
 #Load Packages
@@ -36,7 +36,7 @@ years <- unique(years)
 #### 2. Create Differenced spring/summer NDVI rasters ####
 
 #create destination path for s3 upload at end of loop 
-diff_ndvi_destination <- "s3://earthlab-amahood/wet_dry/derived_raster_data/differenced_indices/ndvi/"
+diff_ndvi_destination <- "s3://earthlab-amahood/wet_dry/archive/derived_raster_data/differenced_indices/ndvi/"
 
 #create local directory to write rasters to within loop 
 dir.create("data/diff_ndvi")

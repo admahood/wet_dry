@@ -156,7 +156,7 @@ for(b in 1:6){
   mc1 <- raster::stack(mc)
   
   #take mean pixel value across all rasters for specified band
-  calcd <-calc(mc1,fun=mean, na.rm = TRUE)
+  calcd <- mean(mc1, na.rm = T)
   
   #set name for mean composite based on year/season and band
   names(calcd) <- paste0(year_season_unique[y], "_sr_band", bandn, "_mc")
