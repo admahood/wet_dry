@@ -34,13 +34,25 @@ system(paste0("aws s3 sync ", ls_ard_path_s3, " ", ls_ard_path_local))
 #list .tar files in folder 
 tar_files <- list.files(ls_ard_path_local, pattern = ".tar", full.names = TRUE)
 
+# SELECTING ARD DATA FROM LS5, LS7, OR BOTH:
+
+  #LS5:
+    tar_files <- tar_files %>% str_subset(pattern = fixed("LT05"))
+    sensor_platform <- "ls5"
+    
+  #LS7: 
+    tar_files <- tar_files %>% str_subset(pattern = fixed("LE07"))
+    sensor_platform <- "ls7"
+    
+  #BOTH: NO ADDITIONAL SUBSETTING NEEDED
+    sensor_platform <- "ls5_and_ls7"
 #create empty vectors and lists to store values & rasters
 years <- c()
 year_season <- c()
 stks <- list()
 
-#list already completed mean composite rasters
-mc_files_done <- system("aws s3 ls s3://earthlab-amahood/wet_dry/derived_raster_data/mean_composites_ndvi/", intern = T)
+#list already completed mean composite rasters 
+mc_files_done <- system(paste0("aws s3 ls s3://earthlab-amahood/wet_dry/derived_raster_data/mean_composites_ndvi/", sensor_platform, "/"), intern = T)
 
 #grab year/season of already completed mc rasters to compare against when looping over new files
 year_season_done <- c()
@@ -48,6 +60,8 @@ for(i in 1:length(mc_files_done)) {
   year_season_done[i] <- substr(mc_files_done[i], 35, 44)
 }
 
+#if no files are done, make year_season_done = NA instead of a blank character vector
+if(nchar(year_season_done[1]) == 0) {year_season_done <- NA}
 
 
 #loop over tar file list, untar, stack bands together, store in a list (stks)
@@ -163,24 +177,20 @@ for(b in 1:6){
   
   #store mean composite raster for a single band in a list for later stacking
   calcd_list[[b]] <- calcd
-  
-  #writeRaster(calcd, filename = paste0("data/mean_composites/", "mc_band_",bandn, ".tif"))
-  #rm(mc)
-  #rm(mc1)
  
 }
   #stack mean composite rasters for a particular year/season into one stack w/ all bands  
   calcd_stk <- stack(calcd_list)
   
   #create filename objects (with & without full path) for saving/s3 upload
-  filename = paste0("data/mean_composites/", "mc_",year_season_unique[y], "_ndvi_ts_2sat", ".tif")
+  filename = paste0("data/mean_composites/", "mc_",year_season_unique[y], "_ndvi_ts_", sensor_platform, ".tif")
   filename_short = paste0("mc_",year_season_unique[y], "_ndvi_ts_2sat", ".tif")
   
   #save mean composite stack to disk
   writeRaster(calcd_stk, filename = filename)
   
   #upload to s3 bucket
-  system(paste0("aws s3 cp ", filename, " ", "s3://earthlab-amahood/wet_dry/derived_raster_data/", "mean_composites_ndvi/", filename_short))
+  system(paste0("aws s3 cp ", filename, " ", "s3://earthlab-amahood/wet_dry/derived_raster_data/", "mean_composites_ndvi/", sensor_platform, "/", filename_short))
   
 }
 
