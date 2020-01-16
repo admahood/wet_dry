@@ -17,29 +17,54 @@ source("scripts/functions.R")
 dir.create("data")
 
 mean_comp_s3 <- "s3://earthlab-amahood/wet_dry/derived_raster_data/mean_composites_ndvi"
-mean_comp_local <- "data/mean_composites"
+mean_comp_local <- "data/mean_composites_done"
 
 #Pull data from AWS s3 bucket
 
 system(paste0("aws s3 sync ", mean_comp_s3, " ", mean_comp_local))
 
+#create sensor platform identifier object for filenames and grabbing proper mean comps
+
+  #IMPORTANT: switch b/w ls5, ls7, and ls5_and_ls7
+sensor_platform <- "ls5"
+  
 #create "years" and "mean composites" iterators for looping
 
-mean_composites <- list.files("data/mean_composites", full.names = T)
+#list mean composite folders (ls5, ls7, ls5_and_ls7)
+mean_composite_folders <- list.files("data/mean_composites_done", full.names = T)
 
-years <- c()
-for(i in 1:length(mean_composites)) {
-  years[i] <- substr(mean_composites[i], 25, 28)
+#subset to folders containing sensor platform character string
+mean_composite_folder <- str_subset(mean_composite_folders, pattern = fixed(sensor_platform))
+
+#b/c ls5_and_ls7 will be grabbed when subsetting for "ls5" or "ls7", second subset here
+for(i in 1:length(mean_composite_folder)) {
+  if(substr(mean_composite_folder[i], 27, 40) != sensor_platform) {
+    mean_composite_folder <- mean_composite_folder[-i]
+  } 
 }
+
+#list mean composite files present in selected folder
+mean_composites <- list.files(mean_composite_folder, full.names = T)   
+
+#create empty vector to store years  
+years <- c()
+
+#loop over each file and grab year
+for(i in 1:length(mean_composites)) {
+  years[i] <- substr(mean_composites[i], 34, 37)
+}
+
+#simplify list to unique years present
 years <- unique(years)
 
 #### 2. Create Differenced spring/summer NDVI rasters ####
 
 #create destination path for s3 upload at end of loop 
-diff_ndvi_destination <- "s3://earthlab-amahood/wet_dry/archive/derived_raster_data/differenced_indices/ndvi/"
+diff_ndvi_destination <- paste0("s3://earthlab-amahood/wet_dry/derived_raster_data/differenced_indices/ndvi/", sensor_platform, "/")
 
 #create local directory to write rasters to within loop 
 dir.create("data/diff_ndvi")
+dir.create(paste0("data/diff_ndvi/", sensor_platform))
 
 for(i in 1:length(years)) {
   
@@ -63,8 +88,8 @@ for(i in 1:length(years)) {
   diff_ndvi = spr_ndvi - smr_ndvi
   
   #create unique filename for differenced raster using veg index and year (later will add tile location to this)
-  filename <- paste0("data/diff_ndvi/diff_ndvi_", years[i], ".tif")
-  filename_short <- paste0("diff_ndvi_", years[i], ".tif")
+  filename <- paste0("data/diff_ndvi/", sensor_platform, "/diff_ndvi_", years[i], "_", sensor_platform, ".tif")
+  filename_short <- paste0("diff_ndvi_", years[i], "_", sensor_platform, ".tif")
   
   #save raster locally
   writeRaster(diff_ndvi, filename)
