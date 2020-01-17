@@ -26,7 +26,7 @@ system(paste0("aws s3 sync ", mean_comp_s3, " ", mean_comp_local))
 #create sensor platform identifier object for filenames and grabbing proper mean comps
 
   #IMPORTANT: switch b/w ls5, ls7, and ls5_and_ls7
-sensor_platform <- "ls5"
+sensor_platform <- "ls5_and_ls7"
   
 #create "years" and "mean composites" iterators for looping
 
@@ -49,9 +49,18 @@ mean_composites <- list.files(mean_composite_folder, full.names = T)
 #create empty vector to store years  
 years <- c()
 
-#loop over each file and grab year
+#loop over each file and grab year 
+
+if(sensor_platform == "ls5_and_ls7") {
+  #LS5 & LS7 combined composites
+  for(i in 1:length(mean_composites)) {
+    years[i] <- substr(mean_composites[i], 42, 45)
+  } 
+} else {
+  #LS5 or LS7
 for(i in 1:length(mean_composites)) {
   years[i] <- substr(mean_composites[i], 34, 37)
+}
 }
 
 #simplify list to unique years present
