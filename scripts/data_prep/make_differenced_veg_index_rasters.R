@@ -116,10 +116,11 @@ for(i in 1:length(years)) {
 #### DIFFERENCED SAVI ####
 
 #create destination path for s3 upload at end of loop 
-diff_savi_destination <- "s3://earthlab-amahood/wet_dry/derived_raster_data/differenced_indices/savi/"
+diff_savi_destination <- paste0("s3://earthlab-amahood/wet_dry/derived_raster_data/differenced_indices/savi/", sensor_platform, "/")
 
 #create local directory to write rasters to within loop 
 dir.create("data/diff_savi")
+dir.create(paste0("data/diff_savi/", sensor_platform))
 
 for(i in 1:length(years)) {
   
@@ -143,8 +144,8 @@ for(i in 1:length(years)) {
   diff_savi = spr_savi - smr_savi
   
   #create unique filename for differenced raster using veg index and year (later will add tile location to this)
-  filename <- paste0("data/diff_savi/diff_savi_", years[i], ".tif")
-  filename_short <- paste0("diff_savi_", years[i], ".tif")
+  filename <- paste0("data/diff_savi/", sensor_platform, "/diff_savi_", years[i], "_", sensor_platform, ".tif")
+  filename_short <- paste0("diff_savi_", years[i], "_", sensor_platform, ".tif")
   
   #save raster locally
   writeRaster(diff_savi, filename)
@@ -161,7 +162,7 @@ for(i in 1:length(years)) {
 #### DIFFERENCED SR ####
 
 #create destination path for s3 upload at end of loop 
-diff_sr_destination <- "s3://earthlab-amahood/wet_dry/derived_raster_data/differenced_indices/sr/"
+diff_sr_destination <- paste0("s3://earthlab-amahood/wet_dry/derived_raster_data/differenced_indices/sr/", sensor_platform, "/")
 
 #create local directory to write rasters to within loop 
 dir.create("data/diff_sr")
@@ -186,8 +187,8 @@ for(i in 1:length(years)) {
   diff_sr = spr_sr - smr_sr
   
   #create unique filename for differenced raster using veg index and year (later will add tile location to this)
-  filename <- paste0("data/diff_sr/diff_sr_", years[i], ".tif")
-  filename_short <- paste0("diff_sr_", years[i], ".tif")
+  filename <- paste0("data/diff_sr/", sensor_platform, "/diff_sr_", years[i], "_", sensor_platform, ".tif")
+  filename_short <- paste0("diff_sr_", years[i], "_", sensor_platform, ".tif")
   
   #save raster locally
   writeRaster(diff_sr, filename)
@@ -202,7 +203,7 @@ for(i in 1:length(years)) {
 #### DIFFERENCED NDSVI ####
 
 #create destination path for s3 upload at end of loop 
-diff_ndsvi_destination <- "s3://earthlab-amahood/wet_dry/derived_raster_data/differenced_indices/ndsvi/"
+diff_ndsvi_destination <- paste0("s3://earthlab-amahood/wet_dry/derived_raster_data/differenced_indices/ndsvi/", sensor_platform, "/")
 
 #create local directory to write rasters to within loop 
 dir.create("data/diff_ndsvi")
@@ -229,8 +230,8 @@ for(i in 1:length(years)) {
   diff_ndsvi = spr_ndsvi - smr_ndsvi
   
   #create unique filename for differenced raster using veg index and year (later will add tile location to this)
-  filename <- paste0("data/diff_ndsvi/diff_ndsvi_", years[i], ".tif")
-  filename_short <- paste0("diff_ndsvi_", years[i], ".tif")
+  filename <- paste0("data/diff_ndsvi/", sensor_platform, "/diff_ndsvi_", years[i], "_", sensor_platform, ".tif")
+  filename_short <- paste0("diff_ndsvi_", years[i], "_", sensor_platform, ".tif")
   
   #save raster locally
   writeRaster(diff_ndsvi, filename)
@@ -249,7 +250,7 @@ for(i in 1:length(years)) {
 #### DIFFERENCED EVI ####
 
 #create destination path for s3 upload at end of loop 
-diff_evi_destination <- "s3://earthlab-amahood/wet_dry/derived_raster_data/differenced_indices/evi/"
+diff_evi_destination <- paste0("s3://earthlab-amahood/wet_dry/derived_raster_data/differenced_indices/evi/", sensor_platform, "/")
 
 #create local directory to write rasters to within loop 
 dir.create("data/diff_evi")
@@ -276,8 +277,8 @@ for(i in 1:length(years)) {
   diff_evi = spr_evi - smr_evi
   
   #create unique filename for differenced raster using veg index and year (later will add tile location to this)
-  filename <- paste0("data/diff_evi/diff_evi_", years[i], ".tif")
-  filename_short <- paste0("diff_evi_", years[i], ".tif")
+  filename <- paste0("data/diff_evi/", sensor_platform, "/diff_evi_", years[i], "_", sensor_platform, ".tif")
+  filename_short <- paste0("diff_evi_", years[i], "_", sensor_platform, ".tif")
   
   #save raster locally
   writeRaster(diff_evi, filename)
@@ -295,7 +296,7 @@ for(i in 1:length(years)) {
 #### DIFFERENCED SATVI ####
 
 #create destination path for s3 upload at end of loop 
-diff_satvi_destination <- "s3://earthlab-amahood/wet_dry/derived_raster_data/differenced_indices/satvi/"
+diff_satvi_destination <- paste0("s3://earthlab-amahood/wet_dry/derived_raster_data/differenced_indices/satvi/", sensor_platform, "/")
 
 #create local directory to write rasters to within loop 
 dir.create("data/diff_satvi")
@@ -320,8 +321,8 @@ for(i in 1:length(years)) {
   diff_satvi = spr_satvi - smr_satvi
   
   #create unique filename for differenced raster using veg index and year (later will add tile location to this)
-  filename <- paste0("data/diff_satvi/diff_satvi_", years[i], ".tif")
-  filename_short <- paste0("diff_satvi_", years[i], ".tif")
+  filename <- paste0("data/diff_satvi/", sensor_platform, "/diff_satvi_", years[i], "_", sensor_platform, ".tif")
+  filename_short <- paste0("diff_satvi_", years[i], "_", sensor_platform, ".tif")
   
   #save raster locally 
   writeRaster(diff_satvi, filename)
@@ -337,7 +338,7 @@ for(i in 1:length(years)) {
 
 #### DIFFERENCED NDTI #### 
 #create destination path for s3 upload at end of loop 
-diff_ndti_destination <- "s3://earthlab-amahood/wet_dry/derived_raster_data/differenced_indices/ndti/"
+diff_ndti_destination <- paste0("s3://earthlab-amahood/wet_dry/derived_raster_data/differenced_indices/ndti/", sensor_platform, "/")
 
 #create local directory to write rasters to within loop 
 dir.create("data/diff_ndti")
@@ -364,8 +365,8 @@ for(i in 1:length(years)) {
   diff_ndti = spr_ndti - smr_ndti
   
   #create unique filename for differenced raster using veg index and year (later will add tile location to this)
-  filename <- paste0("data/diff_ndti/diff_ndti_", years[i], ".tif")
-  filename_short <- paste0("diff_ndti_", years[i], ".tif")
+  filename <- paste0("data/diff_ndti/", sensor_platform, "/diff_ndti_", years[i], "_", sensor_platform, ".tif")
+  filename_short <- paste0("diff_ndti_", years[i], "_", sensor_platform, ".tif")
   
   #save raster locally
   writeRaster(diff_ndti, filename)
@@ -380,7 +381,7 @@ for(i in 1:length(years)) {
 
 #### DIFFERENCED GREEN NDVI ####
 #create destination path for s3 upload at end of loop 
-diff_green_ndvi_destination <- "s3://earthlab-amahood/wet_dry/derived_raster_data/differenced_indices/green_ndvi/"
+diff_green_ndvi_destination <- paste0("s3://earthlab-amahood/wet_dry/derived_raster_data/differenced_indices/green_ndvi/", sensor_platform, "/")
 
 #create local directory to write rasters to within loop 
 dir.create("data/diff_green_ndvi")
@@ -407,8 +408,8 @@ for(i in 1:length(years)) {
   diff_green_ndvi = spr_green_ndvi - smr_green_ndvi
   
   #create unique filename for differenced raster using veg index and year (later will add tile location to this)
-  filename <- paste0("data/diff_green_ndvi/diff_green_ndvi_", years[i], ".tif")
-  filename_short <- paste0("diff_green_ndvi_", years[i], ".tif")
+  filename <- paste0("data/green_ndvi/", sensor_platform, "/green_ndvi_", years[i], "_", sensor_platform, ".tif")
+  filename_short <- paste0("green_ndvi_", years[i], "_", sensor_platform, ".tif")
   
   #save raster locally
   writeRaster(diff_green_ndvi, filename)
@@ -423,8 +424,7 @@ for(i in 1:length(years)) {
 
 #### DIFFERENCED SLA INDEX ####
 #create destination path for s3 upload at end of loop 
-diff_sla_index_destination <- "s3://earthlab-amahood/wet_dry/derived_raster_data/differenced_indices/sla_index/"
-
+diff_sla_index_destination <- paste0("s3://earthlab-amahood/wet_dry/derived_raster_data/differenced_indices/sla_index/", sensor_platform, "/")
 #create local directory to write rasters to within loop 
 dir.create("data/diff_sla_index")
 
@@ -450,8 +450,8 @@ for(i in 1:length(years)) {
   diff_sla_index = spr_sla_index - smr_sla_index
   
   #create unique filename for differenced raster using veg index and year (later will add tile location to this)
-  filename <- paste0("data/diff_sla_index/diff_sla_index_", years[i], ".tif")
-  filename_short <- paste0("diff_sla_index_", years[i], ".tif")
+  filename <- paste0("data/diff_sla_index/", sensor_platform, "/diff_sla_index_", years[i], "_", sensor_platform, ".tif")
+  filename_short <- paste0("diff_sla_index_", years[i], "_", sensor_platform, ".tif")
   
   #save raster locally
   writeRaster(diff_sla_index, filename)
@@ -466,7 +466,7 @@ for(i in 1:length(years)) {
 
 #### DIFFERENCED NDI7 ####
 #create destination path for s3 upload at end of loop 
-diff_ndi7_destination <- "s3://earthlab-amahood/wet_dry/derived_raster_data/differenced_indices/ndi7/"
+diff_ndi7_destination <- paste0("s3://earthlab-amahood/wet_dry/derived_raster_data/differenced_indices/ndi_7/", sensor_platform, "/")
 
 #create local directory to write rasters to within loop 
 dir.create("data/diff_ndi7")
@@ -493,8 +493,8 @@ for(i in 1:length(years)) {
   diff_ndi7 = spr_ndi7 - smr_ndi7
   
   #create unique filename for differenced raster using veg index and year (later will add tile location to this)
-  filename <- paste0("data/diff_ndi7/diff_ndi7_", years[i], ".tif")
-  filename_short <- paste0("diff_ndi7_", years[i], ".tif")
+  filename <- paste0("data/diff_ndi7/", sensor_platform, "/diff_ndi7_", years[i], "_", sensor_platform, ".tif")
+  filename_short <- paste0("diff_ndi7_", years[i], "_", sensor_platform, ".tif")
   
   #save raster locally
   writeRaster(diff_ndi7, filename)
