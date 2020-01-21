@@ -60,6 +60,8 @@ for(i in 1:length(mc_files_done)) {
   year_season_done[i] <- substr(mc_files_done[i], 35, 44)
 }
 
+if(nchar(year_season_done[1]) == 0) {year_season_done <- year_season_done[-1]}
+
 #if no files are done, make year_season_done = NA instead of a blank character vector
 if(nchar(year_season_done[1]) == 0) {year_season_done <- NA}
 
@@ -133,6 +135,8 @@ for(i in 1:length(tar_files)){
   
 
 #change names of raster stacks in list to simpler format (comment this out when we start to work with multiple tiles)
+year_season <- year_season[1:length(stks)]
+
 names(stks) <- year_season
 
 #grab unique years/seasons present in raster stacks
