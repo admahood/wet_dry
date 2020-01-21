@@ -166,6 +166,7 @@ diff_sr_destination <- paste0("s3://earthlab-amahood/wet_dry/derived_raster_data
 
 #create local directory to write rasters to within loop 
 dir.create("data/diff_sr")
+dir.create(paste0("data/diff_sr/", sensor_platform))
 
 for(i in 1:length(years)) {
   
@@ -207,6 +208,7 @@ diff_ndsvi_destination <- paste0("s3://earthlab-amahood/wet_dry/derived_raster_d
 
 #create local directory to write rasters to within loop 
 dir.create("data/diff_ndsvi")
+dir.create(paste0("data/diff_ndsvi/", sensor_platform))
 
 for(i in 1:length(years)) {
   
@@ -254,6 +256,7 @@ diff_evi_destination <- paste0("s3://earthlab-amahood/wet_dry/derived_raster_dat
 
 #create local directory to write rasters to within loop 
 dir.create("data/diff_evi")
+dir.create(paste0("data/diff_evi/", sensor_platform))
 
 for(i in 1:length(years)) {
   
@@ -300,6 +303,7 @@ diff_satvi_destination <- paste0("s3://earthlab-amahood/wet_dry/derived_raster_d
 
 #create local directory to write rasters to within loop 
 dir.create("data/diff_satvi")
+dir.create(paste0("data/diff_satvi/", sensor_platform))
 
 for(i in 1:length(years)) {
   
@@ -342,6 +346,7 @@ diff_ndti_destination <- paste0("s3://earthlab-amahood/wet_dry/derived_raster_da
 
 #create local directory to write rasters to within loop 
 dir.create("data/diff_ndti")
+dir.create(paste0("data/diff_ndti/", sensor_platform))
 
 for(i in 1:length(years)) {
   
@@ -385,6 +390,7 @@ diff_green_ndvi_destination <- paste0("s3://earthlab-amahood/wet_dry/derived_ras
 
 #create local directory to write rasters to within loop 
 dir.create("data/diff_green_ndvi")
+dir.create(paste0("data/diff_green_ndvi/", sensor_platform))
 
 for(i in 1:length(years)) {
   
@@ -427,6 +433,7 @@ for(i in 1:length(years)) {
 diff_sla_index_destination <- paste0("s3://earthlab-amahood/wet_dry/derived_raster_data/differenced_indices/sla_index/", sensor_platform, "/")
 #create local directory to write rasters to within loop 
 dir.create("data/diff_sla_index")
+dir.create(paste0("data/diff_sla_index/", sensor_platform))
 
 for(i in 1:length(years)) {
   
@@ -470,6 +477,7 @@ diff_ndi7_destination <- paste0("s3://earthlab-amahood/wet_dry/derived_raster_da
 
 #create local directory to write rasters to within loop 
 dir.create("data/diff_ndi7")
+dir.create(paste0("data/diff_ndi7/", sensor_platform))
 
 for(i in 1:length(years)) {
   
