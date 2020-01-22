@@ -414,8 +414,8 @@ for(i in 1:length(years)) {
   diff_green_ndvi = spr_green_ndvi - smr_green_ndvi
   
   #create unique filename for differenced raster using veg index and year (later will add tile location to this)
-  filename <- paste0("data/green_ndvi/", sensor_platform, "/green_ndvi_", years[i], "_", sensor_platform, ".tif")
-  filename_short <- paste0("green_ndvi_", years[i], "_", sensor_platform, ".tif")
+  filename <- paste0("data/diff_green_ndvi/", sensor_platform, "/diff_green_ndvi_", years[i], "_", sensor_platform, ".tif")
+  filename_short <- paste0("diff_green_ndvi_", years[i], "_", sensor_platform, ".tif")
   
   #save raster locally
   writeRaster(diff_green_ndvi, filename)
