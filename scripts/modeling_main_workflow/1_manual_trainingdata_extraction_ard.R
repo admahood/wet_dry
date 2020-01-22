@@ -1,7 +1,7 @@
 #Title: Manual Training Data Raster Extraction to Points Using Landsat ARD mean composite band values
 #Author(s): Dylan Murphy
 #Started: 6/28/19
-#Last Modified: 12/5/19
+#Last Modified: 1/22/19
 
 #### 1: Load Packages & Set Up ####
 libs <- c("raster", "sf", "dplyr", "stringr")
@@ -17,8 +17,9 @@ source("/home/rstudio/wet_dry/scripts/functions.R")
 # landsat_local <- "data/landsat_5and7_pixel_replaced_Jun3/" 
 
   #NEW ARD MEAN COMPOSITE PATHS
-landsat_s3 <- "s3://earthlab-amahood/wet_dry/derived_raster_data/mean_composites/"
+landsat_s3 <- "s3://earthlab-amahood/wet_dry/derived_raster_data/mean_composites_ndvi/"
 landsat_local <- "data/landsat_ard"
+dir.create("data")
 dir.create("data/scrap", showWarnings = FALSE)
 exdir <- "data/scrap/"
 
@@ -26,24 +27,28 @@ exdir <- "data/scrap/"
 dir.create("data/training_points/")
 
 system("aws s3 sync s3://earthlab-amahood/wet_dry/input_vector_data/manual_training_points/ /home/rstudio/wet_dry/data/training_points")
+system("aws s3 sync s3://earthlab-amahood/wet_dry/derived_vector_data/training_time_series_climate_vars /home/rstudio/wet_dry/data/training_points")
 system("aws s3 sync s3://earthlab-amahood/wet_dry/input_vector_data/wrs2_asc_desc /home/rstudio/wet_dry/data/WRS2_paths/wrs2_asc_desc")
 system("aws s3 sync s3://earthlab-amahood/wet_dry/input_raster_data/landfire_esp_rcl /home/rstudio/wet_dry/data/landfire_esp_rcl")
 system("aws s3 sync s3://earthlab-amahood/wet_dry/input_vector_data/BLM_AIM /home/rstudio/wet_dry/data/BLM_AIM")
 
-#ONLY SYNC THE BELOW DATA IF ADDING VARIABLES TO POINTS W/VARIABLES ALREADY EXTRACTED - USE
-#ABOVE SYNCS IF CREATING ENTIRELY NEW POINTS
-  #system("aws s3 sync s3://earthlab-amahood/wet_dry/derived_vector_data/manual_training_points_variables_extracted/ /home/rstudio/wet_dry/data/training_points_w_vars")
+#ONLY SYNC THE BELOW DATA IF ADDING VARIABLES TO POINTS W/VARIABLES ALREADY EXTRACTED
+#(USE ABOVE SYNCS IF CREATING ENTIRELY NEW TRAINING POINTS)
+
+system("aws s3 sync s3://earthlab-amahood/wet_dry/derived_vector_data/training_time_series_climate_vars /home/rstudio/wet_dry/data/training_timeseries")
+
+#grab proper crs for reprojection
+crs_grab_points <- st_read("data/manual_points_2class_2010_ard_phenology_all_variables_extracted_w_actual_precip_Nov26.gpkg")
+ts_crs <- st_crs(crs_grab_points)
 
 #Create training point objects to extract variables with: 
 
-#if adding variables to already extracted training data:
-#use the below code chunk to read in already created training data and add variables
-gb_plots <- st_read("data/training_timeseries/gbd_manual_points_2006_ard_phenology_extracted_Aug6.gpkg") %>% 
-  st_transform(as.character(crs(esp_mask))) %>% mutate(ID = row_number(),
-   
+#1.1 -- if creating training data from empty points 
+#first year in training time series = 2010;
+#(see below to change labels and create other years in training timeseries using lyb to change labels):
+gb_plots <- st_read("data/training_points/spatially_balanced_points_ard_phenology/ard_pheno_sbp_points_final_Jul29.shp")
 
-                                                                                                                                                           Year = 2006)
-#if extracting a new year in a training time series:
+#1.2 -- if extracting a new year in a training time series:
 #start with step 11 to change labels based on lyb, change year to target year,
 #then create gb_plots object from "new_naip_points" object
 
@@ -51,6 +56,28 @@ gb_plots <- new_naip_points %>% mutate(ID = row_number(),
                                        Year = ts_year)
 #set year for time series extraction
 year <- unique(gb_plots$Year)
+ts_year <- year
+#1.3 -- if adding variables to already extracted training data:
+#use the below code chunk to read in already created training data and add variables 
+#(as of 1/22/20, adding ndvi informed ard bands and veg indices/diff variables & removing previously extracted)
+
+#set year of training data to which variables are being added
+ts_year <- "2006"
+
+gb_plots <- st_read(paste0("data/training_timeseries/manual_points_2class_", ts_year, "_ard_new_climate_vars_Jan3.gpkg")) %>% 
+  st_transform(crs = ts_crs) %>% mutate(ID = row_number(),Year = ts_year) 
+
+#remove previously extracted bands, veg indices, tassel cap, and diff indices (only applies to point extraction on 1/22/20)
+gb_plots <- gb_plots %>% dplyr::select(-spring_sr_band1, -spring_sr_band2, -spring_sr_band3, -spring_sr_band4, -spring_sr_band5, -spring_sr_band7,
+                                       -summer_sr_band1, -summer_sr_band2, -summer_sr_band3, -summer_sr_band4, -summer_sr_band5, -summer_sr_band7,
+                                       -spring_ndvi, -spring_evi, -spring_evi, -spring_savi, -spring_sr, -spring_ndti, -spring_green_ndvi, 
+                                       -spring_sla_index, -spring_ndi7, -spring_greenness, -spring_brightness, -spring_wetness, 
+                                       -summer_ndvi, -summer_evi, -summer_evi, -summer_savi, -summer_sr, -summer_ndti, -summer_green_ndvi, 
+                                       -summer_sla_index, -summer_ndi7, -summer_greenness, -summer_brightness, -summer_wetness, 
+                                       -diff_evi, -diff_green_ndvi, -diff_ndi7, -diff_ndsvi, -diff_ndti, -diff_ndvi, -diff_satvi, 
+                                       -diff_satvi, -diff_savi, -diff_sla_index, -diff_sr
+                                       )
+   
 #### 2. create objects and extract path/row combos to each point ####
 
 plot_data <- st_read("data/BLM_AIM/BLM_AIM_20161025.shp")
@@ -71,23 +98,27 @@ dupl_vec <- duplicated(gb_plots$ID)
 gb_plots <- gb_plots %>% mutate(duplicated = dupl_vec) 
 gb_plots <- gb_plots[gb_plots$duplicated == F,]
 
-#grab the years and path row combos needed
-
-years <- unique(gb_plots$Year) # getting the years present in training data
+#grab the path row combos needed
 
 path_row_combos <- unique(gb_plots$path_row)
 
-#list available pixel replaced landsat files
-ls_files_list <- system("aws s3 ls s3://earthlab-amahood/wet_dry/derived_raster_data/mean_composites/", intern = T)
+#### 3. LANDSAT ARD BAND EXTRACTION (SPRING & SUMMER BAND VALUES) ####
 
-#subset ls filenames down to just pathrow, platform, and year
+#set sensor platform used to make mean composites to grab correct composite rasters
+sensor_platform <- "ls5_and_ls7" 
+
+#list available pixel replaced landsat files
+ls_files_list <- system(paste0("aws s3 ls s3://earthlab-amahood/wet_dry/derived_raster_data/mean_composites_ndvi/", sensor_platform, "/"), intern = T)
+ls_files_list <- ls_files_list[-1]
+
+#subset ls filenames down to just season, year, and platform
 for(l in 1:length(ls_files_list)) {
-  ls_files_list[l] <- substr(ls_files_list[l], 32, 51)
+  ls_files_list[l] <- substr(ls_files_list[l], 35, 69)
 }
 
 kounter = 1 #set counter to 1 at beginning of loop 
 
-#### 3. LANDSAT ARD BAND EXTRACTION (SPRING & SUMMER BAND VALUES) ####
+years <- unique(gb_plots$Year) #grab years present in training data
 
 #Loop over each year (works even if only one year present in training points) 
 #and path/row combo and extract band values to points
@@ -96,21 +127,20 @@ for(i in 1:length(years)){
   #Subset points for a specific year
     gbplots_subset <- gb_plots[gb_plots$Year == years[i],]
     print(paste0("plots subsetted for ", years[i]))
-    #print(paste(round(counter/125*100), "%")) #progress indicator
     
     #select proper landsat scene from list of files in s3 bucket
     ls_files_annual <- str_subset(ls_files_list, pattern = fixed(years[i]))
     
     for(j in 1:length(ls_files_annual)) {
     
-    season <- substr(ls_files_annual[j], 8, 13)
+    season <- substr(ls_files_annual[j], 5, 10)
     #Download proper scene from s3
-    system(paste0("aws s3 cp ", landsat_s3, ls_files_annual[j], " ", landsat_local, "/", ls_files_annual[j]))
+    system(paste0("aws s3 cp ", landsat_s3, sensor_platform, "/mc_", ls_files_annual[j], " ", landsat_local, "/", ls_files_annual[j]))
     print(paste0("landsat downloaded ", years[i], season))    
     
     
     #create raster stack object from newly downloaded landsat scene & set variable names for each band specifying season of mean composite    
-    ls_stack <- raster::stack(paste0(landsat_local, "/mc_", years[i], season, ".tif")) # this just loads the raster
+    ls_stack <- raster::stack(paste0(landsat_local, "/", years[i], season, "_ndvi_ts_", sensor_platform, ".tif")) # this just loads the raster
     names(ls_stack) <- c(paste0(season, "_sr_band1"), paste0(season, "_sr_band2"), paste0(season, "_sr_band3"), paste0(season, "_sr_band4"), paste0(season, "_sr_band5"), paste0(season, "_sr_band7"))
 
     #check to make sure there are points for a particular pathrow/year      
@@ -121,7 +151,7 @@ for(i in 1:length(years)){
       print(paste0("band values extracted to points ", years[i])) 
       
       #transform points back to lat-long
-      gbplots_subset <- st_transform(st_as_sf(gbplots_subset),crs = st_crs(plot_data))
+      gbplots_subset <- st_transform(st_as_sf(gbplots_subset),crs = ts_crs)
       print(paste0("points transformed to lat long ", years[i]))    
       
       #delete landsat scene from ec2 instance to save space
@@ -336,9 +366,6 @@ df$summer_wetness <- wet7(df$summer_sr_band1,df$summer_sr_band2,df$summer_sr_ban
 
 #### 10. Extracting Differenced Veg. Indices (Phenology Variables) ####
 
-#use old blm data for grabbing longlat crs string
-plot_data <- st_read("data/BLM_AIM/BLM_AIM_20161025.shp") 
-
 #create directory to store differenced veg index rasters
 dir.create("data/diff_indices")
 
@@ -368,13 +395,15 @@ counter <- 1
 
 #loop over years present in training data to match with target differenced veg indices
 for(j in 1:length(target_years)) {
-  #subset training points for a specific year
+  #subset training points for a specific year (works with training data for 1 year but adds flexibility in case of multi-year training data)
   gb_diff_subset <- gb_diff[gb_diff$Year == target_years[j],]
   
   #loop over each differenced index, select target year, and extract to points 
   for(i in 1:length(diff_folders)) {
     #list raster files present in particular differenced index folder (same diff index, different years)
-    diff_index_files <- list.files(diff_folders[i], full.names = T)
+    diff_index_sensors <- list.files(diff_folders[i], full.names = T)
+    diff_index_sensor <- str_subset(diff_index_sensors, pattern = fixed(sensor_platform))
+    diff_index_files <- list.files(diff_index_sensor, full.names = T)
     
     #grab differenced index raster filename for target year
     diff_index_target <- str_subset(diff_index_files, pattern = fixed(target_years[j]))
@@ -389,7 +418,7 @@ for(j in 1:length(target_years)) {
     gb_diff_subset <- raster::extract(diff_index, gb_diff_subset, sp = T)
     
     #transform subset of training points to lat long and sf object
-    gb_diff_subset <- st_transform(st_as_sf(gb_diff_subset),crs = st_crs(plot_data))
+    gb_diff_subset <- st_transform(st_as_sf(gb_diff_subset), crs = ts_crs)
     
     #put subsets of training data for specific years back together into one data frame
       #if counter = 1 (first year present in training data), create new dataframe object
@@ -406,9 +435,9 @@ counter <- counter + 1
 
 result_diff <- result_diff %>% dplyr::mutate(Label = df$Label)
 #paths for saving locally and uploading to s3
-finished_points_local_filename <- paste0("manual_points_2class_", year, "_ard_new_climate_vars_Jan3.gpkg")
-finished_points_local_path <- paste0("data/manual_points_2class_", year, "_ard_new_climate_vars_Jan3.gpkg")
-finished_points_s3_path <- "s3://earthlab-amahood/wet_dry/derived_vector_data/training_time_series_climate_vars/"
+finished_points_local_filename <- paste0("manual_points_2class_", ts_year, "_ard_ndvi_informed_vars_Jan22.gpkg")
+finished_points_local_path <- paste0("data/manual_points_2class_", ts_year, "_ard_ndvi_informed_vars_Jan22.gpkg")
+finished_points_s3_path <- "s3://earthlab-amahood/wet_dry/derived_vector_data/training_time_series_ndvi_informed/"
 
 #save to local disk
 st_write(result_diff, dsn = finished_points_local_path)
@@ -419,10 +448,10 @@ system(paste0("aws s3 cp ", finished_points_local_path, " ", finished_points_s3_
 #### 11. Changing manually created Point Labels for different years based on fire history ####
  
 #SET YEAR (VERY IMPORTANT)
-ts_year <- 2006
+ts_year <- 2010
 
 #download manually created NAIP point data w/ lyb attached from s3
-system("aws s3 sync s3://earthlab-amahood/wet_dry/derived_vector_data/manual_training_points_lyb_extracted/ /home/rstudio/wet_dry/data/training_points")
+system("aws s3 sync s3://earthlab-amahood/wet_dry/derived_vector_data/manual_training_points_lyb_extracted/ /home/rstudio/wet_dry/data/training_points_lyb")
 
 #download 2010 point data to grab crs and reproject
 system("aws s3 cp s3://earthlab-amahood/wet_dry/derived_vector_data/manual_training_points_variables_extracted/ard_pheno_spatially_balanced_points/manual_points_2class_2010_ard_phenology_all_variables_extracted_w_actual_precip_Nov26.gpkg data/manual_points_2class_2010_ard_phenology_all_variables_extracted_w_actual_precip_Nov26.gpkg")
@@ -433,7 +462,7 @@ ts_crs <- st_crs(crs_grab_points)
 
 #read in original (2010) NAIP training data w/ lyb attached
 
-naip_points <- st_read("data/training_points/manual_ard_points_2010_new_vars_and_lyb_Dec10.gpkg") %>% mutate(plot_year = ts_year) %>% st_transform(crs = ts_crs) 
+naip_points <- st_read("data/training_points_lyb/manual_ard_points_2010_new_vars_and_lyb_Dec10.gpkg") %>% mutate(plot_year = ts_year) %>% st_transform(crs = ts_crs) 
 
 #create new object to modify for a new year of labelling (change year in "mutate" to year desired for modeling/labelling)
 new_naip_points <- naip_points %>% mutate(plot_year = ts_year) %>% 
