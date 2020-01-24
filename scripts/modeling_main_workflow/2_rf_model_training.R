@@ -3,8 +3,9 @@
 #Author(s): Dylan Murphy
 
 #### 1: Load Packages/Source scripts/set seed
+install.packages("VSURF")
 
-libs <- c("randomForest", "dplyr","sf", "caTools", "dplyr", "caret")
+libs <- c("randomForest", "dplyr","sf", "caTools", "dplyr", "caret", "VSURF")
 lapply(libs, library, character.only = TRUE, verbose = FALSE)
 #lapply(libs, install.packages, character.only = TRUE, verbose = FALSE) # - optional line to install packages
 source("scripts/functions.R")
@@ -243,6 +244,13 @@ for (i in 1:rvars){ # this takes 10-30 minutes
               "Accuracy:",  round(max(mods[[i]]$results$Accuracy)*100),
               "% | Dropped", vvv, Sys.time()-t0))
 }
+
+#### 4.2.1 VSURF Model Tuning
+gtrain_noNA <- na.omit(gtrain)
+labels <- gtrain_noNA$binary
+gtrain_noNA <- gtrain_noNA %>% dplyr::select(-binary)
+
+model2.vsurf <- VSURF(gtrain_noNA, labels, nfor.pred = 10, n.forinterp = 10, n.forthres = 10, parallel = T)
 #### 4.3: Random Forest Model Training ####
 
 
