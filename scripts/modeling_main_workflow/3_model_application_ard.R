@@ -4,7 +4,7 @@
 #Date Last Modified: Dec 17, 2019
 
 #### 1.1: Setup - Load Packages/Source Scripts
-libs <- c("sf", "tidyverse", "raster", "rgdal", "rgeos", "foreach", "doParallel", "gdalUtils")
+libs <- c("sf", "tidyverse", "raster", "rgdal", "rgeos", "foreach", "doParallel", "gdalUtils", "stringr")
 lapply(libs, library, character.only = TRUE, verbose = FALSE)
 source("scripts/functions.R")
 
@@ -15,7 +15,7 @@ dir.create(tmpd)
 rasterOptions(tmpdir=tmpd)
 
 #### 1.3: Setup - Pull Data from S3
-s3_ls_path <- "s3://earthlab-amahood/wet_dry/derived_raster_data/mean_composites"
+s3_ls_path <- "s3://earthlab-amahood/wet_dry/derived_raster_data/mean_composites_ndvi"
 local_ls_path <- "data/mean_composites"
 
 #terrain paths 
@@ -60,8 +60,9 @@ system("aws s3 sync s3://earthlab-amahood/wet_dry/input_raster_data/landfire_urb
 system("aws s3 sync s3://earthlab-amahood/wet_dry/input_raster_data/naip data/naip")
 
 #grab filenames for ls5 stacks 
-scene <- list.files("data/mean_composites")
-scene_full <- list.files("data/mean_composites", full.names = T)
+scene_folders <- list.files("data/mean_composites", full.names = T)
+scene <- list.files(str_subset(scene_folders, pattern = fixed("ls5_and_ls7")))
+scene_full <- list.files(str_subset(scene_folders, pattern = fixed("ls5_and_ls7")), full.names = T)
 
 spring_scenes <- str_subset(scene_full, pattern = fixed("spring"))
 summer_scenes <- str_subset(scene_full, pattern = fixed("summer"))
@@ -71,7 +72,18 @@ diff_folders <- list.files("data/differenced/", full.names = T)
 
 counter <- 1
 for(i in 1:length(diff_folders)) {
-  diff_files <- list.files(diff_folders[i], full.names = T)
+  diff_platform_folders <- list.files(diff_folders[i], full.names = T)
+  if(counter == 1) {
+    diff_platforl_folders_full <- diff_files 
+  } else {
+    diff_platform_folders_full <- c(diff_files_full, diff_files)
+  }
+  counter = counter + 1
+}
+
+counter <- 1
+for(i in 1:length(diff_platform_folders_full)) {
+  diff_files <- list.files(diff_platform_folders_full[i], full.names = T)
   if(counter == 1) {
     diff_files_full <- diff_files 
   } else {
@@ -79,7 +91,6 @@ for(i in 1:length(diff_folders)) {
   }
   counter = counter + 1
 }
-
 #get folder locations for monthly and seasonal actual precip rasters
 monthly_precip_folders <- list.files("data/prism/monthly_precip/cropped", full.names = T)
 
@@ -104,7 +115,8 @@ naip <- raster("data/naip/m_4011703_ne_11_1_20100704.tif") %>% projectRaster(crs
 #naip <- raster("data/naip/m_4111823_sw_11_1_20100628.tif") %>% projectRaster(crs = crs, res = 30) #kings
 
 #create object to store name of naip scene being modeled while testing model results
-#change to "wmuc", "frank", or "kings"
+
+#IMPORTANT: change to "wmuc", "frank", or "kings"
 naip_name <- "frank"
 
 
@@ -113,10 +125,10 @@ foreach(i = spring_scenes,
         .packages = 'raster') %dopar% {         
           
       #grab file name without directories for filename creation later 
-          file = substr(i, 22, 45) 
+          file = substr(i, 34, 70) 
           
       #grab year for particular loop iteration
-          year = substr(i, 25, 28)
+          year = substr(i, 37, 40)
           
       #grab start time for progress check 
           t0 <- Sys.time()
@@ -328,7 +340,8 @@ foreach(i = spring_scenes,
           gc() 
           
       #make filename 
-          filenamet <- paste0("data/results/", "005007_2class_climate_zscores_", naip_name, "_", year, "_Jan2", ".tif") 
+          filenamet <- paste0("data/results/", "005007_2class_ndvi_informed_indices_", naip_name, "_", year, "_Jan24", ".tif") 
+          filename_short <-  paste0("data/results/", "005007_2class_ndvi_informed_indices_", naip_name, "_", year, "_Jan24", ".tif") 
           system(paste("echo", "filename created", year))
           
       #apply the RF model to raster stack and create "ls5_classed", an annual predicted sage/cheat raster!
@@ -341,7 +354,7 @@ foreach(i = spring_scenes,
       #save resulting land cover rasters and upload to s3
           writeRaster(ls5_classed, filename = filenamet, format = "GTiff", overwrite = T) 
           system(paste("echo", "file saved to disk"))
-          system(paste0("aws s3 cp ", filenamet, " s3://earthlab-amahood/wet_dry/model_results/summer19_model_results/differenced_variables/2class_climate_vars_Dec18/", naip_name, "/", substr(filenamet, 14, 150)))
+          system(paste0("aws s3 cp ", filenamet, " s3://earthlab-amahood/wet_dry/model_results/summer19_model_results/differenced_variables/2class_ndvi_informed_indicesJan24/", naip_name, "/", filename_short))
           system(paste("echo", "aws sync done"))
           
         }
