@@ -45,7 +45,11 @@ gtrain <- rbind(gtrain1, gtrain2, gtrain3, gtrain4, gtrain5)
 
   #THREE CLASSES: 
 #ARD 3-CLASS (GRASS, SHRUB, MIXED) TRAINING DATA (With labels from NAIP)
-gtrain <- st_read("data/training_timeseries/manual_points_3class_2010_ard_phenology_all_variables_extracted_Oct9.gpkg") %>% st_set_geometry(NULL)
+system(paste0("aws s3 cp ", "s3://earthlab-amahood/wet_dry/derived_vector_data/manual_training_points_variables_extracted/ard_pheno_spatially_balanced_points/manual_points_3class_2010_ard_phenology_all_variables_extracted_Oct9.gpkg", 
+              " data/training_timeseries/manual_points_3class_2010_ard_phenology_all_variables_extracted_Oct9.gpkg"))
+
+gtrain <- st_read("data/training_timeseries/manual_points_3class_2010_ard_phenology_all_variables_extracted_Oct9.gpkg") %>%
+  st_set_geometry(NULL)
 
 #### 4.1.1: old method of training class labelling - based on shrub cover attribute ####
 
@@ -169,23 +173,7 @@ gtrain <- gtrain %>%
     - aspect,
     -Label)
 #### 4.1.4: USE THIS CODE AS OF SEP 27 landsat ARD extent training data with differenced veg indices (already labelled) ####
-gtrain <- gtrain %>% 
-  # dplyr::mutate(total_shrubs = SagebrushC) %>% 
-  dplyr::select(spring_sr_band1, spring_sr_band2, spring_sr_band3, spring_sr_band4, spring_sr_band5, spring_sr_band7,
-                summer_sr_band1, summer_sr_band2, summer_sr_band3, summer_sr_band4, summer_sr_band5, summer_sr_band7,
-                spring_ndvi, spring_evi, spring_savi, spring_sr, spring_ndti, spring_sla_index, spring_ndi7, spring_green_ndvi, 
-                summer_ndvi, summer_evi, summer_savi, summer_sr, summer_ndti, summer_sla_index, summer_ndi7, summer_green_ndvi,
-                spring_greenness, spring_brightness, spring_wetness, summer_greenness, summer_brightness, summer_wetness,
-                #total_shrubs, 
-                elevation, slope, aspect, 
-                tpi, tri, roughness, flowdir,
-                precip_anomaly,
-                diff_evi, diff_ndsvi, diff_savi, diff_ndvi, diff_satvi, diff_sr, diff_ndti, diff_green_ndvi, diff_sla_index, diff_ndi_7,
-                jan_precip, feb_precip, mar_precip, apr_precip, may_precip,
-                jun_precip, jul_precip, aug_precip, sep_precip, oct_precip, nov_precip, dec_precip,
-                winter_precip, spring_precip, summer_precip, fall_precip,
-                aet_z, def_z, tmn_z,
-                Label) %>%
+gtrain <- gtrain  %>%
   dplyr::mutate(spring_ndsvi = get_ndsvi(band3 = gtrain$spring_sr_band3, band5 = gtrain$spring_sr_band5),
                 summer_ndsvi = get_ndsvi(band3 = gtrain$summer_sr_band3, band5 = gtrain$summer_sr_band5),
                 spring_satvi = get_satvi(band3 = gtrain$spring_sr_band3, band5 = gtrain$spring_sr_band5, band7 = gtrain$spring_sr_band7, L = 0.5),
@@ -250,7 +238,9 @@ gtrain_noNA <- na.omit(gtrain)
 labels <- gtrain_noNA$binary
 gtrain_noNA <- gtrain_noNA %>% dplyr::select(-binary)
 
-model2.vsurf <- VSURF(gtrain_noNA, labels, nfor.pred = 10, n.forinterp = 10, n.forthres = 10, parallel = T)
+ncores<-detectCores()-1
+model2.vsurf <- VSURF(gtrain_noNA, labels, ncores=ncores,parallel = T)
+
 #### 4.3: Random Forest Model Training ####
 
 
