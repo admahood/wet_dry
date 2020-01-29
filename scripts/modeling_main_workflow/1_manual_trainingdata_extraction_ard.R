@@ -1,7 +1,7 @@
 #Title: Manual Training Data Raster Extraction to Points Using Landsat ARD mean composite band values
 #Author(s): Dylan Murphy
 #Started: 6/28/19
-#Last Modified: 1/22/19
+#Last Modified: 1/29/19
 
 #### 1: Load Packages & Set Up ####
 libs <- c("raster", "sf", "dplyr", "stringr")
@@ -12,11 +12,7 @@ source("/home/rstudio/wet_dry/scripts/functions.R")
 
 #paths 
 
-  #ORIGINAL PIXEL REPLACED LANDSAT PATHS
-# landsat_s3 <- "s3://earthlab-amahood/wet_dry/input_raster_data/landsat_5and7_pixel_replaced_Jun3/"
-# landsat_local <- "data/landsat_5and7_pixel_replaced_Jun3/" 
-
-  #NEW ARD MEAN COMPOSITE PATHS
+  #ARD MEAN COMPOSITE PATHS
 landsat_s3 <- "s3://earthlab-amahood/wet_dry/derived_raster_data/mean_composites_ndvi/"
 landsat_local <- "data/landsat_ard"
 dir.create("data")
@@ -41,24 +37,71 @@ system("aws s3 sync s3://earthlab-amahood/wet_dry/derived_vector_data/training_t
 crs_grab_points <- st_read("data/manual_points_2class_2010_ard_phenology_all_variables_extracted_w_actual_precip_Nov26.gpkg")
 ts_crs <- st_crs(crs_grab_points)
 
-#Create training point objects to extract variables with: 
+#Create training point objects to extract variables to: 
 
-#1.1 -- if creating training data from empty points 
+#### 1.1 -- if creating training data from empty points: set ts_year to 2010 ####
 #first year in training time series = 2010;
 #(see below to change labels and create other years in training timeseries using lyb to change labels):
-gb_plots <- st_read("data/training_points/spatially_balanced_points_ard_phenology/ard_pheno_sbp_points_final_Jul29.shp")
+ts_year <- 2010
+gb_plots <- st_read("data/training_points/spatially_balanced_points_ard_phenology/ard_pheno_sbp_points_final_Jul29.shp") %>% mutate(Year = ts_year)
 
-#1.2 -- if extracting a new year in a training time series:
-#start with step 11 to change labels based on lyb, change year to target year,
-#then create gb_plots object from "new_naip_points" object
+#### 1.2 -- if extracting a new year in a training time series: start with step 1.2.1 below ####
+#1.2.1: Changing manually created Point Labels for different years based on fire history
 
-gb_plots <- new_naip_points %>% mutate(ID = row_number(),
-                                       Year = ts_year)
-#set year for time series extraction
-year <- unique(gb_plots$Year)
-ts_year <- year
-#1.3 -- if adding variables to already extracted training data:
-#use the below code chunk to read in already created training data and add variables 
+#change labels based on lyb, change year to target year,
+#then create gb_plots object from "new_naip_points" object 
+
+#SET YEAR (VERY IMPORTANT)
+ts_year <- 2006
+
+#download manually created NAIP point data w/ lyb attached from s3
+system("aws s3 sync s3://earthlab-amahood/wet_dry/derived_vector_data/manual_training_points_lyb_extracted/ /home/rstudio/wet_dry/data/training_points_lyb")
+
+#download 2010 point data to grab crs and reproject
+system("aws s3 cp s3://earthlab-amahood/wet_dry/derived_vector_data/manual_training_points_variables_extracted/ard_pheno_spatially_balanced_points/manual_points_2class_2010_ard_phenology_all_variables_extracted_w_actual_precip_Nov26.gpkg data/manual_points_2class_2010_ard_phenology_all_variables_extracted_w_actual_precip_Nov26.gpkg")
+
+crs_grab_points <- st_read("data/manual_points_2class_2010_ard_phenology_all_variables_extracted_w_actual_precip_Nov26.gpkg")
+
+ts_crs <- st_crs(crs_grab_points)
+
+#read in original (2010) NAIP informed training data w/ lyb attached
+
+naip_points <- st_read("data/training_points_lyb/manual_ard_points_2010_new_vars_and_lyb_Dec10.gpkg") %>% 
+  dplyr::select(-plot_year) %>% 
+  dplyr::mutate(Year = ts_year) %>%
+  st_transform(crs = ts_crs) 
+
+#create new object to modify for a new year of labelling (change year in "mutate" to year desired for modeling/labelling)
+new_naip_points <- naip_points %>% 
+  filter(Year != lyb | is.na(lyb)) #removing points which burned in the year of interest and keeping those that did not burn
+
+
+#loop through each point and determine whether a steady state can be assumed for the year of choice 
+# (because sagebrush takes a long time to establish, even if it burned in between the target year and 
+#the year of original labelling (2010) I assume it was sagebrush in the target year)
+
+#remove points labelled grass which burned after the target year - cannot assume they were grass prior to burning
+for(i in 1:nrow(new_naip_points)) {
+  if(isTRUE(new_naip_points[i,]$lyb > ts_year & new_naip_points[i,]$Label == "grass")) {
+    new_naip_points <- new_naip_points[-i,]
+  }
+}
+
+#remove previously extracted variables from original year 
+new_naip_points <- new_naip_points %>% dplyr::select(OBJECTID, Label, Year, lyb)
+
+#SAVING POINTS WITH NEW LABELS (WITHOUT VARIABLES EXTRACTED)
+# #create filename for relabeled points w/o variables (change year to match year of interest)
+# new_year_naip_filename <- paste0("data/manual_ard_005007_climare_vars_points_", ts_year, "_no_vars.gpkg")
+# 
+# st_write(new_naip_points, new_year_naip_filename)
+# 
+# system(paste0("aws s3 cp ", new_year_naip_filename, " s3://earthlab-amahood/wet_dry/input_vector_data/manual_training_points/spatially_balanced_points_ard_phenology/spb_points_ard_w_lyb_novars/", substr(new_year_naip_filename, 6, 100)))
+
+
+
+gb_plots <- new_naip_points %>% mutate(ID = row_number())
+#### 1.3 -- if adding variables to already extracted training data: use the below code chunk to read in already created training data and add variables ####
 #(as of 1/22/20, adding ndvi informed ard bands and veg indices/diff variables & removing previously extracted)
 
 #set year of training data to which variables are being added
@@ -177,12 +220,13 @@ for(i in 1:length(years)){
 result <- result[!is.na(result$spring_sr_band1),] 
 result <- result[!is.na(result$summer_sr_band1),] %>% arrange(ID)
 
+gb_plots <- result
 #### 5. PRECIP ANOMALY EXTRACTION ####
 
 #change year in path to year of interest for extraction 
 system(paste0("aws s3 cp s3://earthlab-amahood/wet_dry/derived_raster_data/PRISM_precip_anomaly/greatbasin_trimmed_anomaly_training/precip_anomaly_train", year, ".tif", " data/precip_annual/greatbasin_trimmed_anomaly_training/"))
 
-gbd <- result
+
 
 training_anomaly_paths <- list.files("data/precip_annual/greatbasin_trimmed_anomaly_training", full.names = T)
 training_anomaly_paths <- str_subset(training_anomaly_paths, pattern = fixed(as.character(year)))
@@ -194,12 +238,12 @@ precip_anom_raster <- raster(training_anomaly_paths)
 #### extract precip anomaly to training data points
 precip_anomaly_vec <- c()
 
-for(i in 1:nrow(gbd)) {
-  precip_anomaly_vec[i] <- raster::extract(precip_anom_raster, gbd[i,])
+for(i in 1:nrow(gb_plots)) {
+  precip_anomaly_vec[i] <- raster::extract(precip_anom_raster, gb_plots[i,])
 }
 
 # attach annual precip anomaly to gb training data 
-gbd <- dplyr::mutate(gbd, precip_anomaly = precip_anomaly_vec) 
+gb_plots <- dplyr::mutate(gb_plots, precip_anomaly = precip_anomaly_vec) 
 
 #### 6. ACTUAL PRECIP EXTRACTION ####
 
@@ -228,41 +272,41 @@ for(i in 1:length(month_names)) {
 }
 
 #create empty list to store vectors of extracted precip values
-gbd_pts <- list()
+gb_plots_pts <- list()
 
 #loop over each month's precip raster and extract values at each training point, storing vector result in list
-year <- unique(gbd$Year)
+year <- unique(gb_plots$Year)
 
 for(i in 1:length(monthly_precip_names)) {
   if(month_names[i] == "sep") {
     target_path <- stringr::str_subset(monthly_precip_paths, pattern = fixed(paste0(as.character(year - 1), "0", i)))
     one_month_precip <- raster(target_path)
-    gbd_pts[[i]] <- raster::extract(one_month_precip, gbd)
+    gb_plots_pts[[i]] <- raster::extract(one_month_precip, gb_plots)
     print(paste0(target_path, " extracted for ", month_names[i]))
 } else if (month_names[i] == "oct" | month_names[i] == "nov" | month_names[i] == "dec") {
     target_path <- stringr::str_subset(monthly_precip_paths, pattern = fixed(paste0(as.character(year - 1), i)))
     one_month_precip <- raster(target_path)
-    gbd_pts[[i]] <- raster::extract(one_month_precip, gbd)
+    gb_plots_pts[[i]] <- raster::extract(one_month_precip, gb_plots)
     print(paste0(target_path, " extracted for ", month_names[i]))
 } else if (month_names[i] == "jan" | month_names[i] =="feb" | month_names[i] == "mar" | month_names[i] == "apr" | month_names[i] == "may" | month_names[i] == "jun" | month_names[i] == "jul" | month_names[i] == "aug") {
     target_path <- stringr::str_subset(monthly_precip_paths, pattern = fixed(paste0(as.character(year), "0", i)))
     one_month_precip <- raster(target_path)
-    gbd_pts[[i]] <- raster::extract(one_month_precip, gbd)
+    gb_plots_pts[[i]] <- raster::extract(one_month_precip, gb_plots)
     print(paste0(target_path, " extracted for ", month_names[i]))
   }
 }
 
 #convert list of vectors to data frame and attach respective monthly variable names 
-gbd_pts <- as.data.frame(gbd_pts)
-names(gbd_pts) <- monthly_precip_names
+gb_plots_pts <- as.data.frame(gb_plots_pts)
+names(gb_plots_pts) <- monthly_precip_names
 
 #attach extracted monthly actual precip values to training data
-gbd <- dplyr::bind_cols(gbd, gbd_pts)
+gb_plots <- dplyr::bind_cols(gb_plots, gb_plots_pts)
 
-gbd$winter_precip <- gbd$dec_precip + gbd$jan_precip + gbd$feb_precip 
-gbd$spring_precip <- gbd$mar_precip + gbd$apr_precip + gbd$may_precip 
-gbd$summer_precip <- gbd$jun_precip + gbd$jul_precip + gbd$aug_precip 
-gbd$fall_precip <- gbd$sep_precip + gbd$oct_precip + gbd$nov_precip 
+gb_plots$winter_precip <- gb_plots$dec_precip + gb_plots$jan_precip + gb_plots$feb_precip 
+gb_plots$spring_precip <- gb_plots$mar_precip + gb_plots$apr_precip + gb_plots$may_precip 
+gb_plots$summer_precip <- gb_plots$jun_precip + gb_plots$jul_precip + gb_plots$aug_precip 
+gb_plots$fall_precip <- gb_plots$sep_precip + gb_plots$oct_precip + gb_plots$nov_precip 
 
 #### 7. CLIMATE VARIABLE Z SCORES EXTRACTION ####
 #download climate z score layers from s3
@@ -291,7 +335,7 @@ zscore_names[i] <- paste0(var_names[i], "_z")
 }
 
 #grab years present in training data
-years <- unique(gbd$Year)
+years <- unique(gb_plots$Year)
 
 #create empty list to store climate z score vectors
 climate_zscore_extracted <- list()
@@ -308,7 +352,7 @@ for(i in 1:length(years)) {
   #change the below subsets to grab different months for "water year"
     zscore_layer_water_year <- stack(zscore_layer_prior_year[[9:12]], zscore_layer_sameyear[[1:3]]) 
     zscore_layer <- mean(zscore_layer_water_year[[1:7]]) #change if water year months != 7
-    climate_zscore_extracted[[j]] <- raster::extract(zscore_layer, gbd)
+    climate_zscore_extracted[[j]] <- raster::extract(zscore_layer, gb_plots)
   }
 }
 
@@ -319,50 +363,50 @@ climate_zscores <- as.data.frame(climate_zscore_extracted)
 names(climate_zscores) <- zscore_names
 
 #attach new climate z score variables to main training points
-gbd <- dplyr::bind_cols(gbd, climate_zscores)
+gb_plots <- dplyr::bind_cols(gb_plots, climate_zscores)
 
 #### 8. TERRAIN EXTRACTION ####
 system("aws s3 sync s3://earthlab-amahood/wet_dry/input_raster_data/terrain_2 /home/rstudio/wet_dry/data/terrain_2")
 
-df <- gbd
 
-df$elevation <- raster::extract(raster("data/terrain_2/lf_dem_reproj_full.tif"), df)
-df$slope <- raster::extract(raster("data/terrain_2/slope.tif"), df)
-df$aspect <- raster::extract(raster("data/terrain_2/aspect.tif"), df)
-df$tpi <- raster::extract(raster("data/terrain_2/TPI.tif"), df)
-df$tri <- raster::extract(raster("data/terrain_2/TRI.tif"), df)
-df$roughness <- raster::extract(raster("data/terrain_2/roughness.tif"), df)
-df$flowdir <- raster::extract(raster("data/terrain_2/flowdir.tif"), df)
+
+gb_plots$elevation <- raster::extract(raster("data/terrain_2/lf_dem_reproj_full.tif"), gb_plots)
+gb_plots$slope <- raster::extract(raster("data/terrain_2/slope.tif"), gb_plots)
+gb_plots$aspect <- raster::extract(raster("data/terrain_2/aspect.tif"), gb_plots)
+gb_plots$tpi <- raster::extract(raster("data/terrain_2/TPI.tif"), gb_plots)
+gb_plots$tri <- raster::extract(raster("data/terrain_2/TRI.tif"), gb_plots)
+gb_plots$roughness <- raster::extract(raster("data/terrain_2/roughness.tif"), gb_plots)
+gb_plots$flowdir <- raster::extract(raster("data/terrain_2/flowdir.tif"), gb_plots)
 
 #### 9. VEG INDICES AND TASSELLED CAP VARIABLE CALCULATION ####
 
   #SPRING
-df$spring_ndvi <- get_ndvi(df$spring_sr_band3,df$spring_sr_band4)
-df$spring_evi <- get_evi(df$spring_sr_band1, df$spring_sr_band3, df$spring_sr_band4)
-df$spring_savi <- get_savi(df$spring_sr_band3,df$spring_sr_band4)
-df$spring_sr <- get_sr(df$spring_sr_band3,df$spring_sr_band4)
-df$spring_ndti <- get_ndti(band5 = df$spring_sr_band5, band7 = df$spring_sr_band7)
-df$spring_green_ndvi <- get_green_ndvi(band4 = df$spring_sr_band4, band2 = df$spring_sr_band2)
-df$spring_sla_index <- get_SLA_index(band3 = df$spring_sr_band3, band4 = df$spring_sr_band4, band7 = df$spring_sr_band7)
-df$spring_ndi7 <- get_ndi7(band4 = df$spring_sr_band4, band7 = df$spring_sr_band7)
+gb_plots$spring_ndvi <- get_ndvi(gb_plots$spring_sr_band3,gb_plots$spring_sr_band4)
+gb_plots$spring_evi <- get_evi(gb_plots$spring_sr_band1, gb_plots$spring_sr_band3, gb_plots$spring_sr_band4)
+gb_plots$spring_savi <- get_savi(gb_plots$spring_sr_band3,gb_plots$spring_sr_band4)
+gb_plots$spring_sr <- get_sr(gb_plots$spring_sr_band3,gb_plots$spring_sr_band4)
+gb_plots$spring_ndti <- get_ndti(band5 = gb_plots$spring_sr_band5, band7 = gb_plots$spring_sr_band7)
+gb_plots$spring_green_ndvi <- get_green_ndvi(band4 = gb_plots$spring_sr_band4, band2 = gb_plots$spring_sr_band2)
+gb_plots$spring_sla_index <- get_SLA_index(band3 = gb_plots$spring_sr_band3, band4 = gb_plots$spring_sr_band4, band7 = gb_plots$spring_sr_band7)
+gb_plots$spring_ndi7 <- get_ndi7(band4 = gb_plots$spring_sr_band4, band7 = gb_plots$spring_sr_band7)
 
-df$spring_greenness <- green7(df$spring_sr_band1,df$spring_sr_band2,df$spring_sr_band3,df$spring_sr_band4,df$spring_sr_band5,df$spring_sr_band7)
-df$spring_brightness <- bright7(df$spring_sr_band1,df$spring_sr_band2,df$spring_sr_band3,df$spring_sr_band4,df$spring_sr_band5,df$spring_sr_band7)
-df$spring_wetness <- wet7(df$spring_sr_band1,df$spring_sr_band2,df$spring_sr_band3,df$spring_sr_band4,df$spring_sr_band5,df$spring_sr_band7)
+gb_plots$spring_greenness <- green7(gb_plots$spring_sr_band1,gb_plots$spring_sr_band2,gb_plots$spring_sr_band3,gb_plots$spring_sr_band4,gb_plots$spring_sr_band5,gb_plots$spring_sr_band7)
+gb_plots$spring_brightness <- bright7(gb_plots$spring_sr_band1,gb_plots$spring_sr_band2,gb_plots$spring_sr_band3,gb_plots$spring_sr_band4,gb_plots$spring_sr_band5,gb_plots$spring_sr_band7)
+gb_plots$spring_wetness <- wet7(gb_plots$spring_sr_band1,gb_plots$spring_sr_band2,gb_plots$spring_sr_band3,gb_plots$spring_sr_band4,gb_plots$spring_sr_band5,gb_plots$spring_sr_band7)
 
   #SUMMER
-df$summer_ndvi <- get_ndvi(df$summer_sr_band3,df$summer_sr_band4)
-df$summer_evi <- get_evi(df$summer_sr_band1, df$summer_sr_band3, df$summer_sr_band4)
-df$summer_savi <- get_savi(df$summer_sr_band3,df$summer_sr_band4)
-df$summer_sr <- get_sr(df$summer_sr_band3,df$summer_sr_band4)
-df$summer_ndti <- get_ndti(band5 = df$summer_sr_band5, band7 = df$summer_sr_band7)
-df$summer_green_ndvi <- get_green_ndvi(band4 = df$summer_sr_band4, band2 = df$summer_sr_band2)
-df$summer_sla_index <- get_SLA_index(band3 = df$summer_sr_band3, band4 = df$summer_sr_band4, band7 = df$summer_sr_band7)
-df$summer_ndi7 <- get_ndi7(band4 = df$summer_sr_band4, band7 = df$summer_sr_band7)
+gb_plots$summer_ndvi <- get_ndvi(gb_plots$summer_sr_band3,gb_plots$summer_sr_band4)
+gb_plots$summer_evi <- get_evi(gb_plots$summer_sr_band1, gb_plots$summer_sr_band3, gb_plots$summer_sr_band4)
+gb_plots$summer_savi <- get_savi(gb_plots$summer_sr_band3,gb_plots$summer_sr_band4)
+gb_plots$summer_sr <- get_sr(gb_plots$summer_sr_band3,gb_plots$summer_sr_band4)
+gb_plots$summer_ndti <- get_ndti(band5 = gb_plots$summer_sr_band5, band7 = gb_plots$summer_sr_band7)
+gb_plots$summer_green_ndvi <- get_green_ndvi(band4 = gb_plots$summer_sr_band4, band2 = gb_plots$summer_sr_band2)
+gb_plots$summer_sla_index <- get_SLA_index(band3 = gb_plots$summer_sr_band3, band4 = gb_plots$summer_sr_band4, band7 = gb_plots$summer_sr_band7)
+gb_plots$summer_ndi7 <- get_ndi7(band4 = gb_plots$summer_sr_band4, band7 = gb_plots$summer_sr_band7)
 
-df$summer_greenness <- green7(df$summer_sr_band1,df$summer_sr_band2,df$summer_sr_band3,df$summer_sr_band4,df$summer_sr_band5,df$summer_sr_band7)
-df$summer_brightness <- bright7(df$summer_sr_band1,df$summer_sr_band2,df$summer_sr_band3,df$summer_sr_band4,df$summer_sr_band5,df$summer_sr_band7)
-df$summer_wetness <- wet7(df$summer_sr_band1,df$summer_sr_band2,df$summer_sr_band3,df$summer_sr_band4,df$summer_sr_band5,df$summer_sr_band7)
+gb_plots$summer_greenness <- green7(gb_plots$summer_sr_band1,gb_plots$summer_sr_band2,gb_plots$summer_sr_band3,gb_plots$summer_sr_band4,gb_plots$summer_sr_band5,gb_plots$summer_sr_band7)
+gb_plots$summer_brightness <- bright7(gb_plots$summer_sr_band1,gb_plots$summer_sr_band2,gb_plots$summer_sr_band3,gb_plots$summer_sr_band4,gb_plots$summer_sr_band5,gb_plots$summer_sr_band7)
+gb_plots$summer_wetness <- wet7(gb_plots$summer_sr_band1,gb_plots$summer_sr_band2,gb_plots$summer_sr_band3,gb_plots$summer_sr_band4,gb_plots$summer_sr_band5,gb_plots$summer_sr_band7)
 
 #### 10. Extracting Differenced Veg. Indices (Phenology Variables) ####
 
@@ -372,9 +416,6 @@ dir.create("data/diff_indices")
 #download differenced veg indices from amazon s3 bucket
 s3_differenced_path <- "s3://earthlab-amahood/wet_dry/derived_raster_data/differenced_indices"
 system(paste0("aws s3 sync ", s3_differenced_path, " ", "data/diff_indices"))
-
-#load in labelled training points w/ other variables extracted
-gb_diff <- df
 
 #list folders with differenced veg indices
 diff_folders <- list.files("data/diff_indices", full.names = T)
@@ -388,7 +429,7 @@ diff_index_names[i] <- paste0("diff_", substr(diff_folders[i], 19, 30))
 }
 
 #grab years present in training data
-target_years <- unique(gb_diff$Year)
+target_years <- unique(gb_plots$Year)
 
 #set counter equal to one 
 counter <- 1
@@ -396,7 +437,7 @@ counter <- 1
 #loop over years present in training data to match with target differenced veg indices
 for(j in 1:length(target_years)) {
   #subset training points for a specific year (works with training data for 1 year but adds flexibility in case of multi-year training data)
-  gb_diff_subset <- gb_diff[gb_diff$Year == target_years[j],]
+  gb_plots_subset <- gb_plots[gb_plots$Year == target_years[j],]
   
   #loop over each differenced index, select target year, and extract to points 
   for(i in 1:length(diff_folders)) {
@@ -415,18 +456,18 @@ for(j in 1:length(target_years)) {
     names(diff_index) <- diff_index_names[i]
     
     #extract differenced veg index raster values to subset of training points
-    gb_diff_subset <- raster::extract(diff_index, gb_diff_subset, sp = T)
+    gb_plots_subset <- raster::extract(diff_index, gb_plots_subset, sp = T)
     
     #transform subset of training points to lat long and sf object
-    gb_diff_subset <- st_transform(st_as_sf(gb_diff_subset), crs = ts_crs)
+    gb_plots_subset <- st_transform(st_as_sf(gb_plots_subset), crs = ts_crs)
     
     #put subsets of training data for specific years back together into one data frame
       #if counter = 1 (first year present in training data), create new dataframe object
       #if counter = 2 (other years present in training data), attach subset to dataframe from first iteration of loop 
     if(counter == 1){
-      result_diff <- gb_diff_subset
+      result_diff <- gb_plots_subset
     }else{
-      result_diff <- rbind(result, gb_diff_subset)
+      result_diff <- rbind(result, gb_plots_subset)
     }
   }
 #advance counter 
@@ -434,60 +475,14 @@ counter <- counter + 1
 }
 
 result_diff <- result_diff %>% dplyr::mutate(Label = df$Label)
+gb_plots <- result_diff
 #paths for saving locally and uploading to s3
 finished_points_local_filename <- paste0("manual_points_2class_", ts_year, "_ard_ndvi_informed_vars_Jan22.gpkg")
 finished_points_local_path <- paste0("data/manual_points_2class_", ts_year, "_ard_ndvi_informed_vars_Jan22.gpkg")
 finished_points_s3_path <- "s3://earthlab-amahood/wet_dry/derived_vector_data/training_time_series_ndvi_informed/"
 
 #save to local disk
-st_write(result_diff, dsn = finished_points_local_path)
+st_write(gb_plots, dsn = finished_points_local_path)
 
 #upload naip points with ALL variables (including differenced indices) to amazon s3 bucket
 system(paste0("aws s3 cp ", finished_points_local_path, " ", finished_points_s3_path, finished_points_local_filename))
-
-#### 11. Changing manually created Point Labels for different years based on fire history ####
- 
-#SET YEAR (VERY IMPORTANT)
-ts_year <- 2010
-
-#download manually created NAIP point data w/ lyb attached from s3
-system("aws s3 sync s3://earthlab-amahood/wet_dry/derived_vector_data/manual_training_points_lyb_extracted/ /home/rstudio/wet_dry/data/training_points_lyb")
-
-#download 2010 point data to grab crs and reproject
-system("aws s3 cp s3://earthlab-amahood/wet_dry/derived_vector_data/manual_training_points_variables_extracted/ard_pheno_spatially_balanced_points/manual_points_2class_2010_ard_phenology_all_variables_extracted_w_actual_precip_Nov26.gpkg data/manual_points_2class_2010_ard_phenology_all_variables_extracted_w_actual_precip_Nov26.gpkg")
-
-crs_grab_points <- st_read("data/manual_points_2class_2010_ard_phenology_all_variables_extracted_w_actual_precip_Nov26.gpkg")
-
-ts_crs <- st_crs(crs_grab_points)
-
-#read in original (2010) NAIP training data w/ lyb attached
-
-naip_points <- st_read("data/training_points_lyb/manual_ard_points_2010_new_vars_and_lyb_Dec10.gpkg") %>% mutate(plot_year = ts_year) %>% st_transform(crs = ts_crs) 
-
-#create new object to modify for a new year of labelling (change year in "mutate" to year desired for modeling/labelling)
-new_naip_points <- naip_points %>% mutate(plot_year = ts_year) %>% 
-  filter(plot_year != lyb | is.na(lyb)) #removing points which burned in the year of interest and keeping those that did not burn
-
-
-#loop through each point and determine whether a steady state can be assumed for the year of choice 
-# (because sagebrush takes a long time to establish, even if it burned in between the target year and 
-#the year of original labelling (2010) I assume it was sagebrush in the target year)
-
-#remove points labelled grass which burned after the target year - cannot assume they were grass prior to burning
-for(i in 1:nrow(new_naip_points)) {
-  if(isTRUE(new_naip_points[i,]$lyb > ts_year & new_naip_points[i,]$Label == "grass")) {
-  new_naip_points <- new_naip_points[-i,]
-  }
-}
-
-#remove previously extracted variables from original year 
-new_naip_points <- new_naip_points %>% mutate(Year = plot_year) %>% dplyr::select(OBJECTID, Label, Year, lyb)
-
-#create filename for relabeled points w/o variables (change year to match year of interest)
-new_year_naip_filename <- paste0("data/manual_ard_005007_climare_vars_points_", ts_year, "_no_vars.gpkg")
-
-st_write(new_naip_points, new_year_naip_filename)
-
-system(paste0("aws s3 cp ", new_year_naip_filename, " s3://earthlab-amahood/wet_dry/input_vector_data/manual_training_points/spatially_balanced_points_ard_phenology/spb_points_ard_w_lyb_novars/", substr(new_year_naip_filename, 6, 100)))
-
-       
